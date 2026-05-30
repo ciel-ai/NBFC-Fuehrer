@@ -1,0 +1,136 @@
+{
+  "_comment": [
+    "================================================================",
+    " BEFORE YOUR FIRST BUILD — replace every REPLACE_ME value below",
+    "",
+    " ENV FILE STRATEGY",
+    " ─────────────────",
+    " Each build profile carries two env sources:",
+    "   envFile  → the gitignored .env.{profile} file in the project root.",
+    "              Used by: expo start --env <name>, eas build --local.",
+    "              EAS Cloud workers do NOT see gitignored files, so this",
+    "              path is ignored during cloud builds.",
+    "   env      → inline key-value pairs; always present in the repo.",
+    "              EAS Cloud builds use these values exclusively.",
+    "              When both are present, env OVERRIDES envFile.",
+    "",
+    " Rule of thumb:",
+    "   Edit the .env.{profile} file for local work.",
+    "   Keep the inline env block in sync when you update a URL.",
+    "   Never put secrets in either place — use EXPO_PUBLIC_* only.",
+    "",
+    " PLACEHOLDERS TO REPLACE",
+    " ────────────────────────",
+    " 1. build.preview.env.EXPO_PUBLIC_API_URL",
+    "    .env.staging  → EXPO_PUBLIC_API_URL",
+    "       → your staging HTTPS URL, e.g. https://staging-api.fuehrer.in",
+    "",
+    " 2. build.production.env.EXPO_PUBLIC_API_URL",
+    "    .env.production → EXPO_PUBLIC_API_URL",
+    "       → your production HTTPS URL, e.g. https://api.fuehrer.in",
+    "",
+    " 3. Also update PRIMARY_HASH / BACKUP_HASH and PINNED_DOMAIN in:",
+    "       plugins/withCertificatePinning.js",
+    "       src/core/api/api.ts  (SSL_PINNED_HASHES / PINNED_HOSTNAME)",
+    "",
+    " 4. submit.preview.ios.appleId / submit.production.ios.appleId",
+    "       → your Apple ID email (App Store Connect login)",
+    "",
+    " 5. submit.preview.ios.appleTeamId / submit.production.ios.appleTeamId",
+    "       → 10-character Apple Team ID",
+    "          https://developer.apple.com/account → Membership → Team ID",
+    "",
+    " 6. submit.preview.ios.ascAppId / submit.production.ios.ascAppId",
+    "       → App Store Connect numeric App ID (NOT the bundle ID)",
+    "          App Store Connect → Apps → your app → App Information → Apple ID",
+    "",
+    " 7. submit.preview.android.serviceAccountKeyPath",
+    "    submit.production.android.serviceAccountKeyPath",
+    "       → path to the Google service account JSON from Play Console.",
+    "          Keep this file out of git (add it to .gitignore if needed).",
+    "",
+    " 8. Run once before building:",
+    "       npx eas-cli init",
+    "    Links the project to your Expo account and writes",
+    "    expo.extra.eas.projectId into app.json automatically.",
+    "",
+    " NOTE: _comment is a no-op field ignored by EAS CLI.",
+    "       Delete it once the placeholders are filled if you prefer clean JSON.",
+    "================================================================"
+  ],
+  "cli": {
+    "version": ">= 10.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "ios": {
+        "buildConfiguration": "Debug",
+        "simulator": false
+      },
+      "android": {
+        "buildType": "apk"
+      },
+      "envFile": ".env.development",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "http://localhost:3000",
+        "EXPO_PUBLIC_USE_MOCK": "true"
+      }
+    },
+    "preview": {
+      "distribution": "store",
+      "ios": {
+        "buildConfiguration": "Release"
+      },
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "envFile": ".env.staging",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://staging-api.REPLACE_ME.in",
+        "EXPO_PUBLIC_USE_MOCK": "false"
+      }
+    },
+    "production": {
+      "distribution": "store",
+      "autoIncrement": true,
+      "ios": {
+        "buildConfiguration": "Release"
+      },
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "envFile": ".env.production",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.REPLACE_ME.in",
+        "EXPO_PUBLIC_USE_MOCK": "false"
+      }
+    }
+  },
+  "submit": {
+    "preview": {
+      "ios": {
+        "appleId": "REPLACE_ME@example.com",
+        "appleTeamId": "REPLACE_XXXXXXXXXX",
+        "ascAppId": "REPLACE_1234567890"
+      },
+      "android": {
+        "serviceAccountKeyPath": "./google-service-account.json",
+        "track": "internal"
+      }
+    },
+    "production": {
+      "ios": {
+        "appleId": "REPLACE_ME@example.com",
+        "appleTeamId": "REPLACE_XXXXXXXXXX",
+        "ascAppId": "REPLACE_1234567890"
+      },
+      "android": {
+        "serviceAccountKeyPath": "./google-service-account.json",
+        "track": "production"
+      }
+    }
+  }
+}
