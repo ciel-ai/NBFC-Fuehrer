@@ -1,15 +1,15 @@
-// src/providers/esign/index.ts
+﻿// src/providers/esign/index.ts
 //
 // Singleton factory for the eSign + eStamp provider.
 //
 // Selection logic:
-//   KYC_PROVIDER=signzy  →  SignzyESignProvider  (production / staging)
-//   KYC_PROVIDER=stub    →  StubESignProvider    (development / test)
+//   KYC_PROVIDER=signzy  â†’  SignzyESignProvider  (production / staging)
+//   KYC_PROVIDER=stub    â†’  StubESignProvider    (development / test)
 //
-// eSign uses the same Signzy credentials as kycVerify — both share
+// eSign uses the same Signzy credentials as kycVerify â€” both share
 // env.kyc.apiKey and env.kyc.baseUrl. No separate env vars needed.
 //
-// _resetESignProvider() is exported for Jest — call it in afterEach()
+// _resetESignProvider() is exported for Jest â€” call it in afterEach()
 // alongside _resetStubESignState() when testing the KYC flow end-to-end.
 
 import { env } from '@/config/env';
@@ -34,10 +34,10 @@ let instance: IESignProvider | null = null;
 export function getESignProvider(): IESignProvider {
     if (instance) return instance;
 
-    if (env.kyc.provider === 'signzy') {
+    if (env.kyc.provider === 'perfios') {
         const secrets = getSecrets();
 
-        // Signzy base URL and API key are shared with kycVerify —
+        // Signzy base URL and API key are shared with kycVerify â€”
         // both are part of the same Signzy subscription.
         if (!secrets.signzy.apiKey || !secrets.signzy.baseUrl) {
             throw new Error(
@@ -58,7 +58,7 @@ export function getESignProvider(): IESignProvider {
     return instance;
 }
 
-// For Jest test isolation — reset between tests
+// For Jest test isolation â€” reset between tests
 export function _resetESignProvider(): void {
     instance = null;
 }

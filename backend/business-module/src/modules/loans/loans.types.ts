@@ -1,8 +1,8 @@
-// src/modules/loans/loans.types.ts
+﻿// src/modules/loans/loans.types.ts
 import type { LoanStatus, ProductType, DisbursementMode } from '@/config/constants';
 import type { Rupees, PaginationParams, SortOrder } from '@/types/common.types';
 
-// ─── Core loan application model ───────────────────────────────────────────────
+// â”€â”€â”€ Core loan application model â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export interface LoanApplication {
     id: string;
@@ -18,7 +18,22 @@ export interface LoanApplication {
     storeName: string;
     storeCity: string;
 
-    // Approval details — populated by credit manager
+    // Address fields
+    flatHouseNo: string | null;
+    streetArea: string | null;
+    city: string | null;
+    pincode: string | null;
+    state: string | null;
+
+    // Employment fields
+    employmentType: string | null;
+    employerName: string | null;
+    monthlyIncome: number | null;
+
+    // Repayment
+    repaymentType: string;
+
+    // Approval details â€” populated by credit manager
     approvedAmount: Rupees | null;
     interestRate: number | null;   // Annual % e.g. 18.00
     processingFee: Rupees | null;
@@ -34,7 +49,7 @@ export interface LoanApplication {
     updatedAt: Date;
 }
 
-// ─── Active loan account — created on disbursement ────────────────────────────
+// â”€â”€â”€ Active loan account â€” created on disbursement â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export interface LoanAccount {
     id: string;
@@ -59,7 +74,7 @@ export interface LoanAccount {
     updatedAt: Date;
 }
 
-// ─── Input / output DTOs ───────────────────────────────────────────────────────
+// â”€â”€â”€ Input / output DTOs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export interface CreateLoanApplicationInput {
     userId: string;
@@ -70,6 +85,21 @@ export interface CreateLoanApplicationInput {
     purpose: string;
     storeName: string;
     storeCity: string;
+
+    // Address fields
+    flatHouseNo: string | null;
+    streetArea: string | null;
+    city: string | null;
+    pincode: string | null;
+    state: string | null;
+
+    // Employment fields
+    employmentType: string | null;
+    employerName: string | null;
+    monthlyIncome: number | null;
+
+    // Repayment
+    repaymentType: string;
 }
 
 export interface SubmitLoanApplicationInput {
@@ -102,11 +132,12 @@ export interface ListLoansInput extends PaginationParams {
     toDate?: Date;
 }
 
-// ─── Safe public response shapes ──────────────────────────────────────────────
-// What we expose through the API — no internal DB ids beyond what's necessary
+// â”€â”€â”€ Safe public response shapes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// What we expose through the API â€” no internal DB ids beyond what's necessary
 
 export interface LoanApplicationResponse {
     id: string;
+    referenceNumber: string | null;
     status: LoanStatus;
     amountRequested: Rupees;
     approvedAmount: Rupees | null;
@@ -118,6 +149,21 @@ export interface LoanApplicationResponse {
     purpose: string;
     storeName: string;
     storeCity: string;
+
+    // Address fields
+    flatHouseNo: string | null;
+    streetArea: string | null;
+    city: string | null;
+    pincode: string | null;
+    state: string | null;
+
+    // Employment fields
+    employmentType: string | null;
+    employerName: string | null;
+    monthlyIncome: number | null;
+
+    // Repayment
+    repaymentType: string;
     rejectionReason: string | null;
     appliedAt: Date;
     updatedAt: Date;
@@ -138,7 +184,7 @@ export interface LoanAccountResponse {
     closedAt: Date | null;
 }
 
-// ─── EMI preview — shown to customer before applying ──────────────────────────
+// â”€â”€â”€ EMI preview â€” shown to customer before applying â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export interface EmiPreviewInput {
     amount: Rupees;
@@ -154,7 +200,7 @@ export interface EmiPreviewResult {
     effectiveRate: number;   // APR
 }
 
-// ─── Status transition metadata ────────────────────────────────────────────────
+// â”€â”€â”€ Status transition metadata â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export interface StatusTransitionResult {
     loanId: string;
@@ -162,3 +208,4 @@ export interface StatusTransitionResult {
     currentStatus: LoanStatus;
     transitionedAt: Date;
 }
+

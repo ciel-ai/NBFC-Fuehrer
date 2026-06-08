@@ -187,7 +187,7 @@ export const loansController = {
             };
 
             const ratePerGram = 6200;
-            const purity = purityMap[purityKarat] ?? 0.916;
+            const purity = purityMap[purityKarat ?? '22'] ?? 0.916;
             const weight = parseFloat(weightGrams ?? '0');
             const estimatedGoldValue = Math.round(ratePerGram * purity * weight);
             const maxLoan = Math.round(estimatedGoldValue * 0.75);
@@ -212,7 +212,8 @@ export const loansController = {
     async mandatePreview(req: AuthRequest, res: Response, next: NextFunction) {
         try {
             const user = getAuthUser(req);
-            const { loanAccountId } = req.query as Record<string, string>;
+            const { loanAccountId } = req.query as Record<string, string | undefined>;
+if (!loanAccountId) { res.status(400).json({ success: false, message: 'loanAccountId is required' }); return; }
 
             const account = await loansService.getLoanAccount(
                 loanAccountId, user.id, user.role,

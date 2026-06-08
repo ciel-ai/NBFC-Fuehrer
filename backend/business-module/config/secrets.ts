@@ -1,4 +1,4 @@
-// src/config/secrets.ts
+﻿// src/config/secrets.ts
 //
 // In production: all vendor API keys live in AWS Secrets Manager, never in env vars.
 // At startup, this module fetches them once, caches them in memory, and exposes
@@ -14,7 +14,7 @@ import {
 import { env } from './env';
 import { logger } from './logger';
 
-// ─── Secret names (must match what's created in AWS Secrets Manager) ──────────
+// â”€â”€â”€ Secret names (must match what's created in AWS Secrets Manager) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const SECRET_NAMES = {
     SIGNZY: 'feuhrer/signzy',
@@ -27,7 +27,7 @@ const SECRET_NAMES = {
     KMS: 'feuhrer/kms',
 } as const;
 
-// ─── Typed secret shapes ───────────────────────────────────────────────────────
+// â”€â”€â”€ Typed secret shapes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface SignzySecret {
     apiKey: string;
@@ -72,13 +72,13 @@ export interface AllSecrets {
     resend: ResendSecret;
 }
 
-// ─── In-memory cache ───────────────────────────────────────────────────────────
+// â”€â”€â”€ In-memory cache â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Fetched once at startup. Refreshed only on explicit cache bust
-// (e.g. after a secret rotation — App Runner restart handles this naturally)
+// (e.g. after a secret rotation â€” App Runner restart handles this naturally)
 
 let secretsCache: AllSecrets | null = null;
 
-// ─── AWS Secrets Manager client ────────────────────────────────────────────────
+// â”€â”€â”€ AWS Secrets Manager client â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const smClient = new SecretsManagerClient({
     region: env.aws.region,
@@ -105,7 +105,7 @@ async function fetchSecret<T>(secretName: string): Promise<T> {
     }
 
     if (!response.SecretString) {
-        throw new Error(`Secret "${secretName}" is empty or binary — expected JSON string`);
+        throw new Error(`Secret "${secretName}" is empty or binary â€” expected JSON string`);
     }
 
     try {
@@ -115,13 +115,13 @@ async function fetchSecret<T>(secretName: string): Promise<T> {
     }
 }
 
-// ─── Stub secrets (dev / test) ────────────────────────────────────────────────
-// Pulled directly from env vars — no AWS call needed
+// â”€â”€â”€ Stub secrets (dev / test) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Pulled directly from env vars â€” no AWS call needed
 
 function buildStubSecrets(): AllSecrets {
     return {
         signzy: {
-            apiKey: env.kyc.apiKey ?? 'stub-signzy-key',
+            apiKey: env.kyc.secureId ?? 'stub-perfios-key',
             baseUrl: env.kyc.baseUrl ?? 'https://stub.signzy.local',
         },
         razorpay: {
@@ -151,13 +151,13 @@ function buildStubSecrets(): AllSecrets {
     };
 }
 
-// ─── Main loader ───────────────────────────────────────────────────────────────
+// â”€â”€â”€ Main loader â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function loadSecrets(): Promise<AllSecrets> {
     // Return cached secrets if already loaded
     if (secretsCache) return secretsCache;
 
-    // In dev/test: skip AWS — use env vars
+    // In dev/test: skip AWS â€” use env vars
     if (!env.aws.secretsEnabled) {
         logger.info('Secrets: using stub mode (env vars)');
         secretsCache = buildStubSecrets();
@@ -167,7 +167,7 @@ export async function loadSecrets(): Promise<AllSecrets> {
     logger.info('Secrets: loading from AWS Secrets Manager...');
 
     try {
-        // Fetch all secrets in parallel — fail fast if any are missing
+        // Fetch all secrets in parallel â€” fail fast if any are missing
         const [signzy, razorpay, creditBureau, twilio, msg91, resend] =
             await Promise.all([
                 fetchSecret<SignzySecret>(SECRET_NAMES.SIGNZY),
@@ -189,11 +189,11 @@ export async function loadSecrets(): Promise<AllSecrets> {
         logger.error('Secrets: failed to load from AWS Secrets Manager', {
             error: error.message,
         });
-        throw error; // Fatal — server must not start without secrets
+        throw error; // Fatal â€” server must not start without secrets
     }
 }
 
-// ─── Accessor ─────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Accessor â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Call getSecrets() anywhere after loadSecrets() has run at startup
 
 export function getSecrets(): AllSecrets {
@@ -205,7 +205,7 @@ export function getSecrets(): AllSecrets {
     return secretsCache;
 }
 
-// ─── For testing: clear cache between tests ────────────────────────────────────
+// â”€â”€â”€ For testing: clear cache between tests â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function _clearSecretsCache(): void {
     secretsCache = null;

@@ -1,8 +1,8 @@
-// src/errors/VendorErrors.ts
+﻿// src/errors/VendorErrors.ts
 import { AppError } from './AppError';
 import { HTTP } from '@/config/constants';
 
-// ─── Base vendor error ────────────────────────────────────────────────────────
+// â”€â”€â”€ Base vendor error â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export class VendorError extends AppError {
     public readonly vendor: string;
@@ -40,7 +40,7 @@ export class VendorError extends AppError {
     }
 }
 
-// ─── KYC vendor errors (Signzy) ────────────────────────────────────────────────
+// â”€â”€â”€ KYC vendor errors (Signzy) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export class KycVendorError extends VendorError {
     public readonly checkType: string;
@@ -54,7 +54,7 @@ export class KycVendorError extends VendorError {
         cause?: unknown;
     }) {
         super({
-            vendor: 'signzy',
+            vendor: 'perfios',
             message: options.message,
             errorCode: 'KYC_VENDOR_ERROR',
             vendorCode: options.vendorCode,
@@ -112,19 +112,19 @@ export const KYC_VENDOR_ERRORS = {
         new KycVendorError({
             checkType: 'ESIGN',
             message: 'eSign request failed at provider',
-            retryable: false, // Don't auto-retry eSign — user interaction needed
+            retryable: false, // Don't auto-retry eSign â€” user interaction needed
             cause,
         }),
 
     timeout: (checkType: string) =>
         new KycVendorError({
             checkType,
-            message: `Signzy timed out on ${checkType} check`,
+            message: `Perfios timed out on ${checkType} check`,
             retryable: true,
         }),
 } as const;
 
-// ─── Credit Bureau errors ─────────────────────────────────────────────────────
+// â”€â”€â”€ Credit Bureau errors â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export class BureauVendorError extends VendorError {
     constructor(options: {
@@ -171,7 +171,7 @@ export const BUREAU_ERRORS = {
         }),
 } as const;
 
-// ─── Payment gateway errors (Razorpay) ───────────────────────────────────────
+// â”€â”€â”€ Payment gateway errors (Razorpay) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export class PaymentVendorError extends VendorError {
     constructor(options: {
@@ -230,7 +230,7 @@ export const PAYMENT_ERRORS = {
         }),
 } as const;
 
-// ─── SMS vendor errors ────────────────────────────────────────────────────────
+// â”€â”€â”€ SMS vendor errors â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export class SmsVendorError extends VendorError {
     constructor(options: {
@@ -249,7 +249,7 @@ export class SmsVendorError extends VendorError {
     }
 }
 
-// ─── Storage vendor errors (AWS S3) ──────────────────────────────────────────
+// â”€â”€â”€ Storage vendor errors (AWS S3) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export class StorageVendorError extends VendorError {
     constructor(options: {

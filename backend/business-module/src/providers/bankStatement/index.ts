@@ -1,4 +1,4 @@
-// src/providers/bankStatement/index.ts
+﻿// src/providers/bankStatement/index.ts
 import { env } from '@/config/env';
 import { getSecrets } from '@/config/secrets';
 import { SignzyBankStatementProvider } from './live';
@@ -12,7 +12,7 @@ let instance: IBankStatementProvider | null = null;
 
 export function getBankStatementProvider(): IBankStatementProvider {
     if (instance) return instance;
-    if (env.kyc.provider === 'signzy') {
+    if (env.kyc.provider === 'perfios') {
         const s = getSecrets();
         instance = new SignzyBankStatementProvider(
             s.signzy.apiKey, s.signzy.baseUrl, env.kyc.timeoutMs,

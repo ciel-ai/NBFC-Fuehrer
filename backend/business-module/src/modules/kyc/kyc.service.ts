@@ -1,4 +1,5 @@
 // src/modules/kyc/kyc.service.ts
+import { getRedisClient } from '@/config/redis';
 import { randomUUID } from 'crypto';
 import type { Request } from 'express';
 import { kycRepository } from './kyc.repository';
@@ -153,67 +154,91 @@ export const kycService = {
     // triggers OTP send via Signzy, then discards the plaintext.
 
     async requestAadhaarOtp(
-        input: AadhaarOtpRequestInput,
-        req: Request,
-    ): Promise<{ message: string }> {
-        const { userId, aadhaarNumber } = input;
+    input: AadhaarOtpRequestInput,
+    req: Request,
+): Promise<{ message: string }> {
+    const { userId, aadhaarNumber } = input;
 
-        await kycRepository.findByUserIdOrThrow(userId);
+    await kycRepository.findByUserIdOrThrow(userId);
 
-        const enc = getEncryptionProvider();
-        const aadhaarEncrypted = await enc.encrypt(aadhaarNumber);
-        const last4 = aadhaarLast4(aadhaarNumber);
+    const enc = getEncryptionProvider();
+    const aadhaarEncrypted = await enc.encrypt(aadhaarNumber);
+    const last4 = aadhaarLast4(aadhaarNumber);
 
-        // Persist encrypted Aadhaar before calling vendor —
-        // if vendor call fails, we still have it for retry
-        await kycRepository.saveEncryptedAadhaar(userId, aadhaarEncrypted, last4);
+    await kycRepository.saveEncryptedAadhaar(userId, aadhaarEncrypted, last4);
 
-        // Signzy sends OTP to the mobile registered with Aadhaar (not our app phone)
-        // We don't get a reference ID here — OTP is tied to the Aadhaar itself
-        log.info('Aadhaar OTP requested', { userId, aadhaarLast4: last4 });
+    // Call Perfios consent API — sends OTP to Aadhaar-linked mobile
+    const kycProvider = getKycVerifyProvider();
+    const consentResult = await kycProvider.requestAadhaarConsent(
+        aadhaarNumber,
+        userId,
+    );
 
-        return { message: 'OTP sent to Aadhaar-registered mobile number' };
-    },
+    // Store accessKey in Redis for 10 minutes — needed for OTP verify step
+    if (consentResult.requestId) {
+        const redis = getRedisClient();
+        await redis.set(
+            `kyc:aadhaar:accessKey:${userId}`,
+            consentResult.requestId,
+            'EX',
+            600,
+        );
+    }
+
+    log.info('Aadhaar OTP requested', { userId, aadhaarLast4: last4 });
+    return { message: 'OTP sent to Aadhaar-registered mobile number' };
+},
 
     // ── 3. Aadhaar OTP verify ──────────────────────────────────────────────────────
     // Decrypts stored Aadhaar, sends to Signzy with OTP.
     // On success: stores OCR data, marks AADHAAR_VERIFY done, updates status.
 
     async verifyAadhaarOtp(
-        input: AadhaarOtpVerifyInput,
-        req: Request,
-    ): Promise<KycStatusResponse> {
-        const { userId, otp, shareCode } = input;
-        const doc = await kycRepository.findByUserIdOrThrow(userId);
+    input: AadhaarOtpVerifyInput,
+    req: Request,
+): Promise<KycStatusResponse> {
+    const { userId, otp, shareCode } = input;
+    const doc = await kycRepository.findByUserIdOrThrow(userId);
 
-        if (!doc.aadhaarEncrypted) {
-            throw new KycIncompleteError(userId, ['Aadhaar number not submitted']);
-        }
+    if (!doc.aadhaarEncrypted) {
+        throw new KycIncompleteError(userId, ['Aadhaar number not submitted']);
+    }
 
-        const enc = getEncryptionProvider();
-        const aadhaarPlain = await enc.decrypt(doc.aadhaarEncrypted);
-        const kycProvider = getKycVerifyProvider();
+    // Retrieve accessKey from Redis
+    const redis = getRedisClient();
+    const accessKey = await redis.get(`kyc:aadhaar:accessKey:${userId}`);
 
-        const result = await kycProvider.verifyAadhaar(aadhaarPlain, otp, shareCode);
+    if (!accessKey) {
+        throw new KycIncompleteError(userId, ['Aadhaar consent expired. Please request OTP again.']);
+    }
 
-        await kycRepository.appendSignzyResponse(userId, 'aadhaarVerify', result.rawResponse);
-        await kycRepository.recordCheckResult(
-            userId, KYC_CHECK.AADHAAR_VERIFY, result.verified,
+    const enc = getEncryptionProvider();
+    const aadhaarPlain = await enc.decrypt(doc.aadhaarEncrypted);
+    const kycProvider = getKycVerifyProvider();
+
+    const result = await kycProvider.verifyAadhaar(aadhaarPlain, accessKey, shareCode);
+
+    // Clean up accessKey after use
+    await redis.del(`kyc:aadhaar:accessKey:${userId}`);
+
+    await kycRepository.appendSignzyResponse(userId, 'aadhaarVerify', result.rawResponse);
+    await kycRepository.recordCheckResult(
+        userId, KYC_CHECK.AADHAAR_VERIFY, result.verified,
+    );
+
+    kycEvents.checkCompleted(
+        userId, KYC_CHECK.AADHAAR_VERIFY, result.verified, undefined, req,
+    );
+
+    if (!result.verified) {
+        await this._handleCheckFailure(
+            userId, KYC_CHECK.AADHAAR_VERIFY, 'Aadhaar verification failed', req,
         );
+    }
 
-        kycEvents.checkCompleted(
-            userId, KYC_CHECK.AADHAAR_VERIFY, result.verified, undefined, req,
-        );
-
-        if (!result.verified) {
-            await this._handleCheckFailure(
-                userId, KYC_CHECK.AADHAAR_VERIFY, 'Aadhaar verification failed', req,
-            );
-        }
-
-        const updated = await kycRepository.findByUserIdOrThrow(userId);
-        return toStatusResponse(updated);
-    },
+    const updated = await kycRepository.findByUserIdOrThrow(userId);
+    return toStatusResponse(updated);
+},
 
     // ── 4. Run PAN verification ───────────────────────────────────────────────────
 

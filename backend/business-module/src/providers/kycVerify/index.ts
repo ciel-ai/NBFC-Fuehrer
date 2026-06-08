@@ -1,7 +1,5 @@
-// src/providers/kycVerify/index.ts
-import { env } from '@/config/env';
-import { getSecrets } from '@/config/secrets';
-import { SignzyKycProvider } from './live';
+﻿// src/providers/kycVerify/index.ts
+import { PerfiosKycProvider } from './live';
 import { StubKycVerifyProvider } from './stub';
 import type { IKycVerifyProvider } from './interface';
 
@@ -13,28 +11,41 @@ export type {
     LivenessResult,
     OcrResult,
     BankAccountVerifyResult,
+    AmlResult,
+    GstVerifyResult,
+    ItrResult,
+    BankStatementResult,
+    PepResult,
+    BankDefaulterResult,
+    EmploymentVerifyResult,
+    NameSimilarityResult,
 } from './interface';
 
 let instance: IKycVerifyProvider | null = null;
 
 export function getKycVerifyProvider(): IKycVerifyProvider {
-    if (instance) return instance;
+    if (instance) return instance!;
 
-    if (env.kyc.provider === 'signzy') {
-        const secrets = getSecrets();
-        instance = new SignzyKycProvider(
-            secrets.signzy.apiKey,
-            secrets.signzy.baseUrl,
-            env.kyc.timeoutMs,
+    const secureId = process.env.PERFIOS_SECURE_ID;
+
+    if (secureId) {
+        instance = new PerfiosKycProvider(
+            secureId,
+            process.env.PERFIOS_SECURE_CRED ?? '',
+            process.env.PERFIOS_ORG_ID ?? '',
+            process.env.PERFIOS_BASE_URL ?? 'https://hub-test.perfios.ai/ssp/kyc/api/',
+            process.env.PERFIOS_GST_URL  ?? 'https://hub-test.perfios.ai/ssp/gst/api/',
+            process.env.PERFIOS_ITR_URL  ?? 'https://hub-test.perfios.ai/ssp/itr/',
+            process.env.PERFIOS_KSCAN_URL ?? 'https://hub-test.perfios.ai/ssp/kscan/api/',
+            30000,
         );
     } else {
         instance = new StubKycVerifyProvider();
     }
 
-    return instance;
+    return instance!;
 }
 
-// For testing — reset singleton between tests
 export function _resetKycVerifyProvider(): void {
     instance = null;
 }

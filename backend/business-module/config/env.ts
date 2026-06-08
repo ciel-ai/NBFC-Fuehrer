@@ -85,19 +85,27 @@ const schema = Joi.object({
     }),
 
     // ── KYC Provider (Signzy) ─────────────────────────────────────────────────
-    KYC_PROVIDER: Joi.string()
-        .valid('signzy', 'stub')
-        .default('stub'),
+KYC_PROVIDER: Joi.string()
+    .valid('perfios', 'stub')
+    .default('stub'),
 
-    SIGNZY_BASE_URL: Joi.string().when('KYC_PROVIDER', {
-        is: 'signzy',
-        then: Joi.string().uri().required(),
-    }),
-    SIGNZY_API_KEY: Joi.string().when('KYC_PROVIDER', {
-        is: 'signzy',
-        then: Joi.string().required(),
-    }),
-    SIGNZY_TIMEOUT_MS: Joi.number().integer().default(15000),
+PERFIOS_BASE_URL: Joi.string().when('KYC_PROVIDER', {
+    is: 'perfios',
+    then: Joi.string().uri().required(),
+}),
+PERFIOS_SECURE_ID: Joi.string().when('KYC_PROVIDER', {
+    is: 'perfios',
+    then: Joi.string().required(),
+}),
+PERFIOS_SECURE_CRED: Joi.string().when('KYC_PROVIDER', {
+    is: 'perfios',
+    then: Joi.string().required(),
+}),
+PERFIOS_ORG_ID: Joi.string().when('KYC_PROVIDER', {
+    is: 'perfios',
+    then: Joi.string().required(),
+}),
+PERFIOS_TIMEOUT_MS: Joi.number().integer().default(15000),
 
     // ── Credit Bureau ─────────────────────────────────────────────────────────
     BUREAU_PROVIDER: Joi.string()
@@ -276,11 +284,13 @@ export const env = {
     },
 
     kyc: {
-        provider: value.KYC_PROVIDER as 'signzy' | 'stub',
-        baseUrl: value.SIGNZY_BASE_URL as string | undefined,
-        apiKey: value.SIGNZY_API_KEY as string | undefined,
-        timeoutMs: value.SIGNZY_TIMEOUT_MS as number,
-    },
+    provider: value.KYC_PROVIDER as 'perfios' | 'stub',
+    baseUrl: value.PERFIOS_BASE_URL as string | undefined,
+    secureId: value.PERFIOS_SECURE_ID as string | undefined,
+    secureCred: value.PERFIOS_SECURE_CRED as string | undefined,
+    orgId: value.PERFIOS_ORG_ID as string | undefined,
+    timeoutMs: value.PERFIOS_TIMEOUT_MS as number,
+},
 
     bureau: {
         provider: value.BUREAU_PROVIDER as string,
