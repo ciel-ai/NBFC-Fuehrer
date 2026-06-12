@@ -1,4 +1,4 @@
-import api from '../../api/api';
+﻿import api from '../../api/api';
 import {
   CDL_ANNUAL_INTEREST_RATE,
   CDL_FOIR_LIMIT,
@@ -66,7 +66,7 @@ export const realConsumerDurableLoanService: IConsumerDurableLoanService = {
   },
 
   async submitAgentReviewDecision(decision: CdlAgentReviewDecision): Promise<void> {
-    await api.post(`${base}/applications/${decision.applicationId}/agent-review`, decision);
+    await api.post(`${base}/applications/${decision.applicationId}/credit-decision`, decision);
   },
 
   async generateAgreement(applicationId, input): Promise<CdlAgreementResult> {
@@ -131,3 +131,4 @@ export const realConsumerDurableLoanService: IConsumerDurableLoanService = {
     return res.data;
   },
 };
+
