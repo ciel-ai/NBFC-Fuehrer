@@ -31,6 +31,7 @@ import { collectionsRouter } from '@/modules/collections';
 import { auditRouter } from '@/modules/audit';
 import { reportsRouter } from '@/modules/reports';
 import { adminRouter } from '@/modules/admin';
+import { goldLoansRouter } from '@/modules/goldLoans';
 
 export function createApp(): express.Application {
     const app = express();
@@ -86,6 +87,7 @@ app.use('/notifications', notificationsRouter);
     app.use(`${api}/audit`, auditRouter);
     app.use(`${api}/reports`, reportsRouter);
     app.use(`${api}/admin`, adminRouter);
+    app.use(`${api}/gold-loans`, goldLoansRouter);
 
     // ── 12. 404 handler ────────────────────────────────────────────────────────
     app.use(notFoundHandler());
