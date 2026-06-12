@@ -6,11 +6,11 @@ import type { IKYCService } from './interfaces/IKYCService';
 import type { IPaymentService } from './interfaces/IPaymentService';
 import type { INotificationService } from './interfaces/INotificationService';
 import type { IProfileService } from './interfaces/IProfileService';
-import type { IAgentService } from './interfaces/IAgentService';
 import type { IEMIService } from './interfaces/IEMIService';
 import type { IGoldLoanService } from './interfaces/IGoldLoanService';
 import type { IConsumerDurableLoanService } from './interfaces/IConsumerDurableLoanService';
 import type { IHousingLoanService } from './interfaces/IHousingLoanService';
+import type { ISalesService } from './interfaces/ISalesService';
 
 import { mockLoanService } from './mocks/mockLoanService';
 import { mockAuthService } from './mocks/mockAuthService';
@@ -18,11 +18,11 @@ import { mockKYCService } from './mocks/mockKYCService';
 import { mockPaymentService } from './mocks/mockPaymentService';
 import { mockNotificationService } from './mocks/mockNotificationService';
 import { mockProfileService } from './mocks/mockProfileService';
-import { mockAgentService } from './mocks/mockAgentService';
 import { mockEMIService } from './mocks/mockEMIService';
 import { mockGoldLoanService } from './mocks/mockGoldLoanService';
 import { mockConsumerDurableLoanService } from './mocks/mockConsumerDurableLoanService';
 import { mockHousingLoanService } from './mocks/mockHousingLoanService';
+import { mockSalesService } from './mocks/mockSalesService';
 
 import { realLoanService } from './real/realLoanService';
 import { realAuthService } from './real/realAuthService';
@@ -30,11 +30,11 @@ import { realKYCService } from './real/realKYCService';
 import { realPaymentService } from './real/realPaymentService';
 import { realNotificationService } from './real/realNotificationService';
 import { realProfileService } from './real/realProfileService';
-import { realAgentService } from './real/realAgentService';
 import { realEMIService } from './real/realEMIService';
 import { realGoldLoanService } from './real/realGoldLoanService';
 import { realConsumerDurableLoanService } from './real/realConsumerDurableLoanService';
 import { realHousingLoanService } from './real/realHousingLoanService';
+import { realSalesService } from './real/realSalesService';
 
 import { USE_MOCK } from '../utils/constants';
 
@@ -45,11 +45,11 @@ interface ServiceContextType {
   paymentService: IPaymentService;
   notificationService: INotificationService;
   profileService: IProfileService;
-  agentService: IAgentService;
   emiService: IEMIService;
   goldLoanService: IGoldLoanService;
   consumerDurableLoanService: IConsumerDurableLoanService;
   housingLoanService: IHousingLoanService;
+  salesService: ISalesService;
 }
 
 // Initialized as null to prevent silent bugs when consumed outside the provider.
@@ -72,11 +72,11 @@ export const ServiceProvider: React.FC<ServiceProviderProps> = ({ children, serv
       paymentService:      useMock ? mockPaymentService      : realPaymentService,
       notificationService: useMock ? mockNotificationService : realNotificationService,
       profileService:      useMock ? mockProfileService      : realProfileService,
-      agentService:        useMock ? mockAgentService        : realAgentService,
       emiService:          useMock ? mockEMIService          : realEMIService,
       goldLoanService:     useMock ? mockGoldLoanService     : realGoldLoanService,
       consumerDurableLoanService: useMock ? mockConsumerDurableLoanService : realConsumerDurableLoanService,
       housingLoanService:  useMock ? mockHousingLoanService  : realHousingLoanService,
+      salesService:        useMock ? mockSalesService        : realSalesService,
     }),
     [useMock],
   );

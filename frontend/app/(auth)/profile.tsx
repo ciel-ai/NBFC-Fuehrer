@@ -34,7 +34,7 @@ export default function OnboardingProfileScreen() {
     setIsLoading(true);
     try {
       await updateUser({ name: name.trim(), email: email.trim() || undefined });
-      router.push('/(auth)/role-select');
+      router.replace('/(main)/(tabs)/home');
     } catch (err) {
       console.error(err);
     } finally {

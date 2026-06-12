@@ -7,7 +7,10 @@ import type {
   VerifyOTPRequest,
   VerifyOTPResponse,
   RefreshTokenResponse,
+  SalesRole,
 } from '@/src/entities/auth';
+import type { SalesProduct } from '@/src/entities/salesAgent';
+import { SALES_PRODUCT_LABELS, salesRoleToProduct } from '@/src/entities/salesAgent';
 
 let otpAttempts = 0;
 const MAX_ATTEMPTS = 5;
@@ -15,6 +18,31 @@ const MAX_ATTEMPTS = 5;
 let otpTimestamp: number | null = null;
 let lastOtpSentAt = 0;
 const RESEND_COOLDOWN = 30 * 1000;
+
+// ---------------------------------------------------------------------------
+// Mock sales directory
+//
+// Sales numbers are admin-registered — the backend resolves the granular role
+// from the registered mobile number. Here we hard-code a few so the OTP-based
+// sales flow can be exercised end-to-end. Any number NOT listed falls through
+// to the self-registering customer flow. A deactivated number returns 403.
+//
+// Dev OTP for every number is MOCK_OTP ('123456').
+// ---------------------------------------------------------------------------
+const SALES_DIRECTORY: Record<string, SalesRole> = {
+  '9000000001': 'sales_cdl',
+  '9000000002': 'sales_gold',
+  '9000000003': 'sales_housing',
+};
+
+/** Admin-deactivated sales numbers → OTP verify returns 403. */
+const DEACTIVATED_SALES = new Set<string>(['9000000009']);
+
+const BRANCH_BY_PRODUCT: Record<SalesProduct, string> = {
+  cdl: 'Bengaluru - Koramangala',
+  gold: 'Chennai - T. Nagar',
+  housing: 'Pune - Hinjewadi',
+};
 
 export const mockAuthService: IAuthService = {
   async sendOTP(request: SendOTPRequest): Promise<SendOTPResponse> {
@@ -74,13 +102,54 @@ export const mockAuthService: IAuthService = {
     // success reset
     otpAttempts = 0;
 
+    const phone = request.phone;
+
+    // Admin-deactivated sales number → 403.
+    if (DEACTIVATED_SALES.has(phone)) {
+      throw {
+        code: 'ACCESS_DENIED',
+        message: 'Access not authorized. Contact your administrator.',
+      };
+    }
+
+    // Registered sales number → granular SALES_* role + agent profile.
+    const salesRole = SALES_DIRECTORY[phone];
+    if (salesRole) {
+      const product = salesRoleToProduct(salesRole);
+      const agentName = 'Ravi Sharma';
+      return {
+        success: true,
+        accessToken: 'mock_access_token_' + Date.now(),
+        refreshToken: 'mock_refresh_token_' + Date.now(),
+        user: {
+          id: 'agent_' + phone,
+          phone,
+          name: agentName,
+          role: salesRole,
+        },
+        kycComplete: false,
+        agent: {
+          id: 'agent_' + phone,
+          employeeId: 'EMP' + phone.slice(-4),
+          name: agentName,
+          email: 'ravi.sharma@fuehrernbfc.in',
+          phone,
+          product,
+          branch: BRANCH_BY_PRODUCT[product],
+          fdoCode: 'FDO' + phone.slice(-4),
+          designation: `${SALES_PRODUCT_LABELS[product]} Officer`,
+        },
+      };
+    }
+
+    // Default: customer self-registration.
     return {
       success: true,
       accessToken: 'mock_access_token_' + Date.now(),
       refreshToken: 'mock_refresh_token_' + Date.now(),
       user: {
         ...MOCK_USER,
-        phone: request.phone,
+        phone,
         role: 'customer',
       },
       kycComplete: false,

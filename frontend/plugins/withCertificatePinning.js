@@ -37,12 +37,27 @@ const path = require('path');
 // ─── Configuration ──────────────────────────────────────────────────────────
 // REPLACE all three values before the production build.
 
-const PINNED_DOMAIN = 'api.REPLACE_ME.in';               // ← your API hostname
+// TODO(owner): replace with real value (your API hostname)
+const PINNED_DOMAIN = 'api.REPLACE_ME.in';
 
-const PRIMARY_HASH  = 'REPLACE_WITH_PRIMARY_SHA256_SPKI_HASH=';   // ← current cert
-const BACKUP_HASH   = 'REPLACE_WITH_BACKUP_SHA256_SPKI_HASH=';    // ← next/backup cert
+// TODO(owner): replace with real value (current cert SHA-256 SPKI hash)
+const PRIMARY_HASH  = 'REPLACE_WITH_PRIMARY_SHA256_SPKI_HASH=';
+// TODO(owner): replace with real value (next/backup cert SHA-256 SPKI hash)
+const BACKUP_HASH   = 'REPLACE_WITH_BACKUP_SHA256_SPKI_HASH=';
 
 const PIN_EXPIRATION = '2027-12-31';   // refresh yearly; build fails if expired
+
+/**
+ * Safety guard — never inject pinning while the values are still placeholders.
+ * OS-level pins (Android network_security_config / iOS TrustKit) are enforced by
+ * the platform and would reject EVERY TLS connection to PINNED_DOMAIN if the
+ * hashes are fake, bricking the app. When unconfigured we skip injection entirely
+ * and rely on the OS default trust store (which still validates the chain).
+ */
+const PINNING_CONFIGURED =
+  !PINNED_DOMAIN.includes('REPLACE') &&
+  !PRIMARY_HASH.includes('REPLACE') &&
+  !BACKUP_HASH.includes('REPLACE');
 
 // ─── Android: network_security_config.xml ───────────────────────────────────
 // OkHttp (the HTTP client used by React Native on Android) automatically
@@ -147,6 +162,17 @@ function withIosTrustKit(config) {
  * Add to app.json:  "plugins": [ "./plugins/withCertificatePinning", ... ]
  */
 module.exports = function withCertificatePinning(config) {
+  if (!PINNING_CONFIGURED) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      '[withCertificatePinning] SKIPPED: PINNED_DOMAIN / PRIMARY_HASH / ' +
+        'BACKUP_HASH still contain REPLACE placeholders. Certificate pinning ' +
+        'is NOT injected for this build. Paste the real SHA-256 SPKI hashes in ' +
+        'plugins/withCertificatePinning.js (and src/core/api/api.ts) before the ' +
+        'production build to enable pinning.',
+    );
+    return config;
+  }
   config = withAndroidNetworkSecurityConfig(config);
   config = withAndroidManifestConfig(config);
   config = withIosTrustKit(config);

@@ -27,6 +27,17 @@ export const SECURE_STORE_KEYS = {
   // Persisted failed-attempt counter (string-encoded integer).
   // Survives app restarts — never reset except on correct PIN or re-login.
   MPIN_ATTEMPTS: 'nbfc_mpin_attempts',
+
+  // ── Sales Team module ──────────────────────────────────────────────────
+  // Authenticated sales-agent session (PII) → secureStorage.
+  SALES_AGENT: 'nbfc_sales_agent',
+  // Last product the agent logged into (re-routes to the right dashboard) → secureStorage.
+  SALES_PRODUCT: 'nbfc_sales_product',
+  // Save-as-draft envelope map, keyed by draftId (non-PII routing key; values
+  // are loan drafts that the agent can resume) → appStorage.
+  SALES_DRAFTS: 'nbfc_sales_drafts',
+  // Offline mutation queue (applications captured without connectivity) → appStorage.
+  SALES_OFFLINE_QUEUE: 'nbfc_sales_offline_queue',
 } as const;
 
 export const MPIN_LENGTH = 4;
@@ -45,13 +56,19 @@ export const LOAN_TYPES = {
 export const TENURE_OPTIONS = [3, 6, 9, 12, 18] as const;
 
 // App info
-export const APP_NAME = 'NBFC';
-export const SUPPORT_EMAIL = 'support@yourdomain.in';
+export const APP_NAME = 'Fuehrer';
+// TODO(owner): replace with real value (support email shown in-app)
+export const SUPPORT_EMAIL = 'support@fuehrernbfc.in';
+// TODO(owner): replace with real value (grievance/privacy email shown in-app)
+export const PRIVACY_EMAIL = 'privacy@fuehrernbfc.in';
+// TODO(owner): replace with real value (toll-free support number shown in-app)
 export const SUPPORT_PHONE = '1800-XXX-XXXX';
 
 // Links
-export const TERMS_URL = 'https://yourdomain.in/terms';
-export const PRIVACY_URL = 'https://yourdomain.in/privacy';
+// TODO(owner): replace with real value (public Terms of Service URL)
+export const TERMS_URL = 'https://fuehrernbfc.in/terms';
+// TODO(owner): replace with real value (public Privacy Policy URL)
+export const PRIVACY_URL = 'https://fuehrernbfc.in/privacy';
 export const PMAY_URL = 'https://pmaymis.gov.in';
 
 // ---------------------------------------------------------------------------

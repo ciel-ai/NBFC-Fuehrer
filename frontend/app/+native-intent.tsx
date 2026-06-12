@@ -15,19 +15,25 @@ export function redirectSystemPath({
   path: string;
   initial: boolean;
 }): string {
-  // Payment gateway callback after UPI / net-banking redirect
-  if (path.startsWith('/payment/')) {
-    return path; // handled by (repayment) group
+  // Preserve any query string (e.g. ?ref=xxx) when rewriting a path.
+  const query = path.includes('?') ? path.slice(path.indexOf('?')) : '';
+
+  // Payment gateway callback after UPI / net-banking redirect.
+  if (path.startsWith('/payment/success')) {
+    return `/(main)/loan-detail/payment-success${query}`;
+  }
+  if (path.startsWith('/payment/failure')) {
+    return `/(main)/loan-detail/payment-failure${query}`;
   }
 
-  // Deep link to a specific loan: fuehrer://loans/123 → loan-detail screen
+  // Deep link to a specific loan: fuehrer://loans/123 → loan-detail screen.
   if (path.startsWith('/loans/')) {
     return path.replace('/loans/', '/(main)/loan-detail/');
   }
 
-  // Push notification tap → notifications screen (once built)
+  // Push notification tap → notifications screen.
   if (path === '/notifications') {
-    return '/(main)/(tabs)/home'; // redirect to home until notifications screen exists
+    return '/(main)/notifications';
   }
 
   return initial ? '/(public)' : path;

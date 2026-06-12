@@ -202,13 +202,13 @@ export function ActiveLoanCard({ loan, onPayEMI, onPress }: ActiveLoanCardProps)
             e.stopPropagation();
             onPayEMI?.();
           }}
-          android_ripple={{ color: `${Colors.navy}20` }}
+          android_ripple={{ color: `${Colors.primary}20` }}
           accessibilityRole="button"
           accessibilityLabel={`Pay EMI of ${formatCurrency(loan.emi)} for loan ${loan.id}`}
           hitSlop={6}
         >
           <Text style={styles.payButtonText}>Pay EMI</Text>
-          <Ionicons name="arrow-forward" size={scale(14)} color={Colors.navy} />
+          <Ionicons name="arrow-forward" size={scale(14)} color={Colors.primary} />
         </Pressable>
       </View>
     </Pressable>
@@ -217,7 +217,7 @@ export function ActiveLoanCard({ loan, onPayEMI, onPress }: ActiveLoanCardProps)
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: Colors.navy,
+    backgroundColor: Colors.primary,
     borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
     marginHorizontal: Spacing.xl,
@@ -345,7 +345,7 @@ const styles = StyleSheet.create({
     width: scale(6),
     height: scale(6),
     borderRadius: scale(3),
-    backgroundColor: Colors.navy,
+    backgroundColor: Colors.primary,
   },
   stepLabel: {
     fontFamily: FontFamily.regular,
@@ -412,6 +412,6 @@ const styles = StyleSheet.create({
   payButtonText: {
     fontFamily: FontFamily.bold,
     fontSize: FontSize.sm,
-    color: Colors.navy,
+    color: Colors.primary,
   },
 });

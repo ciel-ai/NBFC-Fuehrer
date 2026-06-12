@@ -23,7 +23,7 @@ import { Button } from '@/src/shared/components/common/Button';
 // ---------------------------------------------------------------------------
 
 interface LoanType {
-  id: 'personal' | 'home' | 'gold' | 'consumer';
+  id: 'home' | 'gold' | 'consumer';
   label: string;
   icon: keyof typeof Ionicons.glyphMap;
   rate: number;
@@ -37,18 +37,6 @@ interface LoanType {
 }
 
 const LOAN_TYPES: LoanType[] = [
-  {
-    id: 'personal',
-    label: 'Personal',
-    icon: 'person',
-    rate: 13.5,
-    minAmt: 25_000,
-    maxAmt: 15_00_000,
-    step: 5_000,
-    defaultAmt: 2_00_000,
-    tenures: [12, 24, 36, 48, 60],
-    defaultTenure: 24,
-  },
   {
     id: 'home',
     label: 'Home',
@@ -130,23 +118,43 @@ interface SliderProps {
 
 function AmountSlider({ value, min, max, step, onChange }: SliderProps) {
   const trackWidth = useRef(0);
+  const dragStartX = useRef(0);
+  const valueRef = useRef(value);
+  const configRef = useRef({ min, max, step, onChange });
+
+  valueRef.current = value;
+  configRef.current = { min, max, step, onChange };
+
   const pct = Math.max(0, Math.min(1, (value - min) / (max - min)));
 
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (e) => updateFromEvent(e.nativeEvent.locationX),
-      onPanResponderMove: (e) => updateFromEvent(e.nativeEvent.locationX),
+      onMoveShouldSetPanResponder: (_, gesture) =>
+        Math.abs(gesture.dx) > 2 || Math.abs(gesture.dy) > 2,
+      onPanResponderGrant: (e) => {
+        dragStartX.current = e.nativeEvent.locationX;
+        updateFromX(dragStartX.current);
+      },
+      onPanResponderMove: (_, gesture) => {
+        updateFromX(dragStartX.current + gesture.dx);
+      },
+      onShouldBlockNativeResponder: () => true,
     }),
   ).current;
 
-  function updateFromEvent(x: number) {
+  function updateFromX(x: number) {
     if (trackWidth.current === 0) return;
+    const { min, max, step, onChange } = configRef.current;
     const ratio = Math.min(1, Math.max(0, x / trackWidth.current));
     const raw = min + ratio * (max - min);
     const stepped = Math.round(raw / step) * step;
-    onChange(Math.min(max, Math.max(min, stepped)));
+    const next = Math.min(max, Math.max(min, stepped));
+
+    if (next !== valueRef.current) {
+      valueRef.current = next;
+      onChange(next);
+    }
   }
 
   const onLayout = (e: LayoutChangeEvent) => {
@@ -165,7 +173,7 @@ function AmountSlider({ value, min, max, step, onChange }: SliderProps) {
       <View
         style={[
           sliderStyles.thumb,
-          { left: `${pct * 100}%` as any, transform: [{ translateX: -scale(12) }] },
+          { left: `${pct * 100}%` as any, transform: [{ translateX: -scale(14) }] },
         ]}
       >
         <View style={sliderStyles.thumbInner} />
@@ -176,14 +184,14 @@ function AmountSlider({ value, min, max, step, onChange }: SliderProps) {
 
 const sliderStyles = StyleSheet.create({
   hitArea: {
-    height: scale(36),
+    height: scale(46),
     justifyContent: 'center',
     position: 'relative',
   },
   track: {
-    height: scale(6),
+    height: scale(8),
     borderRadius: BorderRadius.sm,
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: Colors.border,
     overflow: 'hidden',
   },
   fill: {
@@ -193,21 +201,26 @@ const sliderStyles = StyleSheet.create({
   },
   thumb: {
     position: 'absolute',
-    width: scale(24),
-    height: scale(24),
-    borderRadius: scale(12),
+    width: scale(28),
+    height: scale(28),
+    borderRadius: scale(14),
     backgroundColor: Colors.background,
-    borderWidth: 2,
+    borderWidth: 2.5,
     borderColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     top: '50%',
-    marginTop: -scale(12),
+    marginTop: -scale(14),
+    shadowColor: '#000',
+    shadowOpacity: 0.16,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
   },
   thumbInner: {
-    width: scale(8),
-    height: scale(8),
-    borderRadius: scale(4),
+    width: scale(10),
+    height: scale(10),
+    borderRadius: scale(5),
     backgroundColor: Colors.primary,
   },
 });
@@ -218,7 +231,7 @@ const sliderStyles = StyleSheet.create({
 
 export default function CalculatorScreen() {
   const insets = useSafeAreaInsets();
-  const [activeId, setActiveId] = useState<LoanType['id']>('personal');
+  const [activeId, setActiveId] = useState<LoanType['id']>('home');
   const loan = LOAN_TYPES.find((l) => l.id === activeId)!;
 
   const [amount, setAmount] = useState<number>(loan.defaultAmt);

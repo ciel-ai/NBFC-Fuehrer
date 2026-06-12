@@ -1,358 +1,306 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   Platform,
-  Alert,
-  Linking,
+  Modal,
   TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/src/core/theme/colors';
-import { Typography, FontFamily, FontSize } from '@/src/core/theme/typography';
-import { Spacing, BorderRadius } from '@/src/core/theme/spacing';
-import { Header } from '@/src/shared/components/common/Header';
-import { Button } from '@/src/shared/components/common/Button';
+import { FontFamily, FontSize } from '@/src/core/theme/typography';
+import { Spacing, BorderRadius, Shadow } from '@/src/core/theme/spacing';
+
+const APP_NAME = 'Fuehrer';
 
 interface PermissionItem {
-  key: string;
-  title: string;
-  description: string;
+  key: 'camera' | 'photos';
+  name: string;
   icon: keyof typeof Ionicons.glyphMap;
+  /** Plain-language reason shown in the branded priming card. */
+  rationale: string;
 }
 
+// One branded priming card per permission. IMPORTANT: every permission here is
+// OPTIONAL — the user can tap "Not now" and still reach the rest of the app. The
+// real OS prompt is fired from "Continue", and each permission is also
+// re-requested in-context the first time the related feature is used (KYC capture,
+// document upload), where an "Open Settings" fallback is offered if it was denied.
+// Nothing here blocks onboarding, per Apple Guideline 5.1.1.
 const PERMISSIONS: PermissionItem[] = [
   {
-    key: 'location',
-    title: 'Location',
-    description:
-      'Used to verify your address and find nearby branches & ATMs.',
-    icon: 'location',
-  },
-  {
     key: 'camera',
-    title: 'Camera',
-    description:
-      'Required to scan documents, capture ID proof and selfie for KYC verification.',
-    icon: 'camera',
+    name: 'Camera',
+    icon: 'camera-outline',
+    rationale:
+      `${APP_NAME} uses your camera to capture identity documents and your ` +
+      `selfie during KYC verification.`,
   },
   {
-    key: 'notifications',
-    title: 'Notifications',
-    description:
-      'Receive real-time updates on loan status, EMI reminders and offers.',
-    icon: 'notifications',
-  },
-  {
-    key: 'storage',
-    title: 'Storage',
-    description:
-      'Upload income proof, bank statements and other documents from your device.',
-    icon: 'document-attach',
+    key: 'photos',
+    name: 'Photos',
+    icon: 'images-outline',
+    rationale:
+      `${APP_NAME} needs access to your photos so you can upload income proof ` +
+      `and identity documents.`,
   },
 ];
 
-type Status = 'granted' | 'denied' | 'undetermined';
-type PermissionState = Record<string, Status>;
-
 export default function AppPermissionsScreen() {
-  const [isLoading, setIsLoading] = useState(false);
-  const [hasAttempted, setHasAttempted] = useState(false);
-  const [statuses, setStatuses] = useState<PermissionState>(
-    Object.fromEntries(PERMISSIONS.map((p) => [p.key, 'undetermined']))
-  );
+  // Index of the priming card currently shown.
+  const [index, setIndex] = useState(0);
+  const [busy, setBusy] = useState(false);
 
-  const hasDenied = hasAttempted && PERMISSIONS.some((p) => statuses[p.key] === 'denied');
+  const item = index < PERMISSIONS.length ? PERMISSIONS[index] : null;
 
-  const requestPermission = useCallback(async (key: string) => {
-    setIsLoading(true);
-    let newStatus: Status = 'denied';
+  // Once every permission has been offered, continue to login. There is no
+  // client-side role choice — the role is resolved from the number at OTP time.
+  useEffect(() => {
+    if (index >= PERMISSIONS.length) {
+      router.replace('/(auth)/login');
+    }
+  }, [index]);
 
+  const advance = useCallback(() => setIndex((i) => i + 1), []);
+
+  /**
+   * Fire the real OS permission request for one key. We intentionally ignore the
+   * result: whether granted or denied, the user always proceeds. The feature
+   * screens handle the denied case gracefully when they actually need access.
+   */
+  const requestFromOS = useCallback(async (key: PermissionItem['key']): Promise<void> => {
+    if (Platform.OS === 'web') return;
     try {
-      if (key === 'location') {
-        if (Platform.OS !== 'web') {
-          const Location = await import('expo-location');
-          const { status } = await Location.requestForegroundPermissionsAsync();
-          newStatus = status === 'granted' ? 'granted' : 'denied';
-        } else {
-          newStatus = 'granted';
-        }
-      } else if (key === 'camera') {
-        if (Platform.OS !== 'web') {
-          const CameraModule = await import('expo-camera');
-          const { status } = await CameraModule.Camera.requestCameraPermissionsAsync();
-          newStatus = status === 'granted' ? 'granted' : 'denied';
-        } else {
-          newStatus = 'granted';
-        }
-      } else if (key === 'notifications') {
-        const Notifications = await import('expo-notifications');
-        const { status } = await Notifications.requestPermissionsAsync();
-        newStatus = status === 'granted' ? 'granted' : 'denied';
-      } else if (key === 'storage') {
-        if (Platform.OS !== 'web') {
-          const MediaLibrary = await import('expo-media-library');
-          const { status } = await MediaLibrary.requestPermissionsAsync();
-          newStatus = status === 'granted' ? 'granted' : 'denied';
-        } else {
-          newStatus = 'granted';
-        }
+      if (key === 'camera') {
+        const CameraModule = await import('expo-camera');
+        await CameraModule.Camera.requestCameraPermissionsAsync();
+      } else if (key === 'photos') {
+        const ImagePicker = await import('expo-image-picker');
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
       }
     } catch {
-      newStatus = 'denied';
+      // Never block onboarding on a permission error.
     }
-
-    setStatuses((prev) => ({ ...prev, [key]: newStatus }));
-    setIsLoading(false);
-    setHasAttempted(true);
   }, []);
 
-  const handleContinue = () => {
-    const OPTIONAL_PERMISSIONS = ['notifications', 'storage'];
-const allOk = PERMISSIONS.every((p) => 
-  statuses[p.key] === 'granted' || OPTIONAL_PERMISSIONS.includes(p.key)
-);
+  /** "Continue" → fire the real OS request, then advance regardless of outcome. */
+  const handleContinue = useCallback(async () => {
+    if (!item || busy) return;
+    setBusy(true);
+    await requestFromOS(item.key);
+    setBusy(false);
+    advance();
+  }, [item, busy, requestFromOS, advance]);
 
-    if (allOk) {
-      router.push('/(auth)/role-select');
-    } else {
-      const denied = PERMISSIONS.filter((p) => statuses[p.key] !== 'granted')
-        .map((p) => p.title)
-        .join(', ');
-
-      Alert.alert(
-        'Permissions Required',
-        `The following permissions are mandatory to use this app: ${denied}.\n\nPlease grant them by tapping on each item, or from your device settings if previously denied.`,
-        [
-          { text: 'Open Settings', onPress: () => Linking.openSettings() },
-          { text: 'OK', style: 'cancel' },
-        ]
-      );
-    }
-  };
-
-  const getStatusIcon = (status: Status): keyof typeof Ionicons.glyphMap => {
-    if (status === 'granted') return 'checkmark-circle';
-    if (status === 'denied') return 'close-circle';
-    return 'ellipse-outline';
-  };
-
-  const getStatusColor = (status: Status) => {
-    if (status === 'granted') return Colors.success;
-    if (status === 'denied') return Colors.error;
-    return Colors.textDisabled;
-  };
+  /** "Not now" → skip this permission; it can be enabled later in-context. */
+  const handleSkip = useCallback(() => {
+    if (busy) return;
+    advance();
+  }, [busy, advance]);
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Header showBack />
+    <View style={styles.container}>
+      <StatusBar style="dark" />
 
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
-        <Text style={styles.title}>App permissions</Text>
-        <Text style={styles.subtitle}>
-          All permissions are required to use this app. Please grant access to continue.
-        </Text>
-
-        <View style={styles.permissionList}>
-          {PERMISSIONS.map((item, index) => {
-            const status = statuses[item.key];
-            return (
-              <React.Fragment key={item.key}>
-                <TouchableOpacity 
-                  style={styles.permissionRow}
-                  onPress={() => requestPermission(item.key)}
-                  disabled={status === 'granted' || isLoading}
-                  activeOpacity={0.7}
-                >
-                  <View style={[
-                    styles.iconCircle,
-                    hasAttempted && status === 'denied' && styles.iconCircleDenied,
-                  ]}>
-                    <Ionicons
-                      name={item.icon}
-                      size={22}
-                      color={hasAttempted && status === 'denied' ? Colors.error : Colors.primary}
-                    />
-                  </View>
-                  <View style={styles.permissionContent}>
-                    <View style={styles.permissionTitleRow}>
-                      <Text style={styles.permissionTitle}>
-                        {item.title}
-                        <Text style={styles.requiredStar}> *</Text>
-                      </Text>
-                      <Ionicons
-                        name={getStatusIcon(status)}
-                        size={16}
-                        color={getStatusColor(status)}
-                      />
-                    </View>
-                    <Text style={styles.permissionDescription}>
-                      {item.description}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-                {index < PERMISSIONS.length - 1 && <View style={styles.divider} />}
-              </React.Fragment>
-            );
-          })}
+      {/* Branded backdrop behind the priming card. */}
+      <View style={styles.brandBg}>
+        <View style={styles.brandLogoCircle}>
+          <Ionicons name="shield-checkmark" size={42} color={Colors.primary} />
         </View>
-
-        {hasDenied && (
-          <View style={styles.warningCard}>
-            <Ionicons name="warning" size={18} color={Colors.error} />
-            <Text style={styles.warningText}>
-              Some permissions were denied. All permissions are mandatory. Please tap
-              the denied permissions again or go to Settings to grant them manually.
-            </Text>
-          </View>
-        )}
-
-        <Text style={styles.privacyNote}>
-          🔒 Your data is encrypted and handled as per RBI guidelines. We never
-          share your information with third parties without your consent.
-        </Text>
-      </ScrollView>
-
-      <View style={styles.footer}>
-        <Button
-          title="Continue"
-          onPress={handleContinue}
-          loading={isLoading}
-          disabled={isLoading}
-        />
-        {hasDenied && (
-          <Button
-            title="Open Device Settings"
-            onPress={() => Linking.openSettings()}
-            style={styles.settingsButton}
-          />
-        )}
-        <Text style={styles.mandatoryNote}>
-          * All permissions are mandatory
-        </Text>
+        <Text style={styles.brandName}>{APP_NAME}</Text>
+        <Text style={styles.brandTagline}>NBFC</Text>
+        <Text style={styles.brandHint}>Setting up a few permissions…</Text>
       </View>
-    </SafeAreaView>
+
+      <Modal
+        visible={item !== null}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={handleSkip}
+      >
+        <View style={styles.cardOverlay}>
+          <View style={styles.card}>
+            {/* Step indicator */}
+            <Text style={styles.stepText}>
+              {Math.min(index + 1, PERMISSIONS.length)} of {PERMISSIONS.length}
+            </Text>
+
+            <View style={styles.cardIconWrap}>
+              <Ionicons
+                name={item?.icon ?? 'shield-checkmark-outline'}
+                size={30}
+                color={Colors.primary}
+              />
+            </View>
+
+            <Text style={styles.cardTitle}>{item?.name} access</Text>
+            <Text style={styles.cardBody}>{item?.rationale}</Text>
+            <Text style={styles.cardNote}>
+              Optional — you can enable this anytime in Settings.
+            </Text>
+
+            {/* Primary: branded, NOT the system "Allow" button */}
+            <TouchableOpacity
+              style={styles.primaryButton}
+              onPress={handleContinue}
+              disabled={busy}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel={`Continue and allow ${item?.name} access`}
+            >
+              {busy ? (
+                <ActivityIndicator color={Colors.textWhite} size="small" />
+              ) : (
+                <Text style={styles.primaryButtonText}>Continue</Text>
+              )}
+            </TouchableOpacity>
+
+            {/* Secondary: skip without requesting */}
+            <TouchableOpacity
+              style={styles.secondaryButton}
+              onPress={handleSkip}
+              disabled={busy}
+              activeOpacity={0.6}
+              accessibilityRole="button"
+              accessibilityLabel={`Skip ${item?.name} for now`}
+            >
+              <Text style={styles.secondaryButtonText}>Not now</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  scrollView: { flex: 1 },
-  content: {
-    paddingHorizontal: Spacing.xl,
-    paddingTop: Spacing.lg,
-    paddingBottom: Spacing.md,
-  },
-  title: {
-    fontFamily: FontFamily.bold,
-    fontSize: FontSize['2xl'],
-    color: Colors.textPrimary,
-    marginBottom: Spacing.sm,
-  },
-  subtitle: {
-    ...Typography.body,
-    color: Colors.textSecondary,
-    marginBottom: Spacing.xl,
-  },
-  permissionList: {
+  container: {
+    flex: 1,
     backgroundColor: Colors.background,
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    overflow: 'hidden',
-    marginBottom: Spacing.lg,
   },
-  permissionRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    padding: Spacing.md,
+
+  // ---- Branded backdrop ----
+  brandBg: {
+    flex: 1,
+    backgroundColor: Colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  iconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  brandLogoCircle: {
+    width: 84,
+    height: 84,
+    borderRadius: 42,
     backgroundColor: Colors.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: Spacing.md,
-    flexShrink: 0,
+    marginBottom: Spacing.md,
   },
-  iconCircleDenied: {
-    backgroundColor: Colors.errorLight,
-  },
-  permissionContent: { flex: 1 },
-  permissionTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  permissionTitle: {
-    fontFamily: FontFamily.semiBold,
-    fontSize: FontSize.base,
-    color: Colors.textPrimary,
-  },
-  requiredStar: {
-    color: Colors.error,
+  brandName: {
     fontFamily: FontFamily.bold,
+    fontSize: FontSize['4xl'],
+    color: Colors.primary,
+    letterSpacing: 1,
   },
-  permissionDescription: {
-    ...Typography.caption,
+  brandTagline: {
+    fontFamily: FontFamily.medium,
+    fontSize: 12,
     color: Colors.textSecondary,
-    lineHeight: 18,
+    letterSpacing: 4,
+    marginTop: 2,
   },
-  divider: {
-    height: 1,
-    backgroundColor: Colors.border,
-    marginLeft: 72,
-  },
-  warningCard: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: Spacing.sm,
-    backgroundColor: Colors.errorLight,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.md,
-    marginBottom: Spacing.lg,
-  },
-  warningText: {
-    flex: 1,
+  brandHint: {
     fontFamily: FontFamily.regular,
-    fontSize: 13,
-    color: Colors.error,
-    lineHeight: 18,
+    fontSize: FontSize.sm,
+    color: Colors.textSecondary,
+    marginTop: Spacing.lg,
   },
-  privacyNote: {
-    ...Typography.tiny,
+
+  // ---- Branded priming card (deliberately app-styled, not an OS dialog) ----
+  cardOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15,23,42,0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.xl,
+  },
+  card: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: Colors.background,
+    borderRadius: 24,
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.lg,
+    paddingBottom: Spacing.lg,
+    alignItems: 'center',
+    ...Shadow.large,
+  },
+  stepText: {
+    fontFamily: FontFamily.semiBold,
+    fontSize: FontSize.xs,
+    color: Colors.textDisabled,
+    letterSpacing: 1,
+    alignSelf: 'flex-end',
+  },
+  cardIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    backgroundColor: Colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
+  cardTitle: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.lg,
+    color: Colors.textPrimary,
+    textAlign: 'center',
+    marginBottom: Spacing.sm,
+  },
+  cardBody: {
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.base,
     color: Colors.textSecondary,
     textAlign: 'center',
-    lineHeight: 16,
-    paddingHorizontal: Spacing.sm,
+    lineHeight: FontSize.base * 1.45,
+    marginBottom: Spacing.sm,
   },
-  footer: {
-    paddingHorizontal: Spacing.xl,
-    paddingBottom: Spacing.xl,
-    paddingTop: Spacing.md,
-    alignItems: 'center',
-    gap: Spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-  },
-  settingsButton: {
-    backgroundColor: Colors.backgroundLight,
-  },
-  mandatoryNote: {
+  cardNote: {
     fontFamily: FontFamily.regular,
-    fontSize: 11,
+    fontSize: FontSize.sm,
     color: Colors.textDisabled,
+    textAlign: 'center',
+    marginBottom: Spacing.lg,
+  },
+  primaryButton: {
+    width: '100%',
+    height: 52,
+    borderRadius: BorderRadius.lg,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  primaryButtonText: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.md,
+    color: Colors.textWhite,
+  },
+  secondaryButton: {
+    width: '100%',
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginTop: Spacing.xs,
+  },
+  secondaryButtonText: {
+    fontFamily: FontFamily.semiBold,
+    fontSize: FontSize.base,
+    color: Colors.textSecondary,
   },
 });

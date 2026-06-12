@@ -1,9 +1,12 @@
 import { useEffect } from 'react';
 import { BackHandler } from 'react-native';
 import { Stack, router, useSegments } from 'expo-router';
+import { useAuthGuard } from '@/src/shared/hooks/useAuthGuard';
 
 export default function MainLayout() {
   const segments = useSegments();
+  // Block sales agents (and unauthenticated users) from the customer app.
+  const authorized = useAuthGuard(['customer']);
 
   // Android back button handling
   useEffect(() => {
@@ -29,6 +32,8 @@ export default function MainLayout() {
     const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
     return () => subscription.remove();
   }, [segments]);
+
+  if (!authorized) return null;
 
   return (
     <Stack

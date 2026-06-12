@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Stack, Redirect, useSegments, router } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -14,66 +14,81 @@ import {
   Inter_600SemiBold,
   Inter_700Bold,
 } from '@expo-google-fonts/inter';
-import { AppState, Platform, StyleSheet } from 'react-native';
+import { AppState, Platform, StyleSheet, View } from 'react-native';
 import { useAuthStore } from '@/src/store/authStore';
 import { useUserStore } from '@/src/store/userStore';
 import { useLoanStore } from '@/src/store/loanStore';
+import { useSalesStore } from '@/src/store/salesStore';
+import { isSalesRole } from '@/src/entities/auth';
 import { ErrorBoundary } from '@/src/shared/components/common/ErrorBoundary';
+import { AppSplash } from '@/src/shared/components/common/AppSplash';
 
 SplashScreen.preventAutoHideAsync();
 
 // ---------------------------------------------------------------------------
 // AuthGuard
 // ---------------------------------------------------------------------------
-// Responsibilities:
-//   1. Unauthenticated users  → /(auth)/login
-//   2. Authenticated users    → /(main)/(tabs)/home  (no KYC check here)
-//   3. Authenticated users who land on public/auth routes → home
-//
+// Primary customer/sales split. Roles come from the persisted session (never
+// asserted client-side):
+//   • Sales agents (SALES_*): authenticate via OTP, skip the customer
+//     MPIN/onboarding chain, and live in the (sales) group.
+//   • Customers: phone + OTP + MPIN, then the (main) app.
+// Per-segment role checks are enforced again in each group's layout via
+// useAuthGuard (defence-in-depth).
 // ---------------------------------------------------------------------------
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const segments = useSegments() as string[];
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const onboardingDone = useUserStore((s) => s.onboardingDone);
   const role = useUserStore((s) => s.role);
-const mpinSet = useAuthStore((s) => s.mpinSet);
+  const mpinSet = useAuthStore((s) => s.mpinSet);
   const mpinVerified = useAuthStore((s) => s.mpinVerified);
 
   const firstSegment = segments?.[0] ?? null;
   const secondSegment = segments?.[1] ?? null;
   const inPublicGroup = firstSegment === '(public)';
   const inAuthGroup = firstSegment === '(auth)';
-const isRoot = !firstSegment;
+  const inSalesGroup = firstSegment === '(sales)';
+  const isRoot = !firstSegment;
   const onEnterMpinScreen = inAuthGroup && secondSegment === 'enter-mpin';
 
-  const homeRoute = role === 'agent' ? '/(main)/agent/dashboard' : '/(main)/(tabs)/home';
+  const isSales = isSalesRole(role);
 
-  // 1. Unauthenticated at root → send to terms / landing screen
+  // 1. Unauthenticated at root → terms / landing screen
   if (!isAuthenticated && isRoot) {
-    return <Redirect href="/(public)" />;
+    return <Redirect href="/(auth)/landing" />;
   }
 
-  // 2. Unauthenticated trying to access protected routes → login
+  // 2. Authenticated sales agent → stay in the (sales) group; never enter the
+  //    customer MPIN/onboarding chain.
+  if (isAuthenticated && isSales) {
+    if (inSalesGroup) return <>{children}</>;
+    return <Redirect href="/(sales)" />;
+  }
+
+  // ── From here the user is unauthenticated or a customer. ──────────────────
+
+  // 3. Unauthenticated trying to access protected routes → login
   if (!isAuthenticated && !inPublicGroup && !inAuthGroup) {
     return <Redirect href="/(auth)/login" />;
   }
 
-  // 3. Authenticated but onboarding not done → allow auth screens (set-mpin, role-select, etc.)
+  // 4. Customer mid-onboarding → allow the (auth) screens (set-mpin, etc.)
   if (isAuthenticated && !onboardingDone && inAuthGroup) {
     return <>{children}</>;
   }
 
-  // 4. Returning user: authenticated + onboarding done + MPIN set but not yet verified this session
+  // 5. Returning customer: onboarding done + MPIN set but not yet verified this session
   if (isAuthenticated && onboardingDone && mpinSet && !mpinVerified && !onEnterMpinScreen) {
     return <Redirect href="/(auth)/enter-mpin" />;
   }
 
-  // 5. Authenticated with onboarding done, MPIN verified (or no MPIN), on public/auth/root → go to app
+  // 6. Fully-onboarded customer on public/auth/root → into the app
   if (isAuthenticated && onboardingDone && (inPublicGroup || (inAuthGroup && !onEnterMpinScreen) || isRoot)) {
-    return <Redirect href={homeRoute as any} />;
+    return <Redirect href="/(main)/(tabs)/home" />;
   }
 
-  // 7. Authenticated but onboarding not done, on non-auth routes → set-mpin or complete-profile
+  // 7. Customer authenticated but onboarding not done, off the auth group → resume onboarding
   if (isAuthenticated && !onboardingDone && !inAuthGroup) {
     return <Redirect href={mpinSet ? '/(auth)/complete-profile' : '/(auth)/set-mpin'} />;
   }
@@ -104,6 +119,8 @@ export default function RootLayout() {
 
   const userBootstrap = useUserStore((s) => s.bootstrap);
   const isUserHydrated = useUserStore((s) => s.isHydrated);
+  const salesBootstrap = useSalesStore((s) => s.bootstrap);
+  const isSalesHydrated = useSalesStore((s) => s.isHydrated);
 
 const loadGoldLoanNotifyMe = useLoanStore((s) => s.loadGoldLoanNotifyMe);
 
@@ -114,6 +131,7 @@ const loadGoldLoanNotifyMe = useLoanStore((s) => s.loadGoldLoanNotifyMe);
         await Promise.all([
           authBootstrap(),
           userBootstrap(),
+          salesBootstrap(),
 loadGoldLoanNotifyMe(),
         ]);
       } catch (e) {
@@ -128,7 +146,7 @@ loadGoldLoanNotifyMe(),
     return () => {
       isMounted = false;
     };
-  }, [authBootstrap, userBootstrap, loadGoldLoanNotifyMe]);
+  }, [authBootstrap, userBootstrap, salesBootstrap, loadGoldLoanNotifyMe]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (status) => {
@@ -153,7 +171,7 @@ loadGoldLoanNotifyMe(),
     return () => subscription.remove();
   }, []);
 
-  const isFullyHydrated = isAuthHydrated && isUserHydrated;
+  const isFullyHydrated = isAuthHydrated && isUserHydrated && isSalesHydrated;
 
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const onboardingDone = useUserStore((s) => s.onboardingDone);
@@ -161,6 +179,9 @@ loadGoldLoanNotifyMe(),
   const mpinSet = useAuthStore((s) => s.mpinSet);
   const mpinVerified = useAuthStore((s) => s.mpinVerified);
   const hasInitialNavigated = useRef(false);
+
+  // Animated splash overlay — covers the app until its intro animation ends.
+  const [splashDone, setSplashDone] = useState(false);
 
   // Force navigation to the correct initial screen after bootstrap.
   // This overrides any Expo Router navigation-state restoration that might
@@ -171,19 +192,19 @@ loadGoldLoanNotifyMe(),
     hasInitialNavigated.current = true;
 
     if (!isAuthenticated) {
-      router.replace('/(public)');
+      router.replace('/(auth)/landing');
+    } else if (isSalesRole(role)) {
+      router.replace('/(sales)');
     } else if (!onboardingDone && mpinSet) {
       router.replace('/(auth)/complete-profile');
     } else if (!onboardingDone) {
       router.replace('/(auth)/set-mpin');
     } else if (mpinSet && !mpinVerified) {
       router.replace('/(auth)/enter-mpin');
-    } else if (role === 'agent') {
-      router.replace('/(main)/agent/dashboard');
     } else {
       router.replace('/(main)/(tabs)/home');
     }
-  }, [fontsLoaded, isFullyHydrated, isAuthenticated, onboardingDone, mpinSet, mpinVerified, role]);
+  }, [fontsLoaded, isFullyHydrated, isAuthenticated, onboardingDone, role, mpinSet, mpinVerified]);
 
   useEffect(() => {
     if (fontsLoaded && isFullyHydrated) {
@@ -197,7 +218,16 @@ loadGoldLoanNotifyMe(),
     return () => clearTimeout(t);
   }, []);
 
-  if (!fontsLoaded || !isFullyHydrated) return <SafeAreaProvider><StatusBar style="dark" /></SafeAreaProvider>;
+  // While fonts/stores hydrate, hold a solid royal-blue field (matching the
+  // splash) so there is no white flash before the animated splash mounts.
+  if (!fontsLoaded || !isFullyHydrated) {
+    return (
+      <SafeAreaProvider>
+        <StatusBar style="light" />
+        <View style={styles.splashFill} />
+      </SafeAreaProvider>
+    );
+  }
 
   return (
     <SafeAreaProvider>
@@ -211,8 +241,10 @@ loadGoldLoanNotifyMe(),
                   <Stack.Screen name="(public)" />
                   <Stack.Screen name="(auth)" />
                   <Stack.Screen name="(main)" />
+                  <Stack.Screen name="(sales)" />
                 </Stack>
               </AuthGuard>
+              {!splashDone && <AppSplash onDone={() => setSplashDone(true)} />}
             </GestureHandlerRootView>
           </ServiceProvider>
         </QueryClientProvider>
@@ -221,4 +253,7 @@ loadGoldLoanNotifyMe(),
   );
 }
 
-const styles = StyleSheet.create({ root: { flex: 1 } });
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+  splashFill: { flex: 1, backgroundColor: '#156FE8' },
+});

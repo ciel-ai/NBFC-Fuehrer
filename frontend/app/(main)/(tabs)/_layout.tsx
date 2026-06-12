@@ -1,5 +1,6 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '@/src/core/theme/colors';
 import { Typography, FontSize } from '@/src/core/theme/typography';
@@ -51,11 +52,14 @@ export default function TabsLayout() {
           options={{
             title: tab.title,
             tabBarIcon: ({ focused, color }) => (
-              <Ionicons
-                name={focused ? tab.icon : tab.iconOutline}
-                size={scale(22)}
-                color={color}
-              />
+              <View style={styles.iconStack}>
+                <Ionicons
+                  name={focused ? tab.icon : tab.iconOutline}
+                  size={scale(22)}
+                  color={color}
+                />
+                <View style={[styles.activeDot, focused && styles.activeDotVisible]} />
+              </View>
             ),
           }}
         />
@@ -63,3 +67,21 @@ export default function TabsLayout() {
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  iconStack: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: scale(30),
+  },
+  activeDot: {
+    width: scale(4),
+    height: scale(4),
+    borderRadius: scale(2),
+    marginTop: scale(3),
+    backgroundColor: 'transparent',
+  },
+  activeDotVisible: {
+    backgroundColor: Colors.tabBarActive,
+  },
+});

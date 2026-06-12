@@ -1,18 +1,15 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Platform } from 'react-native';
 import * as Device from 'expo-device';
-import Constants from 'expo-constants';
 
 export interface PermissionStatus {
   camera: 'granted' | 'denied' | 'undetermined';
-  notifications: 'granted' | 'denied' | 'undetermined';
   biometric: 'granted' | 'denied' | 'undetermined' | 'unavailable';
 }
 
 interface UsePermissionsResult {
   permissions: PermissionStatus;
   requestCamera: () => Promise<void>;
-  requestNotifications: () => Promise<void>;
   requestBiometric: () => Promise<void>;
   requestAll: () => Promise<void>;
   isLoading: boolean;
@@ -24,11 +21,8 @@ export function usePermissions(): UsePermissionsResult {
 
   const [permissions, setPermissions] = useState<PermissionStatus>({
     camera: 'undetermined',
-    notifications: 'undetermined',
     biometric: 'undetermined',
   });
-
-  const isExpoGo = Constants.executionEnvironment === 'storeClient';
 
   useEffect(() => {
     return () => {
@@ -69,39 +63,6 @@ export function usePermissions(): UsePermissionsResult {
       setPermissions((p) => ({ ...p, camera: 'denied' }));
     }
   }, []);
-
-  // ================= NOTIFICATIONS =================
-  const requestNotifications = useCallback(async () => {
-    try {
-      if (isExpoGo) {
-        if (!isMountedRef.current) return;
-        setPermissions((p) => ({ ...p, notifications: 'granted' }));
-        return;
-      }
-
-      const Notifications = await import('expo-notifications');
-
-      const existing = await Notifications.getPermissionsAsync();
-
-      if (existing.status === 'granted') {
-        if (!isMountedRef.current) return;
-        setPermissions((p) => ({ ...p, notifications: 'granted' }));
-        return;
-      }
-
-      const { status } = await Notifications.requestPermissionsAsync();
-
-      if (!isMountedRef.current) return;
-      setPermissions((p) => ({
-        ...p,
-        notifications: status === 'granted' ? 'granted' : 'denied',
-      }));
-    } catch (e) {
-      console.log('Notification error:', e);
-      if (!isMountedRef.current) return;
-      setPermissions((p) => ({ ...p, notifications: 'denied' }));
-    }
-  }, [isExpoGo]);
 
   // ================= BIOMETRIC =================
   const requestBiometric = useCallback(async () => {
@@ -154,25 +115,18 @@ export function usePermissions(): UsePermissionsResult {
   const requestAll = useCallback(async () => {
     setIsLoading(true);
 
-    await Promise.allSettled([
-      requestNotifications(),
-      // ⚠️ Enable these AFTER testing
-      requestCamera(),
-      requestBiometric(),
-    ]);
+    await Promise.allSettled([requestCamera(), requestBiometric()]);
 
     if (isMountedRef.current) {
       setIsLoading(false);
     }
-  }, [requestCamera, requestNotifications, requestBiometric]);
+  }, [requestCamera, requestBiometric]);
 
   return {
     permissions,
     requestCamera,
-    requestNotifications,
     requestBiometric,
     requestAll,
     isLoading,
   };
 }
-

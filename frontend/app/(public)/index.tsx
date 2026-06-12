@@ -14,6 +14,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/src/core/theme/colors';
 import { Spacing, BorderRadius, Shadow } from '@/src/core/theme/spacing';
 import { Button } from '@/src/shared/components/common/Button';
+import {
+  SUPPORT_EMAIL,
+  PRIVACY_EMAIL,
+  SUPPORT_PHONE,
+} from '@/src/core/utils/constants';
 
 // ---------------------------------------------------------------------------
 // Content
@@ -76,8 +81,8 @@ Fuehrer NBFC — Effective Year 2026
 
 14. CONTACT US
     Fuehrer NBFC Customer Support
-    Email: support@fueherernbfc.in
-    Helpline: 1800-XXX-XXXX (Toll Free)`;
+    Email: ${SUPPORT_EMAIL}
+    Helpline: ${SUPPORT_PHONE} (Toll Free)`;
 
 const PRIVACY_CONTENT = `PRIVACY POLICY
 Fuehrer NBFC — Effective Year 2026
@@ -120,16 +125,12 @@ This Privacy Policy outlines Fuehrer NBFC's approach to processing of your perso
    g. To facilitate KYC verification and prevent fraud.
 
 6. APP PERMISSIONS
-   Fuehrer NBFC App may require the following device-level permissions:
-   • Location — For KYC verification and identifying nearby branches.
-   • Contacts — For UPI and wallet services.
-   • Camera — For KYC document capture and UPI QR code payments.
-   • Microphone — For voice-assisted search features.
-   • Notifications — For transactional and promotional communications.
-   • Storage/Files — For downloading product documents and KYC processing.
-   • SMS — For OTP-based authentication and SIM binding.
+   Fuehrer NBFC App may request the following device-level permissions:
+   • Camera — To capture identity documents and your selfie during KYC verification.
+   • Photos — To upload identity documents and income proof from your device.
+   • Biometric (Face ID / Fingerprint) — To authenticate and securely sign in to your account.
 
-   Note: All permissions can be managed by the User via device settings.
+   Note: All permissions are optional and can be managed by the User via device settings.
 
 7. COOKIES
    We may use cookies to:
@@ -167,8 +168,8 @@ This Privacy Policy outlines Fuehrer NBFC's approach to processing of your perso
 12. GRIEVANCE OFFICER
     For privacy-related concerns, please contact:
     Fuehrer NBFC Privacy Team
-    Email: privacy@fueherernbfc.in
-    Helpline: 1800-XXX-XXXX (Toll Free)
+    Email: ${PRIVACY_EMAIL}
+    Helpline: ${SUPPORT_PHONE} (Toll Free)
     Response Time: Within 30 working days.
 
 13. CHANGES TO PRIVACY POLICY
@@ -283,7 +284,7 @@ export default function TermsScreen() {
   const [openModal, setOpenModal] = useState<ModalType>(null);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
-  const bothAccepted = termsAccepted && privacyAccepted;
+  const agreementChecked = termsAccepted && privacyAccepted;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -374,6 +375,7 @@ export default function TermsScreen() {
             </View>
           ))}
         </View>
+        <Text style={styles.protectionText}>Your data is protected with encrypted access.</Text>
       </ScrollView>
 
       {/* Footer */}
@@ -381,7 +383,7 @@ export default function TermsScreen() {
         <Button
           title="Accept & Continue"
           onPress={() => router.push('/(auth)/permissions')}
-          disabled={!bothAccepted}
+          disabled={!agreementChecked}
         />
       </View>
 
@@ -431,7 +433,7 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: 'rgba(37,99,235,0.12)',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: Spacing.sm,
@@ -446,7 +448,7 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.medium,
     fontSize: 11,
     color: Colors.textSecondary,
-    letterSpacing: 4,
+    letterSpacing: 2.5,
     marginTop: 2,
   },
 
@@ -455,6 +457,7 @@ const styles = StyleSheet.create({
     fontSize: FontSize['3xl'],
     color: Colors.primary,
     marginBottom: Spacing.sm,
+    textAlign: 'center',
   },
   subtitle: {
     fontFamily: FontFamily.regular,
@@ -462,6 +465,7 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     lineHeight: 22,
     marginBottom: Spacing.lg,
+    textAlign: 'center',
   },
 
   card: {
@@ -541,6 +545,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: Spacing.sm,
     justifyContent: 'center',
+    marginBottom: Spacing.sm,
   },
   pill: {
     flexDirection: 'row',
@@ -552,11 +557,18 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: Colors.textSecondary,
   },
+  protectionText: {
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.sm,
+    color: Colors.textDisabled,
+    textAlign: 'center',
+    marginBottom: Spacing.md,
+  },
 
   footer: {
     paddingHorizontal: Spacing.xl,
     paddingBottom: Spacing.xl,
-    paddingTop: Spacing.md,
+    paddingTop: Spacing.sm,
     borderTopWidth: 1,
     borderTopColor: Colors.border,
   },

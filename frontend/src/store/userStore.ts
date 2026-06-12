@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { appStorage, secureStorage } from '../core/storage/storage';
 import { SECURE_STORE_KEYS } from '../core/utils/constants';
-import { AuthUser, UserRole } from '../entities/auth';
+import { AuthUser, UserRole, isSalesRole } from '../entities/auth';
 
 // ---------------------------------------------------------------------------
 // Storage routing
@@ -81,6 +81,10 @@ interface UserActions {
   setOnboardingDone: () => Promise<void>;
   clearUser: () => Promise<void>;
   setRole: (role: UserRole) => void;
+  /** True for any of the granular SALES_* roles. */
+  isSales: () => boolean;
+  /** True only for the self-registering customer role. */
+  isCustomer: () => boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -159,6 +163,10 @@ export const useUserStore = create<UserState & UserActions>((set, get) => ({
     // in-session override (e.g. role-switch during active session).
     set({ role });
   },
+
+  isSales: () => isSalesRole(get().role),
+
+  isCustomer: () => get().role === 'customer',
 }));
 
 import { storeResetters } from './storeResetters';

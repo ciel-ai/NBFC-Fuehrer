@@ -13,6 +13,7 @@ import { FontFamily, FontSize, Typography } from '@/src/core/theme/typography';
 import { Spacing, BorderRadius, Shadow } from '@/src/core/theme/spacing';
 import { Header } from '@/src/shared/components/common/Header';
 import { scale } from '@/src/core/utils/responsive';
+import { SUPPORT_PHONE } from '@/src/core/utils/constants';
 
 type StageStatus = 'done' | 'current' | 'pending';
 
@@ -211,7 +212,7 @@ export default function LoanStatusScreen() {
           <Ionicons name="call-outline" size={scale(16)} color={Colors.primary} />
           <Text style={styles.helpText}>
             Questions? Call us at{' '}
-            <Text style={styles.helpLink}>1800-XXX-XXXX</Text>
+            <Text style={styles.helpLink}>{SUPPORT_PHONE}</Text>
             {' '}(Mon–Sat, 9 AM–6 PM)
           </Text>
         </View>
