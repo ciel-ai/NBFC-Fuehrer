@@ -1,4 +1,4 @@
-// src/app.ts
+﻿// src/app.ts
 import { profileRouter } from '@/modules/profile';
 import { notificationsRouter } from '@/modules/notifications/notifications.routes';
 import express from 'express';
@@ -16,7 +16,7 @@ import {
 } from '@/middlewares';
 import { bootstrapEventHandlers } from '@/events';
 
-// ── Module routers ─────────────────────────────────────────────────────────────
+// â”€â”€ Module routers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 import { authRouter } from '@/modules/auth';
 import { healthRouter } from '@/modules/health';
 import { webhooksRouter } from '@/modules/webhooks';
@@ -40,45 +40,45 @@ export function createApp(): express.Application {
     const app = express();
     const api = `/api/${env.apiVersion}`;
 
-    // ── 1. Security headers ────────────────────────────────────────────────────
+    // â”€â”€ 1. Security headers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     app.use(helmet({
         contentSecurityPolicy: env.isProd,
         crossOriginEmbedderPolicy: false,
     }));
 
-    // ── 2. CORS ────────────────────────────────────────────────────────────────
+    // â”€â”€ 2. CORS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     app.use(corsMiddleware);
 
-    // ── 3. Request logger ──────────────────────────────────────────────────────
+    // â”€â”€ 3. Request logger â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     app.use(requestLogger());
 
-    // ── 4. Rate limiter ────────────────────────────────────────────────────────
+    // â”€â”€ 4. Rate limiter â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     app.use(generalLimiter);
 
-    // ── 5. Health — no auth, no body parsing ──────────────────────────────────
+    // â”€â”€ 5. Health â€” no auth, no body parsing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     app.use('/health', healthRouter);
 
-    // ── 6. Webhooks — MUST be before express.json() ───────────────────────────
+    // â”€â”€ 6. Webhooks â€” MUST be before express.json() â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     app.use(`${api}/webhooks`, webhooksRouter);
 
-    // ── 7. Body parsing ────────────────────────────────────────────────────────
+    // â”€â”€ 7. Body parsing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     app.use(express.json({ limit: '1mb' }));
     app.use(express.urlencoded({ extended: true, limit: '1mb' }));
     app.use(compression());
 
-    // ── 8. JWT verification ────────────────────────────────────────────────────
+    // â”€â”€ 8. JWT verification â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     app.use(verifyToken());
 
-    // ── 9. Audit trail ─────────────────────────────────────────────────────────
+    // â”€â”€ 9. Audit trail â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     app.use(auditTrail());
 
-    // ── 10. Bootstrap event + notification handlers ───────────────────────────
+    // â”€â”€ 10. Bootstrap event + notification handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     bootstrapEventHandlers();
 
-    // ── 11. Domain routes ──────────────────────────────────────────────────────
+    // â”€â”€ 11. Domain routes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     app.use('/auth', authRouter);
     app.use('/user', profileRouter);
-app.use('/notifications', notificationsRouter);
+app.use(`${api}/notifications`, notificationsRouter);
     app.use(`${api}/kyc`, kycRouter);
     app.use(`${api}/loans`, loansRouter);
     app.use(`${api}/emi`, emiRouter);
@@ -95,10 +95,10 @@ app.use('/notifications', notificationsRouter);
     app.use(`${api}/consumer-durable-loans`, cdlLoansRouter);
     app.use(`${api}/sales`, salesRouter);
 
-    // ── 12. 404 handler ────────────────────────────────────────────────────────
+    // â”€â”€ 12. 404 handler â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     app.use(notFoundHandler());
 
-    // ── 13. Global error handler ───────────────────────────────────────────────
+    // â”€â”€ 13. Global error handler â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     app.use(errorHandler());
 
     return app;

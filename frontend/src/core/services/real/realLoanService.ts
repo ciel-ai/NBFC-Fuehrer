@@ -1,4 +1,4 @@
-import api from '../../api/api';
+﻿import api from '../../api/api';
 import type { ILoanService } from '../interfaces/ILoanService';
 import type { Loan, EMISchedule, LoanApplication, ApplyLoanResponse } from '@/src/entities/loan';
 
@@ -27,3 +27,4 @@ export const realLoanService: ILoanService = {
     await api.post('/loans/gold/notify', { userId });
   },
 };
+
