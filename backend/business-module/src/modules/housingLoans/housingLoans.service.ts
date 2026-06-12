@@ -266,6 +266,10 @@ export const housingLoansService = {
         };
     },
 
+    activateLoan(userId: string, input: Record<string, unknown>) {
+        return { loanId: `ahl_loan_${Date.now()}`, status: 'ACTIVE', activatedAt: new Date().toISOString(), ...input };
+    },
+
     generateNoc(loanId: string): { nocRef: string; nocS3Url: string } {
         return {
             nocRef: `NOC-AHL-${loanId}-${Date.now()}`,

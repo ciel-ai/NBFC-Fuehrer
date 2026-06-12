@@ -119,4 +119,14 @@ export const cdlLoansController = {
             res.status(HTTP.OK).json(successResponse(result));
         } catch (err) { next(err); }
     },
+
+    activateLoan: async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const userId = req.user!.id;
+        const result = cdlLoansService.activateLoan(userId, req.body);
+        res.status(200).json({ success: true, data: result });
+    } catch (err) {
+        next(err);
+    }
+},
 };

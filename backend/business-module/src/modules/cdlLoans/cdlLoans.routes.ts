@@ -1,4 +1,4 @@
-// src/modules/cdlLoans/cdlLoans.routes.ts
+﻿// src/modules/cdlLoans/cdlLoans.routes.ts
 import { Router } from 'express';
 import { cdlLoansController } from './cdlLoans.controller';
 import { requireAuth, allowRoles } from '@/middlewares';
@@ -9,6 +9,7 @@ const C = ROLE.CUSTOMER;
 const F = ROLE.FINANCE;
 const A = ROLE.SUPER_ADMIN;
 
+router.post('/loans', requireAuth(), allowRoles(C, F), cdlLoansController.activateLoan);
 router.post('/applications', requireAuth(), allowRoles(C), cdlLoansController.submitApplication);
 router.post('/applications/:id/kyc', requireAuth(), allowRoles(C), cdlLoansController.runKycChecks);
 router.post('/applications/:id/compliance', requireAuth(), allowRoles(C), cdlLoansController.runComplianceChecks);

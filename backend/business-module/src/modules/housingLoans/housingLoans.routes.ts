@@ -1,4 +1,4 @@
-// src/modules/housingLoans/housingLoans.routes.ts
+﻿// src/modules/housingLoans/housingLoans.routes.ts
 import { Router } from 'express';
 import { housingLoansController } from './housingLoans.controller';
 import { requireAuth, allowRoles } from '@/middlewares';
@@ -10,6 +10,7 @@ const CREDIT = ROLE.CREDIT_MANAGER;
 const FINANCE = ROLE.FINANCE;
 const ADMIN = ROLE.SUPER_ADMIN;
 
+router.post('/loans', requireAuth(), allowRoles(CUSTOMER, FINANCE, ADMIN), housingLoansController.activateLoan);
 router.post('/applications', requireAuth(), allowRoles(CUSTOMER), housingLoansController.submitApplication);
 router.post('/applications/:id/kyc', requireAuth(), allowRoles(CUSTOMER), housingLoansController.runKyc);
 router.post('/applications/:id/compliance', requireAuth(), allowRoles(CUSTOMER), housingLoansController.runCompliance);
