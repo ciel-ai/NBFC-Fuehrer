@@ -1,4 +1,4 @@
-const userService = require('../services/userService');
+﻿const userService = require('../services/userService');
 const asyncHandler = require('../utils/asyncHandler');
 const { sendSuccess } = require('../utils/response');
 
@@ -43,6 +43,12 @@ const login = asyncHandler(async (req, res) => {
   });
 });
 
+const refresh = asyncHandler(async (req, res) => {
+  const { generateToken } = require('../utils/jwtUtils');
+  const newToken = generateToken(req.user.userId, req.user.phone, req.user.role);
+  sendSuccess(res, { message: 'Token refreshed.', data: { token: newToken } });
+});
+
 const logout = asyncHandler(async (req, res) => {
   const result = await userService.logoutUser(req.user.userId, req.token, req.user.exp);
 
@@ -80,6 +86,7 @@ const getUserById = asyncHandler(async (req, res) => {
 });
 
 module.exports = {
+  refresh,
   register,
   sendOtp,
   verifyOtp,
@@ -89,3 +96,5 @@ module.exports = {
   updateProfile,
   getUserById,
 };
+
+
