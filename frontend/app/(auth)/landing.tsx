@@ -73,7 +73,7 @@ export default function LandingScreen() {
       <View style={styles.footer}>
         <Button
           title="Get Started"
-          onPress={() => router.push('/(auth)/permissions')}
+          onPress={() => router.push('/(public)')}
         />
       </View>
     </SafeAreaView>

@@ -20,14 +20,12 @@ import { Header } from '@/src/shared/components/common/Header';
 import { Button } from '@/src/shared/components/common/Button';
 import { phoneSchema, PhoneFormData } from '@/src/core/utils/validators';
 import { sanitizeInput } from '@/src/core/utils/formatters';
-import { useUserStore } from '@/src/store/userStore';
 import { useServices } from '@/src/core/services/ServiceProvider';
 import { scale } from '@/src/core/utils/responsive';
 
 export default function LoginScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const isMountedRef = useRef(true);
-  const role = useUserStore((s) => s.role) ?? 'customer';
   const { authService } = useServices();
 
   const {
@@ -49,7 +47,7 @@ export default function LoginScreen() {
   const onSubmit = async (data: PhoneFormData) => {
     setIsLoading(true);
     try {
-      await authService.sendOTP({ phone: sanitizeInput(data.phone), role });
+      await authService.sendOTP({ phone: sanitizeInput(data.phone) });
       if (!isMountedRef.current) return;
       router.push({
         pathname: '/(auth)/verify-otp',
@@ -78,9 +76,9 @@ export default function LoginScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <Text style={styles.title}>Login to your account</Text>
+          <Text style={styles.title}>Create Your Account</Text>
           <Text style={styles.subtitle}>
-            Enter your registered mobile number to continue
+            Register to apply for loans, track applications, and manage repayments securely.
           </Text>
 
           <View style={styles.inputSection}>

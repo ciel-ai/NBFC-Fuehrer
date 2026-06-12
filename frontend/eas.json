@@ -56,7 +56,19 @@
     "",
     " NOTE: _comment is a no-op field ignored by EAS CLI.",
     "       Delete it once the placeholders are filled if you prefer clean JSON.",
-    "================================================================"
+    "================================================================",
+    "",
+    " ⚠️ TODO(owner): REPLACE BEFORE ANY STORE BUILD ⚠️",
+    " ───────────────────────────────────────────────",
+    " TODO(owner): build.preview.env.EXPO_PUBLIC_API_URL",
+    "   currently 'https://staging-api.REPLACE_ME.in' → real staging HTTPS host.",
+    " TODO(owner): build.production.env.EXPO_PUBLIC_API_URL",
+    "   currently 'https://api.REPLACE_ME.in' → real production HTTPS host.",
+    " TODO(owner): keep .env.staging / .env.production in sync with the above.",
+    " TODO(owner): submit.*.ios.appleId / appleTeamId / ascAppId.",
+    " TODO(owner): submit.*.android.serviceAccountKeyPath.",
+    " A build that ships with REPLACE_ME hosts cannot reach the backend and",
+    " will be rejected for broken functionality (Apple 2.1 / Play policy)."
   ],
   "cli": {
     "version": ">= 10.0.0",

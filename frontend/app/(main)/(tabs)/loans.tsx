@@ -23,7 +23,12 @@ export default function LoansScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await refetch();
+    // Keep the spinner visible briefly even when the (mock) data resolves
+    // instantly, so the pull-to-refresh feedback is actually seen.
+    await Promise.all([
+      refetch(),
+      new Promise((resolve) => setTimeout(resolve, 600)),
+    ]);
     setRefreshing(false);
   }, [refetch]);
 
@@ -35,6 +40,8 @@ export default function LoansScreen() {
       rate: 'From 9% p.a.',
       icon: 'phone-portrait' as const,
       route: '/(main)/apply/consumer-durable',
+      tint: Colors.primaryLight, // light blue
+      accent: Colors.primary,
     },
     {
       id: 'affordable_housing',
@@ -43,6 +50,8 @@ export default function LoansScreen() {
       rate: 'From 8.40% p.a.',
       icon: 'home' as const,
       route: '/(main)/apply/affordable-housing',
+      tint: Colors.successLight, // light green
+      accent: Colors.success,
     },
     {
       id: 'gold_loan',
@@ -51,6 +60,8 @@ export default function LoansScreen() {
       rate: 'From 0.88%/month',
       icon: 'diamond' as const,
       route: '/(main)/apply/gold-loan',
+      tint: Colors.goldLight, // light yellow
+      accent: Colors.goldDark,
     },
   ];
 
@@ -124,21 +135,25 @@ export default function LoansScreen() {
           {loanProducts.map((product) => (
             <Pressable
               key={product.id}
-              style={({ pressed }) => [styles.productRow, pressed && { opacity: 0.85 }]}
+              style={({ pressed }) => [
+                styles.productRow,
+                { backgroundColor: product.tint, borderColor: `${product.accent}33` },
+                pressed && { opacity: 0.85 },
+              ]}
               onPress={() => router.push(product.route as Parameters<typeof router.push>[0])}
-              android_ripple={{ color: `${Colors.primary}10`, borderless: false }}
+              android_ripple={{ color: `${product.accent}10`, borderless: false }}
               accessibilityRole="button"
               accessibilityLabel={`Apply for ${product.title}`}
             >
-              <View style={styles.productIcon}>
-                <Ionicons name={product.icon} size={scale(20)} color={Colors.primary} />
+              <View style={[styles.productIcon, { backgroundColor: Colors.background }]}>
+                <Ionicons name={product.icon} size={scale(20)} color={product.accent} />
               </View>
               <View style={styles.productContent}>
                 <Text style={styles.productTitle}>{product.title}</Text>
                 <Text style={styles.productDesc}>{product.description}</Text>
               </View>
               <View style={styles.productRate}>
-                <Text style={styles.productRateText}>{product.rate}</Text>
+                <Text style={[styles.productRateText, { color: product.accent }]}>{product.rate}</Text>
                 <Ionicons name="chevron-forward" size={scale(14)} color={Colors.textDisabled} />
               </View>
             </Pressable>
@@ -172,12 +187,11 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   loanCard: {
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.primary,
     borderRadius: BorderRadius.lg,
     padding: Spacing.md,
+    marginBottom: Spacing.md,
     ...Shadow.medium,
-    borderWidth: 1,
-    borderColor: Colors.border,
   },
   loanCardHeader: {
     flexDirection: 'row',
@@ -188,12 +202,12 @@ const styles = StyleSheet.create({
   loanType: {
     fontFamily: FontFamily.semiBold,
     fontSize: FontSize.base,
-    color: Colors.textPrimary,
+    color: Colors.textWhite,
   },
   loanId: {
     fontFamily: FontFamily.regular,
     fontSize: 11,
-    color: Colors.textSecondary,
+    color: 'rgba(255,255,255,0.7)',
   },
   statusBadge: {
     flexDirection: 'row',
@@ -210,8 +224,8 @@ const styles = StyleSheet.create({
   statusText: { fontFamily: FontFamily.semiBold, fontSize: 11, color: Colors.success },
   loanDetails: { flexDirection: 'row', justifyContent: 'space-between' },
   loanDetail: { alignItems: 'center' },
-  detailLabel: { fontFamily: FontFamily.regular, fontSize: 11, color: Colors.textSecondary, marginBottom: 2 },
-  detailValue: { fontFamily: FontFamily.semiBold, fontSize: 13, color: Colors.textPrimary },
+  detailLabel: { fontFamily: FontFamily.regular, fontSize: 11, color: 'rgba(255,255,255,0.7)', marginBottom: 2 },
+  detailValue: { fontFamily: FontFamily.semiBold, fontSize: 13, color: Colors.textWhite },
   productRow: {
     flexDirection: 'row',
     alignItems: 'center',

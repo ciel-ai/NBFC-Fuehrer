@@ -13,6 +13,11 @@
         // sit outside src/ but are still part of the program.
         // ── Module resolution ─────────────────────────────────────────────────────
         "moduleResolution": "node",
+        // "node" (alias node10) and baseUrl are reported as deprecated by TS 7.0
+        // previews. Resolution is intentional (node + tsconfig-paths at runtime),
+        // and baseUrl is required for the @/* path aliases below — so silence the
+        // forward-compat warnings rather than change resolution semantics.
+        "ignoreDeprecations": "6.0",
         "baseUrl": ".",
         // The @/ alias — maps to src/ so imports never use ../../../
         // Works with tsconfig-paths at runtime and jest moduleNameMapper in tests

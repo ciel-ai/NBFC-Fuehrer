@@ -78,7 +78,7 @@ export default function ProfileScreen() {
             <Text style={styles.profileName}>{user?.name ?? 'User'}</Text>
             <Text style={styles.profilePhone}>{user?.phone ?? ''}</Text>
             <View style={styles.kycBadge}>
-              <Ionicons name="checkmark-circle" size={scale(12)} color={Colors.success} />
+              <Ionicons name="checkmark-circle" size={scale(12)} color={Colors.textWhite} />
               <Text style={styles.kycText}>KYC Verified</Text>
             </View>
           </View>
@@ -135,7 +135,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.md,
     margin: Spacing.xl,
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.primary,
     borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
     ...Shadow.medium,
@@ -144,15 +144,15 @@ const styles = StyleSheet.create({
     width: scale(60),
     height: scale(60),
     borderRadius: scale(30),
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: 'rgba(255,255,255,0.18)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarText: { fontFamily: FontFamily.bold, fontSize: FontSize['3xl'], color: Colors.primary },
-  profileName: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: Colors.textPrimary, marginBottom: 2 },
-  profilePhone: { fontFamily: FontFamily.regular, fontSize: 13, color: Colors.textSecondary, marginBottom: 6 },
+  avatarText: { fontFamily: FontFamily.bold, fontSize: FontSize['3xl'], color: Colors.textWhite },
+  profileName: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: Colors.textWhite, marginBottom: 2 },
+  profilePhone: { fontFamily: FontFamily.regular, fontSize: 13, color: 'rgba(255,255,255,0.78)', marginBottom: 6 },
   kycBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  kycText: { fontFamily: FontFamily.medium, fontSize: 11, color: Colors.success },
+  kycText: { fontFamily: FontFamily.medium, fontSize: 11, color: Colors.textWhite },
   menuCard: {
     marginHorizontal: Spacing.xl,
     backgroundColor: Colors.background,

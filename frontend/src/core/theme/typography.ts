@@ -1,16 +1,14 @@
 import { TextStyle } from 'react-native';
 import { moderateScale } from '@/src/core/utils/responsive';
 
+// Only the weights actually loaded via useFonts() in app/_layout.tsx are exposed.
+// Add a weight here ONLY after also loading it there, otherwise text using it
+// falls back silently (iOS) or fails to render (Android).
 export const FontFamily = {
-  thin: 'Inter_100Thin',
-  extraLight: 'Inter_200ExtraLight',
-  light: 'Inter_300Light',
   regular: 'Inter_400Regular',
   medium: 'Inter_500Medium',
   semiBold: 'Inter_600SemiBold',
   bold: 'Inter_700Bold',
-  extraBold: 'Inter_800ExtraBold',
-  black: 'Inter_900Black',
 } as const;
 
 export const FontSize = {

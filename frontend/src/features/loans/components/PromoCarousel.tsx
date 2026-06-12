@@ -71,6 +71,8 @@ const PROMO_ITEMS: PromoItem[] = [
 
 const AUTOPLAY_MS = 4500;
 const RESUME_AFTER_INTERACTION_MS = 6000;
+const CAROUSEL_SIDE_PADDING = scale(20);
+const CARD_GAP = scale(12);
 
 function PaginationDot({ active, color }: { active: boolean; color: string }) {
   const width = useSharedValue(active ? 20 : 6);
@@ -140,8 +142,8 @@ function PromoCard({ item, width }: { item: PromoItem; width: number }) {
 
 export function PromoCarousel() {
   const { width: screenWidth } = useWindowDimensions();
-  const cardWidth = screenWidth - Spacing.xl * 2;
-  const snapInterval = cardWidth + Spacing.sm;
+  const cardWidth = screenWidth - CAROUSEL_SIDE_PADDING * 2;
+  const snapInterval = cardWidth + CARD_GAP;
 
   const scrollRef = useRef<ScrollView>(null);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -199,7 +201,7 @@ export function PromoCarousel() {
         contentContainerStyle={styles.scrollContent}
       >
         {PROMO_ITEMS.map((item, i) => (
-          <View key={item.id} style={{ marginRight: i === PROMO_ITEMS.length - 1 ? 0 : Spacing.sm }}>
+          <View key={item.id} style={{ marginRight: i === PROMO_ITEMS.length - 1 ? 0 : CARD_GAP }}>
             <PromoCard item={item} width={cardWidth} />
           </View>
         ))}
@@ -218,15 +220,15 @@ export function PromoCarousel() {
   );
 }
 
-const CARD_MIN_H = scale(140);
+const CARD_MIN_H = scale(168);
 
 const styles = StyleSheet.create({
   container: { marginBottom: Spacing.md },
-  scrollContent: { paddingHorizontal: Spacing.xl },
+  scrollContent: { paddingHorizontal: CAROUSEL_SIDE_PADDING },
 
   card: {
     borderRadius: BorderRadius.xl,
-    minHeight: CARD_MIN_H,
+    height: CARD_MIN_H,
     overflow: 'hidden',
     ...Shadow.medium,
   },
@@ -306,7 +308,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: 'rgba(255,255,255,0.18)',
+    backgroundColor: 'rgba(255,255,255,0.15)',
     paddingHorizontal: Spacing.sm,
     paddingVertical: 5,
     borderRadius: BorderRadius.full,

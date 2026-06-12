@@ -8,6 +8,8 @@ import {
   Pressable,
   KeyboardAvoidingView,
   Platform,
+  Image,
+  ImageSourcePropType,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -27,10 +29,14 @@ interface Product {
   icon: keyof typeof Ionicons.glyphMap;
   iconColor: string;
   iconBg: string;
+  image?: ImageSourcePropType;
 }
 
 const PRODUCTS_BY_CATEGORY: Record<string, Product[]> = {
   mobile: [
+    // NOTE: product thumbnails fall back to the branded Ionicons below. Do NOT add
+    // remote `image: { uri }` URLs here — they break offline and risk trademark
+    // issues at review. Bundle local require() assets if real photos are needed.
     { id: 'm1', name: 'iPhone 15', brand: 'Apple', mrp: 79900, loanAmount: 75000, icon: 'phone-portrait', iconColor: Colors.primary, iconBg: Colors.primaryLight },
     { id: 'm2', name: 'Galaxy S24', brand: 'Samsung', mrp: 74999, loanAmount: 70000, icon: 'phone-portrait', iconColor: '#1a73e8', iconBg: '#E8F0FE' },
     { id: 'm3', name: 'Pixel 8', brand: 'Google', mrp: 59999, loanAmount: 55000, icon: 'phone-portrait', iconColor: '#34A853', iconBg: '#E6F4EA' },
@@ -48,10 +54,29 @@ const PRODUCTS_BY_CATEGORY: Record<string, Product[]> = {
   ],
 };
 
-const DEFAULT_PRODUCTS = PRODUCTS_BY_CATEGORY.mobile;
+const ALL_PRODUCTS = Object.values(PRODUCTS_BY_CATEGORY).flat();
 
 function formatPrice(n: number) {
   return '₹' + n.toLocaleString('en-IN');
+}
+
+/** Product thumbnail: shows the photo, falling back to the icon if it fails. */
+function ProductThumb({ item }: { item: Product }) {
+  const [failed, setFailed] = useState(false);
+  return (
+    <View style={[styles.thumb, { backgroundColor: item.iconBg }]}>
+      {item.image && !failed ? (
+        <Image
+          source={item.image}
+          style={styles.thumbImg}
+          resizeMode="contain"
+          onError={() => setFailed(true)}
+        />
+      ) : (
+        <Ionicons name={item.icon} size={scale(26)} color={item.iconColor} />
+      )}
+    </View>
+  );
 }
 
 export default function ProductListingScreen() {
@@ -61,7 +86,9 @@ export default function ProductListingScreen() {
   }>();
 
   const [search, setSearch] = useState('');
-  const products = PRODUCTS_BY_CATEGORY[categoryId ?? ''] ?? DEFAULT_PRODUCTS;
+  const products = categoryId
+    ? PRODUCTS_BY_CATEGORY[categoryId] ?? ALL_PRODUCTS
+    : ALL_PRODUCTS;
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -95,9 +122,7 @@ export default function ProductListingScreen() {
       accessibilityRole="button"
       accessibilityLabel={`${item.name} by ${item.brand}, MRP ${formatPrice(item.mrp)}, loan up to ${formatPrice(item.loanAmount)}`}
     >
-      <View style={[styles.thumb, { backgroundColor: item.iconBg }]}>
-        <Ionicons name={item.icon} size={scale(26)} color={item.iconColor} />
-      </View>
+      <ProductThumb item={item} />
 
       <View style={styles.rowInfo}>
         <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
@@ -129,7 +154,7 @@ export default function ProductListingScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Header title={categoryName ?? 'Products'} showBack />
+      <Header title={categoryName ?? 'All Products'} showBack />
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -263,6 +288,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
+    overflow: 'hidden',
+  },
+  thumbImg: {
+    width: '82%',
+    height: '82%',
   },
   rowInfo: { flex: 1 },
   productName: {

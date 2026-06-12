@@ -23,7 +23,11 @@ import { formatCountdown, maskPhone } from '@/src/core/utils/formatters';
 import { useAuthStore } from '@/src/store/authStore';
 import { useUserStore } from '@/src/store/userStore';
 import { useKycStore } from '@/src/store/kycStore';
+import { useSalesStore } from '@/src/store/salesStore';
+import { resetAllStores } from '@/src/store/storeResetters';
 import { KycStep, KycStatus } from '@/src/entities/kyc';
+import { isSalesRole } from '@/src/entities/auth';
+import { salesRoleToProduct } from '@/src/entities/salesAgent';
 import { useServices } from '@/src/core/services/ServiceProvider';
 import { MOCK_OTP } from '@/src/core/utils/constants';
 
@@ -43,7 +47,7 @@ export default function VerifyOTPScreen() {
 
   const login = useAuthStore((s) => s.login);
   const setUser = useUserStore((s) => s.setUser);
-  const role = useUserStore((s) => s.role) ?? 'customer';
+  const setSalesSession = useSalesStore((s) => s.setSession);
   const setEngineState = useKycStore((s) => s.setEngineState);
 
   const { secondsLeft, canResend, restart } = useOTPTimer();
@@ -111,10 +115,44 @@ export default function VerifyOTPScreen() {
         const result = await authService.verifyOTP({ phone, otp: otpValue });
         if (!isMountedRef.current) return;
 
+        const role = result.user.role;
+
+        // Defensive: the server returned a role the app doesn't recognise.
+        // Never persist it — clear any partial session and stop.
+        if (role !== 'customer' && !isSalesRole(role)) {
+          await resetAllStores();
+          Alert.alert(
+            'Account not configured',
+            'Your account role is not configured. Contact admin.',
+          );
+          return;
+        }
+
         await setUser(result.user);
         await login(result.accessToken, result.refreshToken);
         if (!isMountedRef.current) return;
 
+        // ── Sales agents: skip the customer MPIN/onboarding chain and route
+        // straight to their product dashboard. The product is derived from the
+        // role (never chosen client-side). ───────────────────────────────────
+        if (isSalesRole(role)) {
+          const product = salesRoleToProduct(role);
+          await setSalesSession(
+            result.agent ?? {
+              id: result.user.id,
+              employeeId: result.user.id,
+              name: result.user.name,
+              phone: result.user.phone,
+              product,
+              branch: '',
+            },
+          );
+          if (!isMountedRef.current) return;
+          router.replace('/(sales)');
+          return;
+        }
+
+        // ── Customer: continue the existing onboarding/MPIN flow. ────────────
         if (result.kycComplete) {
           setEngineState({ currentStep: KycStep.COMPLETED, status: KycStatus.COMPLETED });
         }
@@ -141,6 +179,12 @@ export default function VerifyOTPScreen() {
         } else if (code === 'NETWORK_ERROR') {
           setErrorMessage('Network error. Check your connection and try again.');
           Alert.alert('Network Error', 'Please check your connection and try again.');
+        } else if (code === 'ACCESS_DENIED') {
+          // Admin-deactivated / unauthorised number (403).
+          const message = err?.message || 'Access not authorized. Contact your administrator.';
+          setOtp('');
+          setErrorMessage(message);
+          Alert.alert('Access denied', message);
         } else {
           setErrorMessage('Something went wrong. Please try again.');
           Alert.alert('Error', 'Something went wrong. Please try again.');
@@ -151,7 +195,7 @@ export default function VerifyOTPScreen() {
         }
       }
     },
-    [phone, isLoading, login, restart, setUser, setEngineState]
+    [phone, isLoading, login, restart, setUser, setSalesSession, setEngineState]
   );
 
   const handleResend = async () => {
@@ -159,7 +203,7 @@ export default function VerifyOTPScreen() {
     try {
       setResendLoading(true);
       setErrorMessage(null);
-      await authService.sendOTP({ phone, role });
+      await authService.sendOTP({ phone });
       if (!isMountedRef.current) return;
       restart();
       setOtp('');

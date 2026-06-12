@@ -6,6 +6,7 @@ import {
   ScrollView,
   Pressable,
   Alert,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -63,11 +64,24 @@ export default function KYCStep2Screen() {
 
   const handlePermissionRequest = async () => {
     const result = await requestPermission();
-    if (!result.granted) {
+    if (result.granted) return;
+
+    if (result.canAskAgain) {
+      // OS prompt was shown and declined — let them try again from the button.
+      Alert.alert(
+        'Camera access needed',
+        'Please allow camera access to take a selfie for liveness verification.',
+        [{ text: 'OK' }]
+      );
+    } else {
+      // Permanently denied — the OS won't prompt again, so route to Settings.
       Alert.alert(
         'Camera Required',
-        'Please enable camera permission in your device settings to take a selfie.',
-        [{ text: 'OK' }]
+        'Camera access is blocked. Enable it in Settings to take your selfie, then return to continue.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Open Settings', onPress: () => Linking.openSettings() },
+        ]
       );
     }
   };

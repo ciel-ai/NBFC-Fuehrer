@@ -38,7 +38,8 @@ export function mockDelay<T>(data: T, ms = 1500): Promise<T> {
 // ────────────────────────────────────────────────────────────────────────────
 
 /** API hostname used for OkHttp pattern matching on Android. */
-const PINNED_HOSTNAME = 'api.REPLACE_ME.in';  // ← REPLACE with your API hostname
+// TODO(owner): replace with real value (your API hostname, e.g. api.fuehrer.in)
+const PINNED_HOSTNAME = 'api.REPLACE_ME.in';
 
 /**
  * SHA-256 SPKI hashes (raw base-64, without the "sha256/" prefix).
@@ -46,9 +47,26 @@ const PINNED_HOSTNAME = 'api.REPLACE_ME.in';  // ← REPLACE with your API hostn
  * internally, so do NOT add "sha256/" here.
  */
 const SSL_PINNED_HASHES: string[] = [
-  'REPLACE_WITH_PRIMARY_SHA256_SPKI_HASH=',  // ← REPLACE before production build
-  'REPLACE_WITH_BACKUP_SHA256_SPKI_HASH=',   // ← backup hash for certificate rotation
+  // TODO(owner): replace with real value (primary SHA-256 SPKI hash)
+  'REPLACE_WITH_PRIMARY_SHA256_SPKI_HASH=',
+  // TODO(owner): replace with real value (backup hash for certificate rotation)
+  'REPLACE_WITH_BACKUP_SHA256_SPKI_HASH=',
 ];
+
+/**
+ * Pinning is only safe to enable once real hashes are present. If any hash (or
+ * the hostname) still contains the "REPLACE" placeholder token, pinning against
+ * those fake values would reject EVERY request and brick the app. In that case
+ * we skip the pinned adapter and fall back to the platform's default trust store
+ * (OS-level TLS validation still applies). This guarantees the app keeps working
+ * if someone forgets to paste the hashes, while still pinning in a correct build.
+ */
+function isPinningConfigured(hashes: string[], hostname: string): boolean {
+  if (hostname.includes('REPLACE')) return false;
+  return hashes.length > 0 && hashes.every((h) => h && !h.includes('REPLACE'));
+}
+
+const PINNING_READY = isPinningConfigured(SSL_PINNED_HASHES, PINNED_HOSTNAME);
 
 // Response shape returned by react-native-ssl-pinning's fetch.
 interface PinnedFetchResponse {
@@ -160,6 +178,25 @@ function createPinnedAdapter(hashes: string[]): AxiosAdapter {
 // On native (iOS/Android) the pinned adapter is used; on web the default
 // XMLHttpRequest adapter is used (certificate pinning is not applicable in
 // browsers — the platform enforces its own trust store).
+const shouldPin =
+  Platform.OS !== 'web' &&
+  API_BASE_URL.startsWith('https://') &&
+  PINNING_READY;
+
+if (
+  Platform.OS !== 'web' &&
+  API_BASE_URL.startsWith('https://') &&
+  !PINNING_READY
+) {
+  // Placeholder hashes/hostname detected — pin against them would reject every
+  // request, so we disable pinning and rely on OS-level TLS validation instead.
+  console.warn(
+    '[api] SSL pinning DISABLED: PINNED_HOSTNAME / SSL_PINNED_HASHES still ' +
+      'contain REPLACE placeholders. Paste real SHA-256 SPKI hashes before the ' +
+      'production build to enable certificate pinning.',
+  );
+}
+
 const api: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
   timeout: API_TIMEOUT,
@@ -167,7 +204,7 @@ const api: AxiosInstance = axios.create({
     'Content-Type': 'application/json',
     Accept: 'application/json',
   },
-  adapter: (Platform.OS !== 'web' && API_BASE_URL.startsWith('https://')) ? createPinnedAdapter(SSL_PINNED_HASHES) : undefined,
+  adapter: shouldPin ? createPinnedAdapter(SSL_PINNED_HASHES) : undefined,
 });
 
 // Guard: enforce HTTPS in production (allow http://localhost for dev)
