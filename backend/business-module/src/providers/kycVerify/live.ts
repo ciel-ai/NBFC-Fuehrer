@@ -85,7 +85,7 @@ export class PerfiosKycProvider implements IKycVerifyProvider {
                         rawResponse: d,
                     };
                 } catch (err) {
-                    throw KYC_VENDOR_ERRORS.aadhaarVerifyFailed(err);
+                    const axErr = err as any; console.error('PERFIOS_403_BODY:', JSON.stringify(axErr?.response?.data)); throw KYC_VENDOR_ERRORS.aadhaarVerifyFailed(err);
                 }
             },
             retry: { maxAttempts: 2 },
@@ -119,7 +119,7 @@ export class PerfiosKycProvider implements IKycVerifyProvider {
                         rawResponse: d,
                     };
                 } catch (err) {
-                    throw KYC_VENDOR_ERRORS.aadhaarVerifyFailed(err);
+                    const axErr = err as any; console.error('PERFIOS_403_BODY:', JSON.stringify(axErr?.response?.data)); throw KYC_VENDOR_ERRORS.aadhaarVerifyFailed(err);
                 }
             },
             retry: { maxAttempts: 3, delayMs: 1000 },
@@ -142,7 +142,7 @@ export class PerfiosKycProvider implements IKycVerifyProvider {
                     const d = res.data;
                     return { linked: isSuccess(d.statusCode), rawResponse: d };
                 } catch (err) {
-                    throw KYC_VENDOR_ERRORS.aadhaarVerifyFailed(err);
+                    const axErr = err as any; console.error('PERFIOS_403_BODY:', JSON.stringify(axErr?.response?.data)); throw KYC_VENDOR_ERRORS.aadhaarVerifyFailed(err);
                 }
             },
             retry: { maxAttempts: 3 },
