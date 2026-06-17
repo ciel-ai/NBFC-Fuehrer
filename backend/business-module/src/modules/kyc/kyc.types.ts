@@ -113,8 +113,6 @@ export interface AadhaarOtpRequestInput {
 
 export interface AadhaarOtpVerifyInput {
     userId: string;
-    otp: string;
-    shareCode: string;
 }
 
 // ─── Document upload ──────────────────────────────────────────────────────────

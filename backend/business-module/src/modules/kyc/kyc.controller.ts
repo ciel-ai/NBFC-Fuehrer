@@ -64,15 +64,67 @@ export const kycController = {
     // POST /kyc/aadhaar/otp-verify
     async verifyAadhaarOtp(req: AuthRequest, res: Response, next: NextFunction) {
         try {
-            const body = getValidatedBody<{ otp: string; shareCode: string }>(req);
-            const input: AadhaarOtpVerifyInput = {
-                userId: req.user.id,
-                ...body,
-            };
+           const input: AadhaarOtpVerifyInput = {
+    userId: req.user.id,
+};
             const result = await kycService.verifyAadhaarOtp(input, req);
             res.status(HTTP.OK).json(successResponse(result, 'Aadhaar verified'));
         } catch (err) { next(err); }
     },
+
+    // POST /kyc/verify-pan
+async verifyPan(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+        const body = getValidatedBody<{ pan: string; fullName: string; dob: string }>(req);
+        const result = await kycService.runPanVerification(req.user.id, body.fullName, body.dob, req);
+        res.status(HTTP.OK).json(successResponse(result, 'PAN verified'));
+    } catch (err) { next(err); }
+},
+
+// POST /kyc/verify-bank
+async verifyBank(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+        const body = getValidatedBody<{ accountNumber: string; ifsc: string; accountHolder: string }>(req);
+        const result = await kycService.runBankVerification(req.user.id, body.accountNumber, body.ifsc, body.accountHolder, req);
+        res.status(HTTP.OK).json(successResponse(result, 'Bank account verified'));
+    } catch (err) { next(err); }
+},
+
+// POST /kyc/verify-bank-advanced
+async verifyBankAdvanced(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+        const body = getValidatedBody<{ accountNumber: string; ifsc: string }>(req);
+        const result = await kycService.runBankVerificationAdvanced(req.user.id, body.accountNumber, body.ifsc, req);
+        res.status(HTTP.OK).json(successResponse(result, 'Bank account verified (advanced)'));
+    } catch (err) { next(err); }
+},
+
+// POST /kyc/name-similarity
+async checkNameSimilarity(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+        const body = getValidatedBody<{ name1: string; name2: string }>(req);
+        const result = await kycService.runNameSimilarity(req.user.id, body.name1, body.name2, req);
+        res.status(HTTP.OK).json(successResponse(result, 'Name similarity checked'));
+    } catch (err) { next(err); }
+},
+
+// POST /kyc/verify-bank-silent
+async verifySilentBank(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+        const body = getValidatedBody<{ accountNumber: string; ifsc: string }>(req);
+        const result = await kycService.runSilentBankVerification(req.user.id, body.accountNumber, body.ifsc, req);
+        res.status(HTTP.OK).json(successResponse(result, 'Silent bank verification completed'));
+    } catch (err) { next(err); }
+},
+
+// POST /kyc/verify-gst
+async verifyGST(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+        const body = getValidatedBody<{ gstin: string }>(req);
+        const result = await kycService.runGSTVerification(req.user.id, body.gstin, req);
+        res.status(HTTP.OK).json(successResponse(result, 'GST verified'));
+    } catch (err) { next(err); }
+},
 
     // POST /kyc/documents/upload  (multipart — multer runs before this)
     async uploadDocument(req: AuthRequest, res: Response, next: NextFunction) {

@@ -17,6 +17,12 @@ import {
     requestESignSchema,
     manualOverrideSchema,
     userIdParamSchema,
+    panVerifySchema,
+    bankVerifySchema,
+     bankVerifyAdvancedSchema,
+     nameSimilaritySchema,
+     silentBankVerifySchema,
+     gstVerifySchema
 } from './kyc.dto';
 import { ROLE, BUSINESS_RULES } from '@/config/constants';
 
@@ -129,8 +135,54 @@ router.post(
     requireAuth(),
     allowRoles(ROLE.CUSTOMER),
     kycLimiter,
-    validateBody(initiateKycSchema),
-    kycController.initiate, // TODO: replace with kycController.verifyPan
+    validateBody(panVerifySchema),
+    kycController.verifyPan,
+);
+
+// POST /kyc/verify-bank
+router.post(
+    '/verify-bank',
+    requireAuth(),
+    allowRoles(ROLE.CUSTOMER),
+    kycLimiter,
+    validateBody(bankVerifySchema),
+    kycController.verifyBank,
+);
+
+router.post(
+    '/verify-bank-advanced',
+    requireAuth(),
+    allowRoles(ROLE.CUSTOMER),
+    kycLimiter,
+    validateBody(bankVerifyAdvancedSchema),
+    kycController.verifyBankAdvanced,
+);
+
+router.post(
+    '/verify-bank-silent',
+    requireAuth(),
+    allowRoles(ROLE.CUSTOMER),
+    kycLimiter,
+    validateBody(silentBankVerifySchema),
+    kycController.verifySilentBank,
+);
+
+router.post(
+    '/verify-gst',
+    requireAuth(),
+    allowRoles(ROLE.CUSTOMER),
+    kycLimiter,
+    validateBody(gstVerifySchema),
+    kycController.verifyGST,
+);
+
+router.post(
+    '/name-similarity',
+    requireAuth(),
+    allowRoles(ROLE.CUSTOMER),
+    kycLimiter,
+    validateBody(nameSimilaritySchema),
+    kycController.checkNameSimilarity,
 );
 
 // POST /kyc/pan/verify → canonical path (matches API docs)
@@ -178,3 +230,5 @@ router.post(
 );
 
 export { router as kycRouter };
+
+

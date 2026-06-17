@@ -197,7 +197,7 @@ export const kycService = {
     input: AadhaarOtpVerifyInput,
     req: Request,
 ): Promise<KycStatusResponse> {
-    const { userId, otp, shareCode } = input;
+    const { userId } = input;
     const doc = await kycRepository.findByUserIdOrThrow(userId);
 
     if (!doc.aadhaarEncrypted) {
@@ -216,7 +216,7 @@ export const kycService = {
     const aadhaarPlain = await enc.decrypt(doc.aadhaarEncrypted);
     const kycProvider = getKycVerifyProvider();
 
-    const result = await kycProvider.verifyAadhaar(aadhaarPlain, accessKey, shareCode);
+    const result = await kycProvider.verifyAadhaar(aadhaarPlain, accessKey, '');
 
     // Clean up accessKey after use
     await redis.del(`kyc:aadhaar:accessKey:${userId}`);
@@ -490,6 +490,88 @@ export const kycService = {
             failReason: result.valid ? undefined : 'Bank account verification failed',
         };
     },
+
+    async runBankVerificationAdvanced(
+    userId: string,
+    accountNumber: string,
+    ifsc: string,
+    req: Request,
+): Promise<KycCheckResult> {
+    const kycProvider = getKycVerifyProvider();
+
+    const result = await kycProvider.verifyBankAccountAdvanced(
+        accountNumber,
+        ifsc,
+    );
+
+    await kycRepository.appendSignzyResponse(
+    userId, 'bankAccount', result.rawResponse,
+);
+    await kycRepository.recordCheckResult(
+        userId, KYC_CHECK.BANK_ACCOUNT, result.valid,
+    );
+    kycEvents.checkCompleted(
+        userId, KYC_CHECK.BANK_ACCOUNT, result.valid, undefined, req,
+    );
+
+    return {
+        checkType: KYC_CHECK.BANK_ACCOUNT,
+        passed: result.valid,
+        data: result,
+        failReason: result.valid ? undefined : 'Bank account verification (advanced) failed',
+    };
+},
+
+async runNameSimilarity(
+    userId: string,
+    name1: string,
+    name2: string,
+    req: Request,
+): Promise<KycCheckResult> {
+    const kycProvider = getKycVerifyProvider();
+    const result = await kycProvider.checkNameSimilarity(name1, name2);
+    return {
+        checkType: KYC_CHECK.PAN_VERIFY,
+        passed: result.similar,
+        score: result.score,
+        data: result,
+        failReason: result.similar ? undefined : 'Names do not match',
+    };
+},
+
+async runSilentBankVerification(
+    userId: string,
+    accountNumber: string,
+    ifsc: string,
+    req: Request,
+): Promise<KycCheckResult> {
+    const kycProvider = getKycVerifyProvider();
+    const result = await kycProvider.silentBankVerify(accountNumber, ifsc);
+    await kycRepository.appendSignzyResponse(userId, 'bankAccount', result.rawResponse);
+    await kycRepository.recordCheckResult(userId, KYC_CHECK.BANK_ACCOUNT, result.valid);
+    kycEvents.checkCompleted(userId, KYC_CHECK.BANK_ACCOUNT, result.valid, undefined, req);
+    return {
+        checkType: KYC_CHECK.BANK_ACCOUNT,
+        passed: result.valid,
+        data: result,
+        failReason: result.valid ? undefined : 'Silent bank verification failed',
+    };
+},
+
+async runGSTVerification(
+    userId: string,
+    gstin: string,
+    req: Request,
+): Promise<KycCheckResult> {
+    const kycProvider = getKycVerifyProvider();
+    const result = await kycProvider.verifyGST(gstin);
+    return {
+        checkType: KYC_CHECK.PAN_VERIFY,
+        passed: result.valid,
+        data: result,
+        failReason: result.valid ? undefined : 'GST verification failed',
+    };
+},
 
     // ── 9. Analyse bank statement ─────────────────────────────────────────────────
 

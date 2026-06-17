@@ -54,23 +54,9 @@ export const aadhaarOtpRequestSchema = Joi.object({
 
 // ─── Aadhaar OTP verify ────────────────────────────────────────────────────────
 
-export const aadhaarOtpVerifySchema = Joi.object({
-    otp: Joi.string()
-        .length(6)
-        .pattern(/^\d{6}$/)
-        .required()
-        .messages({
-            'string.pattern.base': 'OTP must be exactly 6 digits',
-        }),
-
-    shareCode: Joi.string()
-        .length(4)
-        .pattern(/^\d{4}$/)
-        .required()
-        .messages({
-            'string.pattern.base': 'Share code must be exactly 4 digits',
-        }),
-});
+// Perfios Aadhaar Number Verification does not require OTP or shareCode.
+// The accessKey from consent step is stored in Redis and used automatically.
+export const aadhaarOtpVerifySchema = Joi.object({});
 
 // ─── Document upload ───────────────────────────────────────────────────────────
 
@@ -107,4 +93,34 @@ export const manualOverrideSchema = Joi.object({
 
 export const userIdParamSchema = Joi.object({
     userId: Joi.string().uuid({ version: 'uuidv4' }).required(),
+});
+
+export const panVerifySchema = Joi.object({
+    fullName: Joi.string().trim().min(2).max(100).required(),
+    dob: Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/).required(),
+});
+
+export const bankVerifySchema = Joi.object({
+    accountNumber: Joi.string().min(5).max(25).required(),
+    ifsc: Joi.string().length(11).required(),
+    accountHolder: Joi.string().min(2).max(100).required(),
+});
+
+export const bankVerifyAdvancedSchema = Joi.object({
+    accountNumber: Joi.string().min(5).max(25).required(),
+    ifsc: Joi.string().length(11).required(),
+});
+
+export const nameSimilaritySchema = Joi.object({
+    name1: Joi.string().min(2).max(100).required(),
+    name2: Joi.string().min(2).max(100).required(),
+});
+
+export const silentBankVerifySchema = Joi.object({
+    accountNumber: Joi.string().min(5).max(25).required(),
+    ifsc: Joi.string().length(11).required(),
+});
+
+export const gstVerifySchema = Joi.object({
+    gstin: Joi.string().length(15).required(),
 });
