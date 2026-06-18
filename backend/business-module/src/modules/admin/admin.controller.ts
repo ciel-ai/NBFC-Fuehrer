@@ -162,6 +162,23 @@ async updateBranch(req: AuthRequest, res: Response, next: NextFunction) {
     } catch (err) { next(err); }
 },
 
+// GET /admin/loans
+async listAllLoans(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+        const result = await adminService.listAllLoans(req.query);
+        res.status(HTTP.OK).json(successResponse(result));
+    } catch (err) { next(err); }
+},
+
+// GET /admin/loans/:loanId
+async getLoanDetail(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+        const loanId = req.params.loanId as string;
+        const result = await adminService.getLoanDetail(loanId);
+        res.status(HTTP.OK).json(successResponse(result));
+    } catch (err) { next(err); }
+},
+
 };
 
 

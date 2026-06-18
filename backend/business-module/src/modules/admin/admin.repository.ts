@@ -89,7 +89,7 @@ export const adminRepository = {
             updated_at: new Date(),
         },
     });
-        return mapAdminUser(row as unknown as Record<string, unknown>);
+    return mapAdminUser(row as unknown as Record<string, unknown>);
     },
 
     async findAdminUserById(id: string): Promise<AdminUser | null> {

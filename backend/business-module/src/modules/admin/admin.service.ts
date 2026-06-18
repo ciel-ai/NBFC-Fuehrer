@@ -46,13 +46,10 @@ async function buildAlerts(): Promise<SystemAlert[]> {
     const { prisma } = await import('@/config/database');
     const alerts: SystemAlert[] = [];
 
-    // Pending KYC over 48 hours
     const staleKyc = await prisma.kyc_documents.count({
         where: {
             overall_status: 'IN_PROGRESS',
-            updated_at: {
-                lt: new Date(Date.now() - 48 * 60 * 60 * 1000),
-            },
+            updated_at: { lt: new Date(Date.now() - 48 * 60 * 60 * 1000) },
         },
     });
     if (staleKyc > 0) {
@@ -65,7 +62,6 @@ async function buildAlerts(): Promise<SystemAlert[]> {
         });
     }
 
-    // Failed disbursements
     const failedDisbursements = await prisma.disbursements.count({
         where: { status: 'FAILED' },
     });
@@ -79,7 +75,6 @@ async function buildAlerts(): Promise<SystemAlert[]> {
         });
     }
 
-    // High NPA rate
     const portfolio = await adminRepository.getPlatformStats();
     if (portfolio.npaRate > 5) {
         alerts.push({
@@ -98,7 +93,6 @@ async function buildAlerts(): Promise<SystemAlert[]> {
         });
     }
 
-    // Unassigned collection cases
     const unassignedCases = await prisma.collection_cases.count({
         where: { status: 'OPEN', assigned_to: null },
     });
@@ -112,13 +106,10 @@ async function buildAlerts(): Promise<SystemAlert[]> {
         });
     }
 
-    // Pending approvals over 24 hours
     const stalePendingApprovals = await prisma.loan_applications.count({
         where: {
             status: 'PENDING_APPROVAL',
-            updated_at: {
-                lt: new Date(Date.now() - 24 * 60 * 60 * 1000),
-            },
+            updated_at: { lt: new Date(Date.now() - 24 * 60 * 60 * 1000) },
         },
     });
     if (stalePendingApprovals > 0) {
@@ -138,32 +129,29 @@ async function buildAlerts(): Promise<SystemAlert[]> {
 
 export const adminService = {
 
-    // ── 1. Admin user management ───────────────────────────────────────────────
-
     async createAdminUser(
-    input: CreateAdminUserInput,
-    req: Request,
-): Promise<AdminUserResponse> {
-    const existing = await adminRepository.findAdminUserByEmail(input.email);
-    if (existing) {
-        throw new ConflictError(
-            `An admin user with email ${input.email} already exists`,
-            { email: input.email },
-        );
-    }
+        input: CreateAdminUserInput,
+        req: Request,
+    ): Promise<AdminUserResponse> {
+        const existing = await adminRepository.findAdminUserByEmail(input.email);
+        if (existing) {
+            throw new ConflictError(
+                `An admin user with email ${input.email} already exists`,
+                { email: input.email },
+            );
+        }
 
-    // Hash password if provided
-    let passwordHash: string | undefined;
-    if (input.password) {
-        const bcrypt = await import('bcryptjs');
-        passwordHash = await bcrypt.hash(input.password, 12);
-    }
+        let passwordHash: string | undefined;
+        if (input.password) {
+            const bcrypt = await import('bcryptjs');
+            passwordHash = await bcrypt.hash(input.password, 12);
+        }
 
-    const user = await adminRepository.createAdminUser({
-        ...input,
-        passwordHash,
-        createdBy: (req as any).user?.id,
-    });
+        const user = await adminRepository.createAdminUser({
+            ...input,
+            passwordHash,
+            createdBy: (req as any).user?.id,
+        });
 
         setAuditContext(req, {
             action: 'ADMIN_USER_CREATED',
@@ -189,11 +177,7 @@ export const adminService = {
     ): Promise<AdminUserResponse> {
         const user = await adminRepository.findAdminUserByIdOrThrow(userId);
 
-        // Super admins cannot suspend other super admins
-        if (
-            user.role === 'SUPER_ADMIN' &&
-            input.status === 'SUSPENDED'
-        ) {
+        if (user.role === 'SUPER_ADMIN' && input.status === 'SUSPENDED') {
             throw new ForbiddenError('Super Admin accounts cannot be suspended');
         }
 
@@ -224,8 +208,6 @@ export const adminService = {
         return toResponse(user);
     },
 
-    // ── 2. System configuration ────────────────────────────────────────────────
-
     async getAllConfigs() {
         return adminRepository.getAllConfigs();
     },
@@ -236,10 +218,7 @@ export const adminService = {
         return config;
     },
 
-    async updateConfig(
-        input: UpdateSystemConfigInput,
-        req: Request,
-    ) {
+    async updateConfig(input: UpdateSystemConfigInput, req: Request) {
         const descriptions: Record<ConfigKey, string> = {
             MAX_LOAN_AMOUNT: 'Maximum loan amount in INR',
             MIN_LOAN_AMOUNT: 'Minimum loan amount in INR',
@@ -291,19 +270,14 @@ export const adminService = {
         return config;
     },
 
-    // ── 3. Dashboard ───────────────────────────────────────────────────────────
-
     async getDashboard(): Promise<AdminDashboard> {
         const [platform, today, alerts] = await Promise.all([
             adminRepository.getPlatformStats(),
             adminRepository.getTodayStats(),
             buildAlerts(),
         ]);
-
         return { platform, today, alerts };
     },
-
-    // ── 4. Maintenance mode ────────────────────────────────────────────────────
 
     async setMaintenanceMode(
         enabled: boolean,
@@ -312,21 +286,13 @@ export const adminService = {
         req: Request,
     ): Promise<void> {
         await this.updateConfig(
-            {
-                key: 'MAINTENANCE_MODE',
-                value: String(enabled),
-                updatedBy: setBy,
-            },
+            { key: 'MAINTENANCE_MODE', value: String(enabled), updatedBy: setBy },
             req,
         );
 
         if (message) {
             await this.updateConfig(
-                {
-                    key: 'MAINTENANCE_MESSAGE',
-                    value: message,
-                    updatedBy: setBy,
-                },
+                { key: 'MAINTENANCE_MESSAGE', value: message, updatedBy: setBy },
                 req,
             );
         }
@@ -334,17 +300,11 @@ export const adminService = {
         log.warn('Maintenance mode changed', { enabled, setBy });
     },
 
-    // ── 5. Check maintenance mode (used by middleware) ─────────────────────────
-
-    async isMaintenanceMode(): Promise<{
-        active: boolean;
-        message: string;
-    }> {
+    async isMaintenanceMode(): Promise<{ active: boolean; message: string }> {
         const config = await adminRepository.getConfig('MAINTENANCE_MODE');
         if (!config || config.value !== 'true') {
             return { active: false, message: '' };
         }
-
         const msgConfig = await adminRepository.getConfig('MAINTENANCE_MESSAGE');
         return {
             active: true,
@@ -352,35 +312,82 @@ export const adminService = {
         };
     },
 
+    // ── Branch management ─────────────────────────────────────────────────────
+
     async listBranches() {
-    const { prisma } = await import('@/config/database');
-    const rows = await prisma.branches.findMany({ orderBy: { created_at: 'desc' } });
-    return rows;
-},
+        const { prisma } = await import('@/config/database');
+        const rows = await prisma.branches.findMany({ orderBy: { created_at: 'desc' } });
+        return rows;
+    },
 
-async createBranch(data: any, req: Request) {
-    const { prisma } = await import('@/config/database');
-    const branch = await prisma.branches.create({
-        data: {
-            name: data.name,
-            address: data.address,
-            city: data.city,
-            state: data.state,
-            pincode: data.pincode,
-            phone: data.phone,
-            updated_at: new Date(),
-        },
-    });
-    return branch;
-},
+    async createBranch(data: any, req: Request) {
+        const { prisma } = await import('@/config/database');
+        const branch = await prisma.branches.create({
+            data: {
+                name: data.name,
+                address: data.address,
+                city: data.city,
+                state: data.state,
+                pincode: data.pincode,
+                phone: data.phone,
+                updated_at: new Date(),
+            },
+        });
+        return branch;
+    },
 
-async updateBranch(branchId: string, data: any, req: Request) {
-    const { prisma } = await import('@/config/database');
-    const branch = await prisma.branches.update({
-        where: { id: branchId },
-        data: { ...data, updated_at: new Date() },
-    });
-    return branch;
-},
+    async updateBranch(branchId: string, data: any, req: Request) {
+        const { prisma } = await import('@/config/database');
+        const branch = await prisma.branches.update({
+            where: { id: branchId },
+            data: { ...data, updated_at: new Date() },
+        });
+        return branch;
+    },
 
+    // ── Loans management ──────────────────────────────────────────────────────
+
+    async listAllLoans(filters: any) {
+        const { prisma } = await import('@/config/database');
+        const where: Record<string, unknown> = {};
+        if (filters.productType) where.product_type = filters.productType;
+        if (filters.status) where.status = filters.status;
+        if (filters.search) {
+            where.OR = [
+                { user: { full_name: { contains: filters.search, mode: 'insensitive' } } },
+                { user: { phone: { contains: filters.search } } },
+            ];
+        }
+        const page = parseInt(filters.page) || 1;
+        const limit = parseInt(filters.limit) || 20;
+        const skip = (page - 1) * limit;
+
+        const [rows, total] = await Promise.all([
+            prisma.loan_applications.findMany({
+                where,
+                include: { user: { select: { full_name: true, phone: true, email: true } } },
+                orderBy: { applied_at: 'desc' },
+                skip,
+                take: limit,
+            }),
+            prisma.loan_applications.count({ where }),
+        ]);
+
+        return {
+            data: rows,
+            pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+        };
+    },
+
+    async getLoanDetail(loanId: string) {
+        const { prisma } = await import('@/config/database');
+        const loan = await prisma.loan_applications.findUnique({
+            where: { id: loanId },
+            include: {
+                user: true
+            },
+        });
+        if (!loan) throw new NotFoundError('Loan', loanId);
+        return loan;
+    },
 };
