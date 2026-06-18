@@ -141,19 +141,29 @@ export const adminService = {
     // ── 1. Admin user management ───────────────────────────────────────────────
 
     async createAdminUser(
-        input: CreateAdminUserInput,
-        req: Request,
-    ): Promise<AdminUserResponse> {
-        // Prevent duplicate email
-        const existing = await adminRepository.findAdminUserByEmail(input.email);
-        if (existing) {
-            throw new ConflictError(
-                `An admin user with email ${input.email} already exists`,
-                { email: input.email },
-            );
-        }
+    input: CreateAdminUserInput,
+    req: Request,
+): Promise<AdminUserResponse> {
+    const existing = await adminRepository.findAdminUserByEmail(input.email);
+    if (existing) {
+        throw new ConflictError(
+            `An admin user with email ${input.email} already exists`,
+            { email: input.email },
+        );
+    }
 
-        const user = await adminRepository.createAdminUser(input);
+    // Hash password if provided
+    let passwordHash: string | undefined;
+    if (input.password) {
+        const bcrypt = await import('bcryptjs');
+        passwordHash = await bcrypt.hash(input.password, 12);
+    }
+
+    const user = await adminRepository.createAdminUser({
+        ...input,
+        passwordHash,
+        createdBy: (req as any).user?.id,
+    });
 
         setAuditContext(req, {
             action: 'ADMIN_USER_CREATED',
@@ -341,4 +351,36 @@ export const adminService = {
             message: msgConfig?.value ?? 'Platform under maintenance',
         };
     },
+
+    async listBranches() {
+    const { prisma } = await import('@/config/database');
+    const rows = await prisma.branches.findMany({ orderBy: { created_at: 'desc' } });
+    return rows;
+},
+
+async createBranch(data: any, req: Request) {
+    const { prisma } = await import('@/config/database');
+    const branch = await prisma.branches.create({
+        data: {
+            name: data.name,
+            address: data.address,
+            city: data.city,
+            state: data.state,
+            pincode: data.pincode,
+            phone: data.phone,
+            updated_at: new Date(),
+        },
+    });
+    return branch;
+},
+
+async updateBranch(branchId: string, data: any, req: Request) {
+    const { prisma } = await import('@/config/database');
+    const branch = await prisma.branches.update({
+        where: { id: branchId },
+        data: { ...data, updated_at: new Date() },
+    });
+    return branch;
+},
+
 };

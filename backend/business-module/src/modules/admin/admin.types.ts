@@ -107,6 +107,12 @@ export interface CreateAdminUserInput {
     phone: string;
     role: Role;
     department: string;
+    username?: string;
+    password?: string;
+    passwordHash?: string;
+    product?: string;
+    branchId?: string;
+    createdBy?: string;
 }
 
 export interface UpdateAdminUserInput {

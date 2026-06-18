@@ -134,4 +134,34 @@ export const adminController = {
             );
         } catch (err) { next(err); }
     },
+
+    // GET /admin/branches
+async listBranches(_req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+        const result = await adminService.listBranches();
+        res.status(HTTP.OK).json(successResponse(result));
+    } catch (err) { next(err); }
+},
+
+// POST /admin/branches
+async createBranch(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+        const body = getValidatedBody<any>(req);
+        const result = await adminService.createBranch(body, req);
+        res.status(HTTP.CREATED).json(successResponse(result, 'Branch created'));
+    } catch (err) { next(err); }
+},
+
+// PATCH /admin/branches/:branchId
+async updateBranch(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+        const { branchId } = getValidatedParams<{ branchId: string }>(req);
+        const body = getValidatedBody<any>(req);
+        const result = await adminService.updateBranch(branchId, body, req);
+        res.status(HTTP.OK).json(successResponse(result, 'Branch updated'));
+    } catch (err) { next(err); }
+},
+
 };
+
+

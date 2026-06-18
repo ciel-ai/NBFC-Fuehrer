@@ -6,39 +6,21 @@ import { commonSchemas } from '@/middlewares';
 // ─── Create admin user ────────────────────────────────────────────────────────
 
 export const createAdminUserSchema = Joi.object({
-    fullName: Joi.string()
-        .trim()
-        .min(2)
-        .max(100)
-        .required(),
-
-    email: Joi.string()
-        .email()
-        .lowercase()
-        .required(),
-
+    fullName: Joi.string().trim().min(2).max(100).required(),
+    email: Joi.string().email().lowercase().required(),
     phone: commonSchemas.phone.required(),
-
-    role: Joi.string()
-        .valid(
-            ROLE.OPS_EXECUTIVE,
-            ROLE.CREDIT_MANAGER,
-            ROLE.COLLECTION_AGENT,
-            ROLE.FINANCE,
-            ROLE.SUPER_ADMIN,
-        )
-        .required()
-        .messages({
-            'any.only':
-                'Role must be one of: OPS_EXECUTIVE, CREDIT_MANAGER, ' +
-                'COLLECTION_AGENT, FINANCE, SUPER_ADMIN',
-        }),
-
-    department: Joi.string()
-        .trim()
-        .min(2)
-        .max(100)
-        .required(),
+    role: Joi.string().valid(
+        ROLE.OPS_EXECUTIVE,
+        ROLE.CREDIT_MANAGER,
+        ROLE.COLLECTION_AGENT,
+        ROLE.FINANCE,
+        ROLE.SUPER_ADMIN,
+    ).required(),
+    department: Joi.string().trim().min(2).max(100).required(),
+    username: Joi.string().trim().min(3).max(50).alphanum().optional(),
+    password: Joi.string().min(8).max(100).optional(),
+    product: Joi.string().valid('GOLD', 'AHL', 'CDL', 'ALL').default('ALL'),
+    branchId: Joi.string().uuid().optional(),
 });
 
 // ─── Update admin user ────────────────────────────────────────────────────────

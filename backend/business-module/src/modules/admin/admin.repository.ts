@@ -59,24 +59,36 @@ export const adminRepository = {
     // ── Admin users ───────────────────────────────────────────────────────────
 
     async createAdminUser(data: {
-        fullName: string;
-        email: string;
-        phone: string;
-        role: Role;
-        department: string;
-    }): Promise<AdminUser> {
-        const row = await prisma.admin_users.create({
-            data: {
-                full_name: data.fullName,
-                email: data.email,
-                phone: data.phone,
-                role: data.role,
-                status: 'ACTIVE',
-                department: data.department,
-                created_at: new Date(),
-                updated_at: new Date(),
-            },
-        });
+    fullName: string;
+    email: string;
+    phone: string;
+    role: Role;
+    department: string;
+    username?: string;
+    passwordHash?: string;
+    product?: string;
+    branchId?: string;
+    createdBy?: string;
+}): Promise<AdminUser> {
+    const row = await prisma.admin_users.create({
+        data: {
+            full_name: data.fullName,
+            email: data.email,
+            phone: data.phone,
+            role: data.role,
+            status: 'ACTIVE',
+            department: data.department,
+            username: data.username,
+            password_hash: data.passwordHash,
+            product: data.product ?? 'ALL',
+            branch_id: data.branchId,
+            created_by: data.createdBy,
+            must_change_password: true,
+            is_active: true,
+            created_at: new Date(),
+            updated_at: new Date(),
+        },
+    });
         return mapAdminUser(row as unknown as Record<string, unknown>);
     },
 

@@ -695,22 +695,52 @@ model notification_deliveries {
 // ─────────────────────────────────────────────────────────────────────────────
 
 model admin_users {
-  id           String  @id @default(uuid()) @db.Uuid
-  full_name    String  @db.VarChar(100)
-  email        String  @unique @db.VarChar(255)
-  phone        String  @unique @db.VarChar(15)
-  role         String  @db.VarChar(30)
-  status       String  @default("ACTIVE") @db.VarChar(20)
-  department   String? @db.VarChar(100)
-  last_login_at DateTime? @db.Timestamptz
-  created_at   DateTime  @default(now()) @db.Timestamptz
-  updated_at   DateTime  @updatedAt @db.Timestamptz
+    id                   String    @id @default(uuid()) @db.Uuid
+    full_name            String    @db.VarChar(100)
+    email                String    @unique @db.VarChar(255)
+    phone                String    @unique @db.VarChar(15)
+    role                 String    @db.VarChar(30)
+    status               String    @default("ACTIVE") @db.VarChar(20)
+    department           String?   @db.VarChar(100)
+    username             String?   @unique @db.VarChar(50)
+    password_hash        String?   @db.VarChar(255)
+    product              String?   @default("ALL") @db.VarChar(20)
+    branch_id            String?   @db.Uuid
+    must_change_password Boolean?  @default(true)
+    is_active            Boolean?  @default(true)
+    created_by           String?   @db.Uuid
+    last_login_at        DateTime? @db.Timestamptz
+    created_at           DateTime  @default(now()) @db.Timestamptz
+    updated_at           DateTime  @updatedAt @db.Timestamptz
 
-  // Relations
-  collection_cases collection_cases[] @relation("AssignedAgent")
+    // Relations
+    collection_cases collection_cases[] @relation("AssignedAgent")
+    branch           branches?          @relation(fields: [branch_id], references: [id], onDelete: SetNull)
 
-  @@index([role, status])
-  @@index([email])
+    @@index([role, status])
+    @@index([email])
+    @@index([username])
+    @@index([product])
+}
+
+model branches {
+    id         String    @id @default(uuid()) @db.Uuid
+    name       String    @db.VarChar(100)
+    address    String    @db.VarChar(300)
+    city       String    @db.VarChar(50)
+    state      String    @db.VarChar(50)
+    pincode    String    @db.VarChar(10)
+    phone      String?   @db.VarChar(15)
+    manager_id String?   @db.Uuid
+    is_active  Boolean?  @default(true)
+    created_at DateTime  @default(now()) @db.Timestamptz
+    updated_at DateTime  @default(now()) @db.Timestamptz
+
+    // Relations
+    admin_users admin_users[]
+
+    @@index([city])
+    @@index([is_active])
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

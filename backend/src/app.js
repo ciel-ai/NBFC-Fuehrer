@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const userRoutes = require('./routes/userRoutes');
 const kycRoutes = require('./routes/kycRoutes');
+const staffRoutes = require('./routes/staffRoutes');
 const notFound = require('./middleware/notFound');
 const errorHandler = require('./middleware/errorHandler');
 
@@ -13,6 +14,7 @@ app.use(express.urlencoded({ extended: false }));
 
 app.use('/api/users', userRoutes);
 app.use('/api/kyc', kycRoutes);
+app.use('/staff', staffRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {

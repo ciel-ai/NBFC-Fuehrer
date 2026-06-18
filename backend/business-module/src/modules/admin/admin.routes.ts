@@ -109,4 +109,8 @@ router.post(
     adminController.setMaintenance,
 );
 
+router.get('/branches', requireAuth(), allowRoles(...SUPER_ADMIN_ONLY), adminController.listBranches);
+router.post('/branches', requireAuth(), allowRoles(...SUPER_ADMIN_ONLY), validateBody(Joi.object({ name: Joi.string().required(), address: Joi.string().required(), city: Joi.string().required(), state: Joi.string().required(), pincode: Joi.string().required(), phone: Joi.string().optional() })), adminController.createBranch);
+router.patch('/branches/:branchId', requireAuth(), allowRoles(...SUPER_ADMIN_ONLY), adminController.updateBranch);
+
 export { router as adminRouter };
