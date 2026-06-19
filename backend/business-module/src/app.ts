@@ -15,6 +15,7 @@ import {
     notFoundHandler,
 } from '@/middlewares';
 import { bootstrapEventHandlers } from '@/events';
+import { moneyConverterMiddleware } from '@/middlewares/moneyConverter.middleware';
 
 // â”€â”€ Module routers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 import { authRouter } from '@/modules/auth';
@@ -71,6 +72,8 @@ export function createApp(): express.Application {
 
     // â”€â”€ 9. Audit trail â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     app.use(auditTrail());
+    // ── Money converter — rupees → paise in all responses ───────────────────────
+app.use(moneyConverterMiddleware());
 
     // â”€â”€ 10. Bootstrap event + notification handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     bootstrapEventHandlers();

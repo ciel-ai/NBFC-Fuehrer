@@ -373,10 +373,20 @@ export const adminService = {
             prisma.loan_applications.count({ where }),
         ]);
 
-        return {
-            data: rows,
-            pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
-        };
+        const { serializeMoney } = await import('@/utils/money');
+const serialized = rows.map(row => ({
+    ...row,
+    amount_requested: serializeMoney(row.amount_requested),
+    approved_amount: serializeMoney(row.approved_amount),
+    monthly_emi: serializeMoney(row.monthly_emi),
+    processing_fee: serializeMoney(row.processing_fee),
+    processing_fee_gst: serializeMoney(row.processing_fee_gst),
+}));
+
+return {
+    data: rows,
+    pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+};
     },
 
     async getLoanDetail(loanId: string) {
