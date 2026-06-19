@@ -9,10 +9,12 @@
 import { Router } from 'express';
 import { applicationsRouter } from './applications/applications.routes';
 import { creditRouter } from './credit/credit.routes';
+import { financeRouter } from './finance/finance.routes';
 
 const router = Router();
 
 router.use('/applications', applicationsRouter);
 router.use('/credit', creditRouter);
+router.use('/finance', financeRouter);
 
 export { router as webRouter };
