@@ -22,9 +22,16 @@ function assertReportAccess(
     role: string,
     reportType: string,
 ): void {
-    const PORTFOLIO_ROLES = new Set(['FINANCE', 'SUPER_ADMIN', 'CREDIT_MANAGER']);
-    const COLLECTION_ROLES = new Set(['FINANCE', 'SUPER_ADMIN', 'OPS_EXECUTIVE']);
-    const RBI_ROLES = new Set(['FINANCE', 'SUPER_ADMIN']);
+    const PORTFOLIO_ROLES = new Set([
+        'FINANCE', 'SUPER_ADMIN', 'CREDIT_MANAGER',
+        'ADMIN', 'CREDIT_CDL', 'CREDIT_GOLD', 'CREDIT_HOUSING',
+        'FINANCE_CDL', 'FINANCE_GOLD', 'FINANCE_HOUSING',
+    ]);
+    const COLLECTION_ROLES = new Set([
+        'FINANCE', 'SUPER_ADMIN', 'OPS_EXECUTIVE',
+        'ADMIN', 'FINANCE_CDL', 'FINANCE_GOLD', 'FINANCE_HOUSING',
+    ]);
+    const RBI_ROLES = new Set(['FINANCE', 'SUPER_ADMIN', 'ADMIN']);
 
     const allowed =
         reportType === 'portfolio' ? PORTFOLIO_ROLES :

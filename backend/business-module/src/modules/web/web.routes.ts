@@ -14,6 +14,7 @@ import { usersRouter } from './users/users.routes';
 import { adminService } from '@/modules/admin/admin.service';
 import { requireAuth, allowRoles } from '@/middlewares';
 import { ROLE, HTTP } from '@/config/constants';
+import { dashboardRouter } from './dashboard/dashboard.routes';
 
 const router = Router();
 
@@ -21,6 +22,7 @@ router.use('/applications', applicationsRouter);
 router.use('/credit', creditRouter);
 router.use('/finance', financeRouter);
 router.use('/users', usersRouter);
+router.use('/dashboard', dashboardRouter);
 
 // GET /branches — top-level per frontend spec
 router.get('/branches', requireAuth(), allowRoles(ROLE.ADMIN, ROLE.SUPER_ADMIN), async (_req, res, next) => {
