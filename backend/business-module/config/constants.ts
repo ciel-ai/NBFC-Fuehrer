@@ -117,13 +117,28 @@ export type PaymentChannel = (typeof PAYMENT_CHANNEL)[keyof typeof PAYMENT_CHANN
 // ─── Roles ────────────────────────────────────────────────────────────────────
 
 export const ROLE = {
+    // Mobile app users (kept for compatibility)
     CUSTOMER: 'CUSTOMER',
     AGENT: 'AGENT',
-    OPS_EXECUTIVE: 'OPS_EXECUTIVE',
-    CREDIT_MANAGER: 'CREDIT_MANAGER',
-    COLLECTION_AGENT: 'COLLECTION_AGENT',
-    FINANCE: 'FINANCE',
+    
+    // Internal staff — matches frontend
+    ADMIN: 'ADMIN',
+    CREDIT_CDL: 'CREDIT_CDL',
+    CREDIT_GOLD: 'CREDIT_GOLD',
+    CREDIT_HOUSING: 'CREDIT_HOUSING',
+    FINANCE_CDL: 'FINANCE_CDL',
+    FINANCE_GOLD: 'FINANCE_GOLD',
+    FINANCE_HOUSING: 'FINANCE_HOUSING',
+    SALES_CDL: 'SALES_CDL',
+    SALES_GOLD: 'SALES_GOLD',
+    SALES_HOUSING: 'SALES_HOUSING',
+    
+    // Legacy (deprecated, will remove later)
     SUPER_ADMIN: 'SUPER_ADMIN',
+    CREDIT_MANAGER: 'CREDIT_MANAGER',
+    FINANCE: 'FINANCE',
+    OPS_EXECUTIVE: 'OPS_EXECUTIVE',
+    COLLECTION_AGENT: 'COLLECTION_AGENT',
 } as const;
 
 export type Role = (typeof ROLE)[keyof typeof ROLE];
@@ -269,3 +284,4 @@ export const CRON_SCHEDULE = {
     NPA_WATCH: '0 1 * * *',    // Daily 1:00 AM IST (low traffic window)
     SETTLEMENT: '0 22 * * *',   // Daily 10:00 PM IST
 } as const;
+
