@@ -17,6 +17,7 @@ import { ROLE, HTTP } from '@/config/constants';
 import { dashboardRouter } from './dashboard/dashboard.routes';
 import { settingsRouter } from './settings/settings.routes';
 import { auditLogsRouter } from './auditLogs/auditLogs.routes';
+import { searchRouter } from './search/search.routes';
 
 const router = Router();
 
@@ -27,6 +28,7 @@ router.use('/users', usersRouter);
 router.use('/dashboard', dashboardRouter);
 router.use('/settings', settingsRouter);
 router.use('/audit-logs', auditLogsRouter);
+router.use('/search', searchRouter);
 
 // GET /branches — top-level per frontend spec
 router.get('/branches', requireAuth(), allowRoles(ROLE.ADMIN, ROLE.SUPER_ADMIN), async (_req, res, next) => {
