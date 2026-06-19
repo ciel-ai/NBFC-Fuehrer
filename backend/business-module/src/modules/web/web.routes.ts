@@ -10,11 +10,24 @@ import { Router } from 'express';
 import { applicationsRouter } from './applications/applications.routes';
 import { creditRouter } from './credit/credit.routes';
 import { financeRouter } from './finance/finance.routes';
+import { usersRouter } from './users/users.routes';
+import { adminService } from '@/modules/admin/admin.service';
+import { requireAuth, allowRoles } from '@/middlewares';
+import { ROLE, HTTP } from '@/config/constants';
 
 const router = Router();
 
 router.use('/applications', applicationsRouter);
 router.use('/credit', creditRouter);
 router.use('/finance', financeRouter);
+router.use('/users', usersRouter);
+
+// GET /branches — top-level per frontend spec
+router.get('/branches', requireAuth(), allowRoles(ROLE.ADMIN, ROLE.SUPER_ADMIN), async (_req, res, next) => {
+    try {
+        const result = await adminService.listBranches();
+        res.status(HTTP.OK).json(result);
+    } catch (err) { next(err); }
+});
 
 export { router as webRouter };
