@@ -1,19 +1,3 @@
-// prisma/schema.prisma
-//
-// Feuhrer CDL Platform — PostgreSQL Schema
-// Region: ap-south-1 (Mumbai) — RBI data localisation compliance
-//
-// Conventions:
-//   - All PKs are UUID v4 — never expose sequential integers to clients
-//   - All monetary values use Decimal(15,2) — never Float (floating-point drift)
-//   - All timestamps are stored in UTC — display conversion happens in the app
-//   - Encrypted fields store base64 ciphertext — plaintext never touches the DB
-//   - Soft deletes are NOT used — records are immutable for RBI compliance
-//   - snake_case column names — mapped to camelCase in TypeScript via Prisma
-//   - Every table has created_at — most have updated_at
-//   - Indexes on every FK, every status field used in WHERE clauses,
-//     and every field used in ORDER BY on paginated queries
-
 generator client {
   provider        = "prisma-client-js"
   previewFeatures = ["fullTextSearch"]
@@ -24,189 +8,126 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// USERS
-// Owned by the user-module team. Business module reads but never writes.
-// ─────────────────────────────────────────────────────────────────────────────
-
 model users {
-  id          String   @id @default(uuid()) @db.Uuid
-  phone       String   @unique @db.VarChar(15)
-  full_name   String   @db.VarChar(100)
-  email       String?  @unique @db.VarChar(255)
-  fcm_token   String?  @db.VarChar(500)  // Expo push token — updated on login
-  is_active   Boolean  @default(true)
-  created_at  DateTime @default(now()) @db.Timestamptz
-  updated_at  DateTime @updatedAt @db.Timestamptz
-
-  // Relations
-  kyc_documents       kyc_documents?
-  loan_applications   loan_applications[]
-  loan_accounts       loan_accounts[]
-  agent               agents?
+  id                String              @id @default(uuid()) @db.Uuid
+  phone             String              @unique @db.VarChar(15)
+  full_name         String              @db.VarChar(100)
+  email             String?             @unique @db.VarChar(255)
+  fcm_token         String?             @db.VarChar(500)
+  is_active         Boolean             @default(true)
+  created_at        DateTime            @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime            @updatedAt @db.Timestamptz(6)
+  agent             agents?
+  kyc_documents     kyc_documents?
+  loan_accounts     loan_accounts[]
+  loan_applications loan_applications[]
 
   @@index([phone])
   @@index([email])
   @@index([is_active])
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// KYC DOCUMENTS
-// One row per user. Updated as each of the 13 checks completes.
-// Sensitive fields (aadhaar, pan) store AES-256 ciphertext via AWS KMS.
-// ─────────────────────────────────────────────────────────────────────────────
-
 model kyc_documents {
-  id      String @id @default(uuid()) @db.Uuid
-  user_id String @unique @db.Uuid
-
-  // Encrypted identity — never store plaintext
-  aadhaar_encrypted String? @db.Text         // AES-256 ciphertext
-  pan_encrypted     String? @db.Text         // AES-256 ciphertext
-
-  // Display-safe masked values
-  aadhaar_last4     String? @db.VarChar(4)
-  pan_masked        String? @db.VarChar(10)  // ABCDE****F
-
-  // S3 object keys — signed URLs generated on demand, never stored
-  selfie_s3_key              String? @db.VarChar(500)
-  aadhaar_front_s3_key       String? @db.VarChar(500)
-  aadhaar_back_s3_key        String? @db.VarChar(500)
-  pan_s3_key                 String? @db.VarChar(500)
-  bank_statement_s3_key      String? @db.VarChar(500)
-  signed_agreement_s3_key    String? @db.VarChar(500)
-
-  // Scores from vendor checks
-  liveness_score    Decimal? @db.Decimal(5, 2)
-  face_match_score  Decimal? @db.Decimal(5, 2)
-  fraud_score       Decimal? @db.Decimal(5, 2)
-  credit_score      Int?
-
-  // eSign
-  esign_request_id  String? @db.VarChar(100)
-  esign_status      String? @db.VarChar(30)
-
-  // Raw vendor responses stored as JSONB for debugging / reprocessing
-  // NEVER log this field — it may contain PII from vendor APIs
-  signzy_responses  Json?
-
-  // Status tracking
-  overall_status    String   @default("NOT_STARTED") @db.VarChar(30)
-  completed_checks  String[] @default([])             // Array of KycCheck enum values
-  failed_checks     String[] @default([])
-  rejection_reason  String?  @db.Text
-
-  verified_at       DateTime? @db.Timestamptz
-  created_at        DateTime  @default(now()) @db.Timestamptz
-  updated_at        DateTime  @updatedAt @db.Timestamptz
-
-  // Relations
-  user users @relation(fields: [user_id], references: [id], onDelete: Restrict)
+  id                      String    @id @default(uuid()) @db.Uuid
+  user_id                 String    @unique @db.Uuid
+  aadhaar_encrypted       String?
+  pan_encrypted           String?
+  aadhaar_last4           String?   @db.VarChar(4)
+  pan_masked              String?   @db.VarChar(10)
+  selfie_s3_key           String?   @db.VarChar(500)
+  aadhaar_front_s3_key    String?   @db.VarChar(500)
+  aadhaar_back_s3_key     String?   @db.VarChar(500)
+  pan_s3_key              String?   @db.VarChar(500)
+  bank_statement_s3_key   String?   @db.VarChar(500)
+  signed_agreement_s3_key String?   @db.VarChar(500)
+  liveness_score          Decimal?  @db.Decimal(5, 2)
+  face_match_score        Decimal?  @db.Decimal(5, 2)
+  fraud_score             Decimal?  @db.Decimal(5, 2)
+  credit_score            Int?
+  esign_request_id        String?   @db.VarChar(100)
+  esign_status            String?   @db.VarChar(30)
+  signzy_responses        Json?
+  overall_status          String    @default("NOT_STARTED") @db.VarChar(30)
+  completed_checks        String[]  @default([])
+  failed_checks           String[]  @default([])
+  rejection_reason        String?
+  verified_at             DateTime? @db.Timestamptz(6)
+  created_at              DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime  @updatedAt @db.Timestamptz(6)
+  user                    users     @relation(fields: [user_id], references: [id])
 
   @@index([overall_status])
   @@index([user_id])
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// AGENTS
-// Field sales staff who onboard customers and submit loan applications.
-// Each agent is also a user (agent.user_id → users.id).
-// ─────────────────────────────────────────────────────────────────────────────
-
 model agents {
-  id           String  @id @default(uuid()) @db.Uuid
-  user_id      String  @unique @db.Uuid
-  agent_code   String  @unique @db.VarChar(20)   // AGT-2026-000001
-
-  full_name    String  @db.VarChar(100)
-  phone        String  @unique @db.VarChar(15)
-  email        String? @db.VarChar(255)
-
-  shop_name    String  @db.VarChar(100)
-  shop_address String  @db.VarChar(300)
-  shop_city    String  @db.VarChar(100)
-  shop_pincode String  @db.VarChar(6)
-
-  // Stored masked — raw account used for payouts then discarded
-  bank_account_no   String @db.VarChar(30)   // XXXXXXXXXXX1234
-  bank_ifsc         String @db.VarChar(11)
-  bank_account_name String @db.VarChar(100)
-
-  status            String  @default("PENDING") @db.VarChar(20)
-  commission_rate   Decimal @default(0.015) @db.Decimal(6, 4)
-  pan_number        String? @db.VarChar(10)  // ABCDE****F
-  aadhaar_last4     String? @db.VarChar(4)
-  suspension_reason String? @db.Text
-
-  onboarded_at DateTime  @default(now()) @db.Timestamptz
-  created_at   DateTime  @default(now()) @db.Timestamptz
-  updated_at   DateTime  @updatedAt @db.Timestamptz
-
-  // Relations
-  user               users                @relation(fields: [user_id], references: [id], onDelete: Restrict)
-  loan_applications  loan_applications[]
+  id                 String               @id @default(uuid()) @db.Uuid
+  user_id            String               @unique @db.Uuid
+  agent_code         String               @unique @db.VarChar(20)
+  full_name          String               @db.VarChar(100)
+  phone              String               @unique @db.VarChar(15)
+  email              String?              @db.VarChar(255)
+  shop_name          String               @db.VarChar(100)
+  shop_address       String               @db.VarChar(300)
+  shop_city          String               @db.VarChar(100)
+  shop_pincode       String               @db.VarChar(6)
+  bank_account_no    String               @db.VarChar(30)
+  bank_ifsc          String               @db.VarChar(11)
+  bank_account_name  String               @db.VarChar(100)
+  status             String               @default("PENDING") @db.VarChar(20)
+  commission_rate    Decimal              @default(0.015) @db.Decimal(6, 4)
+  pan_number         String?              @db.VarChar(10)
+  aadhaar_last4      String?              @db.VarChar(4)
+  suspension_reason  String?
+  onboarded_at       DateTime             @default(now()) @db.Timestamptz(6)
+  created_at         DateTime             @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime             @updatedAt @db.Timestamptz(6)
   agent_commissions  agent_commissions[]
+  user               users                @relation(fields: [user_id], references: [id])
   commission_payouts commission_payouts[]
+  loan_applications  loan_applications[]
 
   @@index([status])
   @@index([shop_city])
   @@index([agent_code])
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// LOAN APPLICATIONS
-// The application record — created in DRAFT, progresses through the state
-// machine until it either becomes a loan_account or is rejected.
-// ─────────────────────────────────────────────────────────────────────────────
-
 model loan_applications {
-  id       String @id @default(uuid()) @db.Uuid
-  user_id  String @db.Uuid
-  agent_id String? @db.Uuid
-
-  // Application details
-  status           String  @default("DRAFT")   @db.VarChar(30)
-  amount_requested Decimal @db.Decimal(15, 2)
-  tenure_months    Int
-  product_type     String  @db.VarChar(50)
-  purpose          String  @db.VarChar(200)
-  store_name       String  @db.VarChar(100)
-  store_city       String  @db.VarChar(100)
-
-  // Address — Step 2 of loan application screen
-  flat_house_no    String?  @db.VarChar(100)
-  street_area      String?  @db.VarChar(200)
-  city             String?  @db.VarChar(100)
-  pincode          String?  @db.VarChar(6)
-  state            String?  @db.VarChar(100)
-
-  // Employment — Step 2 of loan application screen
-  employment_type  String?  @db.VarChar(30)
-  employer_name    String?  @db.VarChar(200)
-  monthly_income   Decimal? @db.Decimal(12, 2)
-
-  // Repayment type — from Loan Amount & Tenure screen
-  repayment_type   String   @default("MONTHLY_EMI") @db.VarChar(20)
-
-  // Approved terms — populated by credit manager on approval
-  approved_amount    Decimal? @db.Decimal(15, 2)
-  interest_rate      Decimal? @db.Decimal(6, 2)   // Annual %
-  processing_fee     Decimal? @db.Decimal(15, 2)
-  processing_fee_gst Decimal? @db.Decimal(15, 2)
-  monthly_emi        Decimal? @db.Decimal(15, 2)
-
-  // Decision
-  rejection_reason String? @db.Text
-  reviewed_by      String? @db.Uuid
-  reviewed_at      DateTime? @db.Timestamptz
-
-  applied_at DateTime  @default(now()) @db.Timestamptz
-  updated_at DateTime  @updatedAt @db.Timestamptz
-
-  // Relations
-  user         users          @relation(fields: [user_id], references: [id], onDelete: Restrict)
-  agent        agents?        @relation(fields: [agent_id], references: [id], onDelete: SetNull)
-  loan_account loan_accounts?
+  id                   String                 @id @default(uuid()) @db.Uuid
+  user_id              String                 @db.Uuid
+  agent_id             String?                @db.Uuid
+  status               String                 @default("DRAFT") @db.VarChar(30)
+  amount_requested     Decimal                @db.Decimal(15, 2)
+  tenure_months        Int
+  product_type         String                 @db.VarChar(50)
+  purpose              String                 @db.VarChar(200)
+  store_name           String                 @db.VarChar(100)
+  store_city           String                 @db.VarChar(100)
+  approved_amount      Decimal?               @db.Decimal(15, 2)
+  interest_rate        Decimal?               @db.Decimal(6, 2)
+  processing_fee       Decimal?               @db.Decimal(15, 2)
+  processing_fee_gst   Decimal?               @db.Decimal(15, 2)
+  monthly_emi          Decimal?               @db.Decimal(15, 2)
+  rejection_reason     String?
+  reviewed_by          String?                @db.Uuid
+  reviewed_at          DateTime?              @db.Timestamptz(6)
+  applied_at           DateTime               @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime               @updatedAt @db.Timestamptz(6)
+  city                 String?                @db.VarChar(100)
+  employer_name        String?                @db.VarChar(200)
+  employment_type      String?                @db.VarChar(30)
+  flat_house_no        String?                @db.VarChar(100)
+  monthly_income       Decimal?               @db.Decimal(12, 2)
+  pincode              String?                @db.VarChar(6)
+  state                String?                @db.VarChar(100)
+  street_area          String?                @db.VarChar(200)
+  repayment_type       String                 @default("MONTHLY_EMI") @db.VarChar(20)
+  bureau_reports       bureau_reports?
+  collateral_gold      collateral_gold?
+  collateral_property  collateral_property?
+  loan_account         loan_accounts?
+  agent                agents?                @relation(fields: [agent_id], references: [id])
+  user                 users                  @relation(fields: [user_id], references: [id])
   underwriting_reports underwriting_reports[]
 
   @@index([user_id])
@@ -217,43 +138,32 @@ model loan_applications {
   @@index([applied_at])
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// LOAN ACCOUNTS
-// Created atomically at disbursement. The live loan record.
-// One application can have at most one loan account.
-// ─────────────────────────────────────────────────────────────────────────────
-
 model loan_accounts {
-  id             String @id @default(uuid()) @db.Uuid
-  application_id String @unique @db.Uuid
-  user_id        String @db.Uuid
-
-  account_number     String  @unique @db.VarChar(20)  // FHR-2026-000001
-  principal_amount   Decimal @db.Decimal(15, 2)
-  interest_rate      Decimal @db.Decimal(6, 2)
-  tenure_months      Int
-  monthly_emi        Decimal @db.Decimal(15, 2)
-  outstanding_balance Decimal @db.Decimal(15, 2)
-  total_interest     Decimal @db.Decimal(15, 2)
-
-  status              String  @default("DISBURSED") @db.VarChar(20)
-  repayment_mode      String  @default("IMPS")      @db.VarChar(20)
-  razorpay_mandate_id String? @db.VarChar(100)
-
-  disbursed_at DateTime? @db.Timestamptz
-  closed_at    DateTime? @db.Timestamptz
-  created_at   DateTime  @default(now()) @db.Timestamptz
-  updated_at   DateTime  @updatedAt @db.Timestamptz
-
-  // Relations
-  application         loan_applications      @relation(fields: [application_id], references: [id], onDelete: Restrict)
-  user                users                  @relation(fields: [user_id], references: [id], onDelete: Restrict)
-  emi_schedule        emi_schedule[]
-  payments            payments[]
-  disbursements       disbursements[]
-  collection_cases    collection_cases[]
+  id                  String              @id @default(uuid()) @db.Uuid
+  application_id      String              @unique @db.Uuid
+  user_id             String              @db.Uuid
+  account_number      String              @unique @db.VarChar(20)
+  principal_amount    Decimal             @db.Decimal(15, 2)
+  interest_rate       Decimal             @db.Decimal(6, 2)
+  tenure_months       Int
+  monthly_emi         Decimal             @db.Decimal(15, 2)
+  outstanding_balance Decimal             @db.Decimal(15, 2)
+  total_interest      Decimal             @db.Decimal(15, 2)
+  status              String              @default("DISBURSED") @db.VarChar(20)
+  repayment_mode      String              @default("IMPS") @db.VarChar(20)
+  razorpay_mandate_id String?             @db.VarChar(100)
+  disbursed_at        DateTime?           @db.Timestamptz(6)
+  closed_at           DateTime?           @db.Timestamptz(6)
+  created_at          DateTime            @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime            @updatedAt @db.Timestamptz(6)
   agent_commissions   agent_commissions[]
+  collection_cases    collection_cases[]
+  disbursements       disbursements[]
+  emi_schedule        emi_schedule[]
   enach_mandates      enach_mandates[]
+  application         loan_applications   @relation(fields: [application_id], references: [id])
+  user                users               @relation(fields: [user_id], references: [id])
+  payments            payments[]
 
   @@index([user_id])
   @@index([status])
@@ -263,85 +173,60 @@ model loan_accounts {
   @@index([status, disbursed_at])
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// UNDERWRITING REPORTS
-// One report per underwriting run. Multiple reports per loan if re-run.
-// ─────────────────────────────────────────────────────────────────────────────
-
 model underwriting_reports {
-  id      String @id @default(uuid()) @db.Uuid
-  loan_id String @db.Uuid
-  user_id String @db.Uuid
-
-  decision        String  @db.VarChar(20)   // APPROVED | REJECTED | REFERRED
-  credit_score    Int?
-  internal_score  Int                        // 0–100 composite
-  fraud_score     Decimal? @db.Decimal(5, 2)
-
-  monthly_income        Decimal? @db.Decimal(15, 2)
-  existing_emi_per_month Decimal? @db.Decimal(15, 2)
-  requested_emi         Decimal  @db.Decimal(15, 2)
-  foir                  Decimal? @db.Decimal(6, 4)
-  dti                   Decimal? @db.Decimal(6, 4)
-
-  // Rule engine output stored as JSON
-  rule_results    Json
-  passed_rules    Int
-  failed_rules    Int
-  hard_fail_rules String[] @default([])
-
-  // Recommended terms
-  recommended_amount  Decimal? @db.Decimal(15, 2)
-  recommended_rate    Decimal? @db.Decimal(6, 2)
-  recommended_tenure  Int?
-  max_eligible_amount Decimal? @db.Decimal(15, 2)
-
-  rejection_reasons String[] @default([])
-  referral_reasons  String[] @default([])
-  notes             String?  @db.Text
-
-  completed_at DateTime  @default(now()) @db.Timestamptz
-  created_at   DateTime  @default(now()) @db.Timestamptz
-  updated_at   DateTime  @updatedAt @db.Timestamptz
-
-  // Relations
-  loan_application loan_applications @relation(fields: [loan_id], references: [id], onDelete: Restrict)
+  id                     String            @id @default(uuid()) @db.Uuid
+  loan_id                String            @db.Uuid
+  user_id                String            @db.Uuid
+  decision               String            @db.VarChar(20)
+  credit_score           Int?
+  internal_score         Int
+  fraud_score            Decimal?          @db.Decimal(5, 2)
+  monthly_income         Decimal?          @db.Decimal(15, 2)
+  existing_emi_per_month Decimal?          @db.Decimal(15, 2)
+  requested_emi          Decimal           @db.Decimal(15, 2)
+  foir                   Decimal?          @db.Decimal(6, 4)
+  dti                    Decimal?          @db.Decimal(6, 4)
+  rule_results           Json
+  passed_rules           Int
+  failed_rules           Int
+  hard_fail_rules        String[]          @default([])
+  recommended_amount     Decimal?          @db.Decimal(15, 2)
+  recommended_rate       Decimal?          @db.Decimal(6, 2)
+  recommended_tenure     Int?
+  max_eligible_amount    Decimal?          @db.Decimal(15, 2)
+  rejection_reasons      String[]          @default([])
+  referral_reasons       String[]          @default([])
+  notes                  String?
+  completed_at           DateTime          @default(now()) @db.Timestamptz(6)
+  created_at             DateTime          @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime          @updatedAt @db.Timestamptz(6)
+  loan_application       loan_applications @relation(fields: [loan_id], references: [id])
 
   @@index([loan_id])
   @@index([decision])
   @@index([loan_id, created_at])
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// EMI SCHEDULE
-// Pre-generated at disbursement. One row per EMI, entire tenure.
-// ─────────────────────────────────────────────────────────────────────────────
-
 model emi_schedule {
-  id              String @id @default(uuid()) @db.Uuid
-  loan_account_id String @db.Uuid
-
+  id                  String        @id @default(uuid()) @db.Uuid
+  loan_account_id     String        @db.Uuid
   emi_number          Int
-  due_date            DateTime @db.Date
-  emi_amount          Decimal  @db.Decimal(15, 2)
-  principal_component Decimal  @db.Decimal(15, 2)
-  interest_component  Decimal  @db.Decimal(15, 2)
-  outstanding_after   Decimal  @db.Decimal(15, 2)
-
-  status         String  @default("PENDING") @db.VarChar(20)
-  penalty_amount Decimal @default(0) @db.Decimal(15, 2)
-  bounce_count   Int     @default(0)
-  last_bounce_at DateTime? @db.Timestamptz
-  next_retry_at  DateTime? @db.Timestamptz
-  collection_id  String?   @db.Uuid
-
-  paid_at    DateTime? @db.Timestamptz
-  created_at DateTime  @default(now()) @db.Timestamptz
-  updated_at DateTime  @updatedAt @db.Timestamptz
-
-  // Relations
-  loan_account loan_accounts @relation(fields: [loan_account_id], references: [id], onDelete: Restrict)
-  payments     payments[]
+  due_date            DateTime      @db.Date
+  emi_amount          Decimal       @db.Decimal(15, 2)
+  principal_component Decimal       @db.Decimal(15, 2)
+  interest_component  Decimal       @db.Decimal(15, 2)
+  outstanding_after   Decimal       @db.Decimal(15, 2)
+  status              String        @default("PENDING") @db.VarChar(20)
+  penalty_amount      Decimal       @default(0) @db.Decimal(15, 2)
+  bounce_count        Int           @default(0)
+  last_bounce_at      DateTime?     @db.Timestamptz(6)
+  next_retry_at       DateTime?     @db.Timestamptz(6)
+  collection_id       String?       @db.Uuid
+  paid_at             DateTime?     @db.Timestamptz(6)
+  created_at          DateTime      @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime      @updatedAt @db.Timestamptz(6)
+  loan_account        loan_accounts @relation(fields: [loan_account_id], references: [id])
+  payments            payments[]
 
   @@unique([loan_account_id, emi_number])
   @@index([loan_account_id])
@@ -352,40 +237,29 @@ model emi_schedule {
   @@index([next_retry_at])
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// DISBURSEMENTS
-// One row per disbursement attempt. Written before the payout call.
-// ─────────────────────────────────────────────────────────────────────────────
-
 model disbursements {
-  id              String @id @default(uuid()) @db.Uuid
-  loan_id         String @db.Uuid
-  loan_account_id String? @db.Uuid
-  user_id         String  @db.Uuid
-
-  beneficiary_name     String  @db.VarChar(100)
-  account_number       String  @db.VarChar(30)
-  ifsc                 String  @db.VarChar(11)
-  mode                 String  @db.VarChar(20)
-
-  principal_amount     Decimal @db.Decimal(15, 2)
-  processing_fee       Decimal @db.Decimal(15, 2)
-  processing_fee_gst   Decimal @db.Decimal(15, 2)
-  net_disbursed_amount Decimal @db.Decimal(15, 2)
-
-  razorpay_payout_id String? @db.VarChar(100)
-  utr_number         String? @db.VarChar(50)
-  status             String  @default("PENDING") @db.VarChar(20)
-  failure_reason     String? @db.Text
-
-  initiated_by String   @db.Uuid
-  initiated_at DateTime @db.Timestamptz
-  completed_at DateTime? @db.Timestamptz
-  created_at   DateTime  @default(now()) @db.Timestamptz
-  updated_at   DateTime  @updatedAt @db.Timestamptz
-
-  // Relations
-  loan_account loan_accounts? @relation(fields: [loan_account_id], references: [id], onDelete: SetNull)
+  id                   String         @id @default(uuid()) @db.Uuid
+  loan_id              String         @db.Uuid
+  loan_account_id      String?        @db.Uuid
+  user_id              String         @db.Uuid
+  beneficiary_name     String         @db.VarChar(100)
+  account_number       String         @db.VarChar(30)
+  ifsc                 String         @db.VarChar(11)
+  mode                 String         @db.VarChar(20)
+  principal_amount     Decimal        @db.Decimal(15, 2)
+  processing_fee       Decimal        @db.Decimal(15, 2)
+  processing_fee_gst   Decimal        @db.Decimal(15, 2)
+  net_disbursed_amount Decimal        @db.Decimal(15, 2)
+  razorpay_payout_id   String?        @db.VarChar(100)
+  utr_number           String?        @db.VarChar(50)
+  status               String         @default("PENDING") @db.VarChar(20)
+  failure_reason       String?
+  initiated_by         String         @db.Uuid
+  initiated_at         DateTime       @db.Timestamptz(6)
+  completed_at         DateTime?      @db.Timestamptz(6)
+  created_at           DateTime       @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime       @updatedAt @db.Timestamptz(6)
+  loan_account         loan_accounts? @relation(fields: [loan_account_id], references: [id])
 
   @@index([loan_id])
   @@index([loan_account_id])
@@ -394,43 +268,30 @@ model disbursements {
   @@index([initiated_at])
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// PAYMENTS
-// Every payment attempt — eNACH debits, manual links, cash collections.
-// Written before the gateway call for reconciliation anchor.
-// ─────────────────────────────────────────────────────────────────────────────
-
 model payments {
-  id              String  @id @default(uuid()) @db.Uuid
-  loan_account_id String  @db.Uuid
-  user_id         String  @db.Uuid
-  emi_id          String? @db.Uuid
-
-  payment_type    String  @db.VarChar(20)
-  amount          Decimal @db.Decimal(15, 2)
-  penalty_amount  Decimal @default(0) @db.Decimal(15, 2)
-  total_collected Decimal @db.Decimal(15, 2)
-
-  channel         String  @db.VarChar(20)
-  gateway         String  @db.VarChar(30)
-  gateway_txn_id  String? @db.VarChar(100)
-  utr_number      String? @db.VarChar(50)
-
-  status          String  @default("PENDING") @db.VarChar(20)
-  failure_reason  String? @db.Text
-  failure_code    String? @db.VarChar(50)
-
-  mandate_id       String? @db.VarChar(100)
-  debit_attempt_no Int     @default(1)
-
-  initiated_at DateTime  @default(now()) @db.Timestamptz
-  settled_at   DateTime? @db.Timestamptz
-  created_at   DateTime  @default(now()) @db.Timestamptz
-  updated_at   DateTime  @updatedAt @db.Timestamptz
-
-  // Relations
-  loan_account loan_accounts  @relation(fields: [loan_account_id], references: [id], onDelete: Restrict)
-  emi          emi_schedule?  @relation(fields: [emi_id], references: [id], onDelete: SetNull)
+  id               String        @id @default(uuid()) @db.Uuid
+  loan_account_id  String        @db.Uuid
+  user_id          String        @db.Uuid
+  emi_id           String?       @db.Uuid
+  payment_type     String        @db.VarChar(20)
+  amount           Decimal       @db.Decimal(15, 2)
+  penalty_amount   Decimal       @default(0) @db.Decimal(15, 2)
+  total_collected  Decimal       @db.Decimal(15, 2)
+  channel          String        @db.VarChar(20)
+  gateway          String        @db.VarChar(30)
+  gateway_txn_id   String?       @db.VarChar(100)
+  utr_number       String?       @db.VarChar(50)
+  status           String        @default("PENDING") @db.VarChar(20)
+  failure_reason   String?
+  failure_code     String?       @db.VarChar(50)
+  mandate_id       String?       @db.VarChar(100)
+  debit_attempt_no Int           @default(1)
+  initiated_at     DateTime      @default(now()) @db.Timestamptz(6)
+  settled_at       DateTime?     @db.Timestamptz(6)
+  created_at       DateTime      @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime      @updatedAt @db.Timestamptz(6)
+  emi              emi_schedule? @relation(fields: [emi_id], references: [id])
+  loan_account     loan_accounts @relation(fields: [loan_account_id], references: [id])
 
   @@index([loan_account_id])
   @@index([emi_id])
@@ -441,63 +302,44 @@ model payments {
   @@index([loan_account_id, status])
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ENACH MANDATES
-// One active mandate per loan account.
-// ─────────────────────────────────────────────────────────────────────────────
-
 model enach_mandates {
-  id              String @id @default(uuid()) @db.Uuid
-  loan_account_id String @db.Uuid
-  user_id         String @db.Uuid
-
-  razorpay_mandate_id String  @unique @db.VarChar(100)
-  bank_account        String  @db.VarChar(30)   // Masked XXXXXX1234
-  ifsc                String  @db.VarChar(11)
-  max_amount          Decimal @db.Decimal(15, 2)
-  status              String  @default("CREATED") @db.VarChar(30)
-
-  registered_at DateTime? @db.Timestamptz
-  cancelled_at  DateTime? @db.Timestamptz
-  created_at    DateTime  @default(now()) @db.Timestamptz
-  updated_at    DateTime  @updatedAt @db.Timestamptz
-
-  // Relations
-  loan_account loan_accounts @relation(fields: [loan_account_id], references: [id], onDelete: Restrict)
+  id                  String        @id @default(uuid()) @db.Uuid
+  loan_account_id     String        @db.Uuid
+  user_id             String        @db.Uuid
+  razorpay_mandate_id String        @unique @db.VarChar(100)
+  bank_account        String        @db.VarChar(30)
+  ifsc                String        @db.VarChar(11)
+  max_amount          Decimal       @db.Decimal(15, 2)
+  status              String        @default("CREATED") @db.VarChar(30)
+  registered_at       DateTime?     @db.Timestamptz(6)
+  cancelled_at        DateTime?     @db.Timestamptz(6)
+  created_at          DateTime      @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime      @updatedAt @db.Timestamptz(6)
+  loan_account        loan_accounts @relation(fields: [loan_account_id], references: [id])
 
   @@index([loan_account_id])
   @@index([status])
   @@index([razorpay_mandate_id])
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// AGENT COMMISSIONS
-// One row per disbursed loan (if submitted by an agent).
-// Clawback window is 90 days post-disbursement.
-// ─────────────────────────────────────────────────────────────────────────────
-
 model agent_commissions {
-  id              String @id @default(uuid()) @db.Uuid
-  agent_id        String @db.Uuid
-  loan_account_id String @db.Uuid
-  user_id         String @db.Uuid
-
-  commission_amount        Decimal @db.Decimal(15, 2)
-  status                   String  @default("EARNED") @db.VarChar(20)
-  clawback_eligible_until  DateTime @db.Timestamptz
-  clawback_reason          String?  @db.Text
-  clawed_back_at           DateTime? @db.Timestamptz
-  payout_id                String?   @db.Uuid
-
-  earned_at  DateTime  @default(now()) @db.Timestamptz
-  paid_at    DateTime? @db.Timestamptz
-  created_at DateTime  @default(now()) @db.Timestamptz
-  updated_at DateTime  @updatedAt @db.Timestamptz
-
-  // Relations
-  agent        agents        @relation(fields: [agent_id], references: [id], onDelete: Restrict)
-  loan_account loan_accounts @relation(fields: [loan_account_id], references: [id], onDelete: Restrict)
-  payout       commission_payouts? @relation(fields: [payout_id], references: [id], onDelete: SetNull)
+  id                      String              @id @default(uuid()) @db.Uuid
+  agent_id                String              @db.Uuid
+  loan_account_id         String              @db.Uuid
+  user_id                 String              @db.Uuid
+  commission_amount       Decimal             @db.Decimal(15, 2)
+  status                  String              @default("EARNED") @db.VarChar(20)
+  clawback_eligible_until DateTime            @db.Timestamptz(6)
+  clawback_reason         String?
+  clawed_back_at          DateTime?           @db.Timestamptz(6)
+  payout_id               String?             @db.Uuid
+  earned_at               DateTime            @default(now()) @db.Timestamptz(6)
+  paid_at                 DateTime?           @db.Timestamptz(6)
+  created_at              DateTime            @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime            @updatedAt @db.Timestamptz(6)
+  agent                   agents              @relation(fields: [agent_id], references: [id])
+  loan_account            loan_accounts       @relation(fields: [loan_account_id], references: [id])
+  payout                  commission_payouts? @relation(fields: [payout_id], references: [id])
 
   @@index([agent_id])
   @@index([loan_account_id])
@@ -506,71 +348,51 @@ model agent_commissions {
   @@index([clawback_eligible_until])
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// COMMISSION PAYOUTS
-// Batch payout records — one payout covers multiple earned commissions.
-// ─────────────────────────────────────────────────────────────────────────────
-
 model commission_payouts {
-  id           String   @id @default(uuid()) @db.Uuid
-  agent_id     String   @db.Uuid
-  total_amount Decimal  @db.Decimal(15, 2)
-  commission_ids String[] @default([])         // UUIDs of agent_commissions included
-  utr_number   String?  @db.VarChar(50)
-  status       String   @default("PENDING") @db.VarChar(20)
-  processed_at DateTime? @db.Timestamptz
-  created_at   DateTime  @default(now()) @db.Timestamptz
-  updated_at   DateTime  @updatedAt @db.Timestamptz
-
-  // Relations
-  agent       agents              @relation(fields: [agent_id], references: [id], onDelete: Restrict)
-  commissions agent_commissions[]
+  id             String              @id @default(uuid()) @db.Uuid
+  agent_id       String              @db.Uuid
+  total_amount   Decimal             @db.Decimal(15, 2)
+  commission_ids String[]            @default([])
+  utr_number     String?             @db.VarChar(50)
+  status         String              @default("PENDING") @db.VarChar(20)
+  processed_at   DateTime?           @db.Timestamptz(6)
+  created_at     DateTime            @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime            @updatedAt @db.Timestamptz(6)
+  commissions    agent_commissions[]
+  agent          agents              @relation(fields: [agent_id], references: [id])
 
   @@index([agent_id])
   @@index([status])
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// COLLECTION CASES
-// Opened when a loan becomes overdue (30+ DPD).
-// One open case per loan account at any time.
-// ─────────────────────────────────────────────────────────────────────────────
-
 model collection_cases {
-  id              String @id @default(uuid()) @db.Uuid
-  loan_account_id String @db.Uuid
-  user_id         String @db.Uuid
-  assigned_to     String? @db.Uuid
-
-  overdue_days   Int
-  overdue_amount Decimal @db.Decimal(15, 2)
-  penalty_amount Decimal @default(0) @db.Decimal(15, 2)
-  total_due      Decimal @db.Decimal(15, 2)
-
-  status          String  @default("OPEN") @db.VarChar(20)
-  ptp_date        DateTime? @db.Date
-  ptp_amount      Decimal?  @db.Decimal(15, 2)
-  ptp_broken      Boolean   @default(false)
-
-  opened_at       DateTime  @default(now()) @db.Timestamptz
-  resolved_at     DateTime? @db.Timestamptz
-  closed_at       DateTime? @db.Timestamptz
-  close_reason    String?   @db.Text
-  last_contact_at DateTime? @db.Timestamptz
-  contact_count   Int       @default(0)
-
-  escalation_level  Int     @default(0)
-  escalated_at      DateTime? @db.Timestamptz
-  escalation_reason String?   @db.Text
-  notes             String?   @db.Text
-
-  created_at DateTime @default(now()) @db.Timestamptz
-  updated_at DateTime @updatedAt @db.Timestamptz
-
-  // Relations
-  loan_account  loan_accounts  @relation(fields: [loan_account_id], references: [id], onDelete: Restrict)
-  assigned_agent admin_users?  @relation("AssignedAgent", fields: [assigned_to], references: [id], onDelete: SetNull)
-  contact_logs  contact_logs[]
+  id                String         @id @default(uuid()) @db.Uuid
+  loan_account_id   String         @db.Uuid
+  user_id           String         @db.Uuid
+  assigned_to       String?        @db.Uuid
+  overdue_days      Int
+  overdue_amount    Decimal        @db.Decimal(15, 2)
+  penalty_amount    Decimal        @default(0) @db.Decimal(15, 2)
+  total_due         Decimal        @db.Decimal(15, 2)
+  status            String         @default("OPEN") @db.VarChar(20)
+  ptp_date          DateTime?      @db.Date
+  ptp_amount        Decimal?       @db.Decimal(15, 2)
+  ptp_broken        Boolean        @default(false)
+  opened_at         DateTime       @default(now()) @db.Timestamptz(6)
+  resolved_at       DateTime?      @db.Timestamptz(6)
+  closed_at         DateTime?      @db.Timestamptz(6)
+  close_reason      String?
+  last_contact_at   DateTime?      @db.Timestamptz(6)
+  contact_count     Int            @default(0)
+  escalation_level  Int            @default(0)
+  escalated_at      DateTime?      @db.Timestamptz(6)
+  escalation_reason String?
+  notes             String?
+  created_at        DateTime       @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime       @updatedAt @db.Timestamptz(6)
+  assigned_agent    admin_users?   @relation("AssignedAgent", fields: [assigned_to], references: [id])
+  loan_account      loan_accounts  @relation(fields: [loan_account_id], references: [id])
+  contact_logs      contact_logs[]
 
   @@index([loan_account_id])
   @@index([status])
@@ -581,28 +403,19 @@ model collection_cases {
   @@index([opened_at])
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// CONTACT LOGS
-// Append-only log of every contact attempt by collection agents.
-// ─────────────────────────────────────────────────────────────────────────────
-
 model contact_logs {
-  id        String @id @default(uuid()) @db.Uuid
-  case_id   String @db.Uuid
-  logged_by String @db.Uuid
-
-  outcome          String  @db.VarChar(40)
-  channel          String  @db.VarChar(20)
-  ptp_date         DateTime? @db.Date
-  ptp_amount       Decimal?  @db.Decimal(15, 2)
-  payment_received Decimal?  @db.Decimal(15, 2)
-  notes            String    @db.Text
-
-  contacted_at DateTime @default(now()) @db.Timestamptz
-  created_at   DateTime @default(now()) @db.Timestamptz
-
-  // Relations
-  collection_case collection_cases @relation(fields: [case_id], references: [id], onDelete: Restrict)
+  id               String           @id @default(uuid()) @db.Uuid
+  case_id          String           @db.Uuid
+  logged_by        String           @db.Uuid
+  outcome          String           @db.VarChar(40)
+  channel          String           @db.VarChar(20)
+  ptp_date         DateTime?        @db.Date
+  ptp_amount       Decimal?         @db.Decimal(15, 2)
+  payment_received Decimal?         @db.Decimal(15, 2)
+  notes            String
+  contacted_at     DateTime         @default(now()) @db.Timestamptz(6)
+  created_at       DateTime         @default(now()) @db.Timestamptz(6)
+  collection_case  collection_cases @relation(fields: [case_id], references: [id])
 
   @@index([case_id])
   @@index([logged_by])
@@ -610,22 +423,16 @@ model contact_logs {
   @@index([case_id, contacted_at])
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// WEBHOOK LOGS
-// Every inbound webhook from every vendor — for idempotency and debugging.
-// Append-only.
-// ─────────────────────────────────────────────────────────────────────────────
-
 model webhook_logs {
-  id               String  @id @default(uuid()) @db.Uuid
-  source           String  @db.VarChar(30)
-  event            String  @db.VarChar(100)
-  gateway_event_id String? @db.VarChar(200)
-  status           String  @db.VarChar(20)
+  id               String    @id @default(uuid()) @db.Uuid
+  source           String    @db.VarChar(30)
+  event            String    @db.VarChar(100)
+  gateway_event_id String?   @db.VarChar(200)
+  status           String    @db.VarChar(20)
   processing_ms    Int
-  error_message    String? @db.Text
-  received_at      DateTime @db.Timestamptz
-  processed_at     DateTime? @db.Timestamptz
+  error_message    String?
+  received_at      DateTime  @db.Timestamptz(6)
+  processed_at     DateTime? @db.Timestamptz(6)
 
   @@index([gateway_event_id])
   @@index([source, gateway_event_id])
@@ -633,32 +440,23 @@ model webhook_logs {
   @@index([received_at])
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// AUDIT LOGS
-// RBI-mandated immutable audit trail. Append-only — no update/delete.
-// Retained for minimum 5 years.
-// ─────────────────────────────────────────────────────────────────────────────
-
 model audit_logs {
-  id          String  @id @default(uuid()) @db.Uuid
-  action      String  @db.VarChar(100)
-  entity_type String? @db.VarChar(50)
-  entity_id   String? @db.Uuid
-  user_id     String? @db.Uuid
-  role        String? @db.VarChar(30)
-
-  request_id  String  @db.VarChar(36)
-  ip_address  String? @db.VarChar(45)    // IPv6-compatible
-  user_agent  String? @db.VarChar(500)
-  http_method String? @db.VarChar(10)
-  http_path   String? @db.VarChar(500)
-  status_code Int?
-
-  before_state String? @db.Text   // JSON
-  after_state  String? @db.Text   // JSON
-  metadata     String? @db.Text   // JSON
-
-  created_at DateTime @default(now()) @db.Timestamptz
+  id           String   @id @default(uuid()) @db.Uuid
+  action       String   @db.VarChar(100)
+  entity_type  String?  @db.VarChar(50)
+  entity_id    String?  @db.Uuid
+  user_id      String?  @db.Uuid
+  role         String?  @db.VarChar(30)
+  request_id   String   @db.VarChar(36)
+  ip_address   String?  @db.VarChar(45)
+  user_agent   String?  @db.VarChar(500)
+  http_method  String?  @db.VarChar(10)
+  http_path    String?  @db.VarChar(500)
+  status_code  Int?
+  before_state String?
+  after_state  String?
+  metadata     String?
+  created_at   DateTime @default(now()) @db.Timestamptz(6)
 
   @@index([entity_type, entity_id])
   @@index([user_id, created_at])
@@ -667,121 +465,91 @@ model audit_logs {
   @@index([created_at])
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// NOTIFICATION DELIVERIES
-// Delivery receipt for every SMS, email, and push notification sent.
-// ─────────────────────────────────────────────────────────────────────────────
-
 model notification_deliveries {
-  id           String  @id @default(uuid()) @db.Uuid
-  template_key String  @db.VarChar(60)
-  channel      String  @db.VarChar(10)
-  recipient    String  @db.VarChar(500)   // phone | email | fcmToken
-  status       String  @db.VarChar(20)
-  message_id   String? @db.VarChar(100)
-  error        String? @db.Text
-  sent_at      DateTime? @db.Timestamptz
-  created_at   DateTime  @default(now()) @db.Timestamptz
+  id           String    @id @default(uuid()) @db.Uuid
+  template_key String    @db.VarChar(60)
+  channel      String    @db.VarChar(10)
+  recipient    String    @db.VarChar(500)
+  status       String    @db.VarChar(20)
+  message_id   String?   @db.VarChar(100)
+  error        String?
+  sent_at      DateTime? @db.Timestamptz(6)
+  created_at   DateTime  @default(now()) @db.Timestamptz(6)
 
   @@index([template_key, created_at])
   @@index([channel, status])
   @@index([created_at])
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ADMIN USERS
-// Internal staff — ops, credit managers, finance, collection agents, super admins.
-// Separate from the users table (which is for customers and agents).
-// ─────────────────────────────────────────────────────────────────────────────
-
 model admin_users {
-    id                   String    @id @default(uuid()) @db.Uuid
-    full_name            String    @db.VarChar(100)
-    email                String    @unique @db.VarChar(255)
-    phone                String    @unique @db.VarChar(15)
-    role                 String    @db.VarChar(30)
-    status               String    @default("ACTIVE") @db.VarChar(20)
-    department           String?   @db.VarChar(100)
-    username             String?   @unique @db.VarChar(50)
-    password_hash        String?   @db.VarChar(255)
-    product              String?   @default("ALL") @db.VarChar(20)
-    branch_id            String?   @db.Uuid
-    must_change_password Boolean?  @default(true)
-    is_active            Boolean?  @default(true)
-    created_by           String?   @db.Uuid
-    last_login_at        DateTime? @db.Timestamptz
-    created_at           DateTime  @default(now()) @db.Timestamptz
-    updated_at           DateTime  @updatedAt @db.Timestamptz
+  id                                        String             @id @default(uuid()) @db.Uuid
+  full_name                                 String             @db.VarChar(100)
+  email                                     String             @unique @db.VarChar(255)
+  phone                                     String             @unique @db.VarChar(15)
+  role                                      String             @db.VarChar(30)
+  status                                    String             @default("ACTIVE") @db.VarChar(20)
+  department                                String?            @db.VarChar(100)
+  last_login_at                             DateTime?          @db.Timestamptz(6)
+  created_at                                DateTime           @default(now()) @db.Timestamptz(6)
+  updated_at                                DateTime           @updatedAt @db.Timestamptz(6)
+  username                                  String?            @unique @db.VarChar(50)
+  password_hash                             String?            @db.VarChar(255)
+  product                                   String?            @default("ALL") @db.VarChar(20)
+  branch_id                                 String?            @db.Uuid
+  must_change_password                      Boolean?           @default(true)
+  created_by                                String?            @db.Uuid
+  is_active                                 Boolean?           @default(true)
+  branch                                    branches?          @relation(fields: [branch_id], references: [id], onUpdate: NoAction)
+  branches_branches_manager_idToadmin_users branches[]         @relation("branches_manager_idToadmin_users")
+  collection_cases                          collection_cases[] @relation("AssignedAgent")
 
-    // Relations
-    collection_cases collection_cases[] @relation("AssignedAgent")
-    branch           branches?          @relation(fields: [branch_id], references: [id], onDelete: SetNull)
-
-    @@index([role, status])
-    @@index([email])
-    @@index([username])
-    @@index([product])
+  @@index([role, status])
+  @@index([email])
+  @@index([username])
+  @@index([product])
 }
 
 model branches {
-    id         String    @id @default(uuid()) @db.Uuid
-    name       String    @db.VarChar(100)
-    address    String    @db.VarChar(300)
-    city       String    @db.VarChar(50)
-    state      String    @db.VarChar(50)
-    pincode    String    @db.VarChar(10)
-    phone      String?   @db.VarChar(15)
-    manager_id String?   @db.Uuid
-    is_active  Boolean?  @default(true)
-    created_at DateTime  @default(now()) @db.Timestamptz
-    updated_at DateTime  @default(now()) @db.Timestamptz
+  id                                           String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                                         String        @db.VarChar(100)
+  address                                      String        @db.VarChar(300)
+  city                                         String        @db.VarChar(50)
+  state                                        String        @db.VarChar(50)
+  pincode                                      String        @db.VarChar(10)
+  phone                                        String?       @db.VarChar(15)
+  manager_id                                   String?       @db.Uuid
+  is_active                                    Boolean?      @default(true)
+  created_at                                   DateTime      @default(now()) @db.Timestamptz(6)
+  updated_at                                   DateTime      @default(now()) @db.Timestamptz(6)
+  admin_users                                  admin_users[]
+  admin_users_branches_manager_idToadmin_users admin_users?  @relation("branches_manager_idToadmin_users", fields: [manager_id], references: [id], onUpdate: NoAction)
 
-    // Relations
-    admin_users admin_users[]
-
-    @@index([city])
-    @@index([is_active])
+  @@index([city])
+  @@index([is_active])
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// SYSTEM CONFIG
-// Runtime configuration — values that can change without a deployment.
-// Cached in Redis with a 5-minute TTL.
-// ─────────────────────────────────────────────────────────────────────────────
 
 model system_config {
   key         String   @id @db.VarChar(60)
   value       String   @db.VarChar(500)
   description String   @db.VarChar(300)
   updated_by  String   @db.Uuid
-  updated_at  DateTime @db.Timestamptz
+  updated_at  DateTime @db.Timestamptz(6)
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// OPERATIONAL OVERRIDES
-// Every manual action performed by Super Admin through the admin panel.
-// Append-only.
-// ─────────────────────────────────────────────────────────────────────────────
-
 model operational_overrides {
-  id           String  @id @default(uuid()) @db.Uuid
-  target_type  String  @db.VarChar(50)
-  target_id    String  @db.VarChar(100)
-  action       String  @db.VarChar(100)
-  reason       String  @db.Text
-  performed_by String  @db.Uuid
-  performed_at DateTime @db.Timestamptz
-  metadata     String? @db.Text   // JSON
+  id           String   @id @default(uuid()) @db.Uuid
+  target_type  String   @db.VarChar(50)
+  target_id    String   @db.VarChar(100)
+  action       String   @db.VarChar(100)
+  reason       String
+  performed_by String   @db.Uuid
+  performed_at DateTime @db.Timestamptz(6)
+  metadata     String?
 
   @@index([target_type, target_id])
   @@index([performed_by])
   @@index([performed_at])
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// REPORT AUDIT LOG
-// Tracks every report generated — who requested it, when, what format.
-// ─────────────────────────────────────────────────────────────────────────────
 
 model report_audit_log {
   id           String   @id @default(uuid()) @db.Uuid
@@ -791,8 +559,95 @@ model report_audit_log {
   from_date    DateTime @db.Date
   to_date      DateTime @db.Date
   row_count    Int?
-  generated_at DateTime @default(now()) @db.Timestamptz
+  generated_at DateTime @default(now()) @db.Timestamptz(6)
 
   @@index([report_type, generated_at])
   @@index([generated_by])
+}
+
+model bureau_accounts {
+  id                 String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bureau_report_id   String         @db.Uuid
+  lender             String?        @db.VarChar(100)
+  account_type       String?        @db.VarChar(50)
+  sanctioned_amount  Decimal?       @db.Decimal(15, 2)
+  outstanding_amount Decimal?       @db.Decimal(15, 2)
+  opened_on          DateTime?      @db.Date
+  status             String?        @db.VarChar(20)
+  created_at         DateTime       @default(now()) @db.Timestamptz(6)
+  bureau_reports     bureau_reports @relation(fields: [bureau_report_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([bureau_report_id], map: "bureau_accounts_report_id_idx")
+}
+
+model bureau_reports {
+  id                   String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  loan_id              String            @unique @db.Uuid
+  provider             String            @default("CIBIL") @db.VarChar(30)
+  score                Int               @db.SmallInt
+  report_date          DateTime          @db.Date
+  enquiries_6m         Int?              @db.SmallInt
+  total_accounts       Int?              @db.SmallInt
+  active_accounts      Int?              @db.SmallInt
+  overdue_accounts     Int?              @db.SmallInt
+  oldest_account_years Decimal?          @db.Decimal(4, 1)
+  payment_history      Json?
+  raw_payload          Json?
+  pulled_at            DateTime          @default(now()) @db.Timestamptz(6)
+  created_at           DateTime          @default(now()) @db.Timestamptz(6)
+  bureau_accounts      bureau_accounts[]
+  loan_applications    loan_applications @relation(fields: [loan_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([loan_id])
+  @@index([score])
+}
+
+model collateral_gold {
+  id                 String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  loan_id            String            @unique @db.Uuid
+  net_weight_grams   Decimal           @db.Decimal(8, 2)
+  gross_weight_grams Decimal           @db.Decimal(8, 2)
+  purity_karat       Int               @db.SmallInt
+  rate_per_gram      Decimal           @db.Decimal(10, 2)
+  valuation          Decimal           @db.Decimal(15, 2)
+  ltv_pct            Decimal           @db.Decimal(5, 2)
+  items              Json
+  valued_by          String            @db.VarChar(100)
+  valued_at          DateTime          @default(now()) @db.Timestamptz(6)
+  created_at         DateTime          @default(now()) @db.Timestamptz(6)
+  loan_applications  loan_applications @relation(fields: [loan_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([loan_id])
+}
+
+model collateral_property {
+  id                 String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  loan_id            String            @unique @db.Uuid
+  property_type      String            @db.VarChar(50)
+  address            String            @db.VarChar(300)
+  market_value       Decimal           @db.Decimal(15, 2)
+  ltv_pct            Decimal           @db.Decimal(5, 2)
+  builder_name       String?           @db.VarChar(100)
+  construction_stage String?           @db.VarChar(50)
+  valued_at          DateTime          @default(now()) @db.Timestamptz(6)
+  created_at         DateTime          @default(now()) @db.Timestamptz(6)
+  loan_applications  loan_applications @relation(fields: [loan_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([loan_id])
+}
+
+model loan_products {
+  product_type       String   @id @db.VarChar(30)
+  min_amount         Decimal  @db.Decimal(15, 2)
+  max_amount         Decimal  @db.Decimal(15, 2)
+  min_rate           Decimal  @db.Decimal(5, 2)
+  max_rate           Decimal  @db.Decimal(5, 2)
+  max_tenure_months  Int      @db.SmallInt
+  processing_fee_pct Decimal  @db.Decimal(5, 3)
+  insurance_pct      Decimal  @default(0) @db.Decimal(5, 3)
+  stamp_duty         Decimal  @default(0) @db.Decimal(10, 2)
+  documentation_fee  Decimal  @default(0) @db.Decimal(10, 2)
+  max_ltv_pct        Decimal? @db.Decimal(5, 2)
+  is_active          Boolean  @default(true)
+  updated_at         DateTime @default(now()) @db.Timestamptz(6)
 }
