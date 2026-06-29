@@ -1,10 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const { login, updatePassword, getMe } = require('../controllers/staffController');
+const { login, updatePassword, getMe, requestOtp, verifyOtp } = require('../controllers/staffController');
 const { verifyToken } = require('../utils/jwtUtils');
 const AppError = require('../utils/appError');
 
-// Middleware — verify JWT for protected routes
 const requireStaffAuth = (req, res, next) => {
     try {
         const header = req.headers.authorization;
@@ -18,11 +17,10 @@ const requireStaffAuth = (req, res, next) => {
     }
 };
 
-// Public
 router.post('/login', login);
-
-// Protected
 router.post('/change-password', requireStaffAuth, updatePassword);
 router.get('/me', requireStaffAuth, getMe);
+router.post('/otp/request', requestOtp);
+router.post('/otp/verify', verifyOtp);
 
 module.exports = router;
