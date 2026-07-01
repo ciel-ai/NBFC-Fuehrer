@@ -636,6 +636,12 @@ model collateral_property {
   @@index([loan_id])
 }
 
+model number_sequences {
+  sequence_key  String   @id @db.VarChar(50)
+  current_value Int      @default(0)
+  updated_at    DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+}
+
 model loan_products {
   product_type       String   @id @db.VarChar(30)
   min_amount         Decimal  @db.Decimal(15, 2)

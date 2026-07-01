@@ -2,6 +2,7 @@
 import { prisma } from '@/config/database';
 import { withTransaction } from '@/config/database';
 import { createModuleLogger } from '@/config/logger';
+import { generateLoanAccountNumber } from '@/utils/referenceNumber.util';
 import {
     LOAN_STATUS,
     PAGINATION,
@@ -95,16 +96,7 @@ function mapAccount(row: Record<string, unknown>): LoanAccount {
 // ─── Account number generator ──────────────────────────────────────────────────
 // FHR-2026-000001 — human-readable, sequential, year-scoped
 
-async function generateAccountNumber(): Promise<string> {
-    const year = new Date().getFullYear();
-    const result = await prisma.$queryRaw<[{ count: bigint }]>`
-    SELECT COUNT(*)::bigint as count
-    FROM loan_accounts
-    WHERE EXTRACT(YEAR FROM created_at) = ${year}
-  `;
-    const seq = Number(result[0]!.count) + 1;
-    return `FHR-${year}-${String(seq).padStart(6, '0')}`;
-}
+
 
 // ─── Repository ────────────────────────────────────────────────────────────────
 
@@ -298,7 +290,7 @@ export const loansRepository = {
         totalInterest: number;
     }): Promise<LoanAccount> {
         return withTransaction(async (tx) => {
-            const accountNumber = await generateAccountNumber();
+            const accountNumber = await generateLoanAccountNumber();
 
             const row = await tx.loan_accounts.create({
                 data: {
