@@ -2,7 +2,7 @@
 import { prisma } from '@/config/database';
 import { withTransaction } from '@/config/database';
 import { createModuleLogger } from '@/config/logger';
-import { generateLoanAccountNumber } from '@/utils/referenceNumber.util';
+import { generateLoanAccountNumber, generateLoanApplicationNumber } from '@/utils/referenceNumber.util';
 import {
     LOAN_STATUS,
     PAGINATION,
@@ -49,6 +49,7 @@ function mapCustomer(row: Record<string, unknown>): CustomerProfile {
 function mapApplication(row: Record<string, unknown>): LoanApplication {
     return {
         id: row.id as string,
+        referenceNumber: row.reference_number as string | null,
         userId: row.user_id as string,
         agentId: row.agent_id as string | null,
         customerId: row.customer_id as string | null,
@@ -158,16 +159,18 @@ export const loansRepository = {
     },
 
     async createApplication(
-        data: Omit<LoanApplication, 'id' | 'status' | 'approvedAmount' |
+        data: Omit<LoanApplication, 'id' | 'referenceNumber' | 'status' | 'approvedAmount' |
             'interestRate' | 'processingFee' | 'processingFeeGst' |
             'rejectionReason' | 'reviewedBy' | 'reviewedAt' | 'updatedAt'>,
     ): Promise<LoanApplication> {
+        const referenceNumber = await generateLoanApplicationNumber();
         const row = await prisma.loan_applications.create({
             data: {
-                user_id:         data.userId,
-                agent_id:        data.agentId,
-                customer_id:     data.customerId,
-                status:          LOAN_STATUS.DRAFT,
+                user_id:          data.userId,
+                agent_id:         data.agentId,
+                customer_id:      data.customerId,
+                reference_number: referenceNumber,
+                status:           LOAN_STATUS.DRAFT,
                 amount_requested: data.amountRequested,
                 tenure_months:   data.tenureMonths,
                 product_type:    data.productType,

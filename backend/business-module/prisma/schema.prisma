@@ -141,6 +141,7 @@ model loan_applications {
   state                String?                @db.VarChar(100)
   street_area          String?                @db.VarChar(200)
   repayment_type       String                 @default("MONTHLY_EMI") @db.VarChar(20)
+  reference_number     String?                @unique @db.VarChar(20)
   customer_id          String?                @db.Uuid
   customer             customers?             @relation(fields: [customer_id], references: [id])
   bureau_reports       bureau_reports?

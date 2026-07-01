@@ -33,6 +33,7 @@ export interface UpsertCustomerInput {
 
 export interface LoanApplication {
     id: string;
+    referenceNumber: string | null;
     userId: string;
     agentId: string | null;
     customerId: string | null;

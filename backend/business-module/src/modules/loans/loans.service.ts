@@ -104,10 +104,7 @@ function toApplicationResponse(
         ? calculateEmi(app.approvedAmount, app.interestRate, app.tenureMonths)
         : null;
 
-    // TODO: replace with atomic number_sequences-based application ref number
-    const year = new Date(app.appliedAt).getFullYear();
-    const shortRef = app.id.replace(/-/g, '').slice(-5).toUpperCase();
-    const referenceNumber = `FHR-${year}-${shortRef}`;
+    const referenceNumber = app.referenceNumber ?? null;
 
     return {
         id: app.id,

@@ -19,3 +19,9 @@ export async function generateLoanAccountNumber(): Promise<string> {
     const seq = await getNextSequenceValue(`LOAN_ACCOUNT_${year}`);
     return `FHR-${year}-${String(seq).padStart(6, '0')}`;
 }
+
+export async function generateLoanApplicationNumber(): Promise<string> {
+    const year = new Date().getFullYear();
+    const seq = await getNextSequenceValue(`LOAN_APP_${year}`);
+    return `FHR-${year}-${String(seq).padStart(6, '0')}`;
+}
