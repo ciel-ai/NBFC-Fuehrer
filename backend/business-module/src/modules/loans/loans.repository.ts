@@ -21,6 +21,8 @@ import type {
     LoanApplication,
     LoanAccount,
     ListLoansInput,
+    CustomerProfile,
+    UpsertCustomerInput,
 } from './loans.types';
 import { NotFoundError } from '@/errors';
 
@@ -28,11 +30,28 @@ const log = createModuleLogger('loans.repository');
 
 // ─── Mappers ───────────────────────────────────────────────────────────────────
 
+function mapCustomer(row: Record<string, unknown>): CustomerProfile {
+    return {
+        id: row.id as string,
+        userId: row.user_id as string,
+        flatHouseNo: row.flat_house_no as string | null,
+        streetArea: row.street_area as string | null,
+        city: row.city as string | null,
+        state: row.state as string | null,
+        pincode: row.pincode as string | null,
+        employmentType: row.employment_type as string | null,
+        employerName: row.employer_name as string | null,
+        createdAt: row.created_at as Date,
+        updatedAt: row.updated_at as Date,
+    };
+}
+
 function mapApplication(row: Record<string, unknown>): LoanApplication {
     return {
         id: row.id as string,
         userId: row.user_id as string,
         agentId: row.agent_id as string | null,
+        customerId: row.customer_id as string | null,
         status: row.status as LoanStatus,
         amountRequested: toNumber(row.amount_requested as number),
         tenureMonths: row.tenure_months as number,
@@ -53,20 +72,8 @@ function mapApplication(row: Record<string, unknown>): LoanApplication {
         reviewedAt: row.reviewed_at as Date | null,
         appliedAt: row.applied_at as Date,
         updatedAt: row.updated_at as Date,
-
-        // Address fields
-        flatHouseNo: row.flat_house_no as string | null,
-        streetArea: row.street_area as string | null,
-        city: row.city as string | null,
-        pincode: row.pincode as string | null,
-        state: row.state as string | null,
-
-        // Employment fields
-        employmentType: row.employment_type as string | null,
-        employerName: row.employer_name as string | null,
         monthlyIncome: row.monthly_income
             ? toNumber(row.monthly_income as number) : null,
-
         repaymentType: (row.repayment_type as string) ?? 'MONTHLY_EMI',
     };
 }
@@ -93,14 +100,47 @@ function mapAccount(row: Record<string, unknown>): LoanAccount {
     } as LoanAccount;
 }
 
-// ─── Account number generator ──────────────────────────────────────────────────
-// FHR-2026-000001 — human-readable, sequential, year-scoped
-
-
-
 // ─── Repository ────────────────────────────────────────────────────────────────
 
 export const loansRepository = {
+
+    // ── Customer upsert ───────────────────────────────────────────────────────
+
+    async upsertCustomer(data: UpsertCustomerInput): Promise<CustomerProfile> {
+        const row = await prisma.customers.upsert({
+            where: { user_id: data.userId },
+            update: {
+                flat_house_no:   data.flatHouseNo   ?? null,
+                street_area:     data.streetArea    ?? null,
+                city:            data.city          ?? null,
+                state:           data.state         ?? null,
+                pincode:         data.pincode       ?? null,
+                employment_type: data.employmentType ?? null,
+                employer_name:   data.employerName  ?? null,
+                updated_at:      new Date(),
+            },
+            create: {
+                user_id:         data.userId,
+                flat_house_no:   data.flatHouseNo   ?? null,
+                street_area:     data.streetArea    ?? null,
+                city:            data.city          ?? null,
+                state:           data.state         ?? null,
+                pincode:         data.pincode       ?? null,
+                employment_type: data.employmentType ?? null,
+                employer_name:   data.employerName  ?? null,
+                created_at:      new Date(),
+                updated_at:      new Date(),
+            },
+        });
+        return mapCustomer(row as unknown as Record<string, unknown>);
+    },
+
+    async findCustomerByUserId(userId: string): Promise<CustomerProfile | null> {
+        const row = await prisma.customers.findUnique({
+            where: { user_id: userId },
+        });
+        return row ? mapCustomer(row as unknown as Record<string, unknown>) : null;
+    },
 
     // ── Application CRUD ──────────────────────────────────────────────────────
 
@@ -122,34 +162,24 @@ export const loansRepository = {
             'interestRate' | 'processingFee' | 'processingFeeGst' |
             'rejectionReason' | 'reviewedBy' | 'reviewedAt' | 'updatedAt'>,
     ): Promise<LoanApplication> {
-       const row = await prisma.loan_applications.create({
-    data: {
-        user_id: data.userId,
-        agent_id: data.agentId,
-        status: LOAN_STATUS.DRAFT,
-        amount_requested: data.amountRequested,
-        tenure_months: data.tenureMonths,
-        product_type: data.productType,
-        purpose: data.purpose,
-        store_name: data.storeName,
-        store_city: data.storeCity,
-        applied_at: data.appliedAt,
-        updated_at: new Date(),
-
-        // Address fields
-        flat_house_no:  data.flatHouseNo   ?? null,
-        street_area:    data.streetArea    ?? null,
-        city:           data.city          ?? null,
-        pincode:        data.pincode       ?? null,
-        state:          data.state         ?? null,
-
-        // Employment fields
-        employment_type: data.employmentType ?? null,
-        employer_name:   data.employerName   ?? null,
-        monthly_income:  data.monthlyIncome  ?? null,
-        repayment_type:  data.repaymentType  ?? 'MONTHLY_EMI',
-    },
-});
+        const row = await prisma.loan_applications.create({
+            data: {
+                user_id:         data.userId,
+                agent_id:        data.agentId,
+                customer_id:     data.customerId,
+                status:          LOAN_STATUS.DRAFT,
+                amount_requested: data.amountRequested,
+                tenure_months:   data.tenureMonths,
+                product_type:    data.productType,
+                purpose:         data.purpose,
+                store_name:      data.storeName,
+                store_city:      data.storeCity,
+                monthly_income:  data.monthlyIncome  ?? null,
+                repayment_type:  data.repaymentType  ?? 'MONTHLY_EMI',
+                applied_at:      data.appliedAt,
+                updated_at:      new Date(),
+            },
+        });
         return mapApplication(row as unknown as Record<string, unknown>);
     },
 
@@ -294,26 +324,25 @@ export const loansRepository = {
 
             const row = await tx.loan_accounts.create({
                 data: {
-                    application_id: data.applicationId,
-                    user_id: data.userId,
-                    account_number: accountNumber,
-                    principal_amount: data.principalAmount,
-                    interest_rate: data.interestRate,
-                    tenure_months: data.tenureMonths,
-                    monthly_emi: data.monthlyEmi,
+                    application_id:     data.applicationId,
+                    user_id:            data.userId,
+                    account_number:     accountNumber,
+                    principal_amount:   data.principalAmount,
+                    interest_rate:      data.interestRate,
+                    tenure_months:      data.tenureMonths,
+                    monthly_emi:        data.monthlyEmi,
                     outstanding_balance: data.principalAmount + data.totalInterest,
-                    total_interest: data.totalInterest,
-                    status: LOAN_STATUS.DISBURSED,
-                    created_at: new Date(),
-                    updated_at: new Date(),
+                    total_interest:     data.totalInterest,
+                    status:             LOAN_STATUS.DISBURSED,
+                    created_at:         new Date(),
+                    updated_at:         new Date(),
                 },
             });
 
-            // Update application status to DISBURSED atomically
             await tx.loan_applications.update({
                 where: { id: data.applicationId },
                 data: {
-                    status: LOAN_STATUS.DISBURSED,
+                    status:     LOAN_STATUS.DISBURSED,
                     updated_at: new Date(),
                 },
             });
@@ -362,9 +391,7 @@ export const loansRepository = {
             Date.now() - overdueDaysThreshold * 24 * 60 * 60 * 1000,
         );
 
-        const rows = await prisma.$queryRaw<
-            Array<{ loan_account_id: string; user_id: string; overdue_days: number }>
-        > `
+        const rows = await prisma.$queryRaw`
       SELECT
         la.id           AS loan_account_id,
         la.user_id,
@@ -378,7 +405,7 @@ export const loansRepository = {
       GROUP BY la.id, la.user_id
       HAVING EXTRACT(DAY FROM NOW() - MIN(es.due_date)) >= ${overdueDaysThreshold}
       ORDER BY overdue_days DESC
-    `;
+    ` as Array<{ loan_account_id: string; user_id: string; overdue_days: number }>;
 
         return rows.map((r) => ({
             loanAccountId: r.loan_account_id,

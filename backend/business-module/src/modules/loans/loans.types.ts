@@ -2,12 +2,40 @@
 import type { LoanStatus, ProductType, DisbursementMode } from '@/config/constants';
 import type { Rupees, PaginationParams, SortOrder } from '@/types/common.types';
 
-// â”€â”€â”€ Core loan application model â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Customer profile ──────────────────────────────────────────────────────────
+
+export interface CustomerProfile {
+    id: string;
+    userId: string;
+    flatHouseNo: string | null;
+    streetArea: string | null;
+    city: string | null;
+    state: string | null;
+    pincode: string | null;
+    employmentType: string | null;
+    employerName: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+export interface UpsertCustomerInput {
+    userId: string;
+    flatHouseNo?: string | null;
+    streetArea?: string | null;
+    city?: string | null;
+    state?: string | null;
+    pincode?: string | null;
+    employmentType?: string | null;
+    employerName?: string | null;
+}
+
+// ─── Core loan application model ───────────────────────────────────────────────
 
 export interface LoanApplication {
     id: string;
     userId: string;
     agentId: string | null;
+    customerId: string | null;
     status: LoanStatus;
 
     // Request details
@@ -18,24 +46,15 @@ export interface LoanApplication {
     storeName: string;
     storeCity: string;
 
-    // Address fields
-    flatHouseNo: string | null;
-    streetArea: string | null;
-    city: string | null;
-    pincode: string | null;
-    state: string | null;
-
-    // Employment fields
-    employmentType: string | null;
-    employerName: string | null;
+    // Income snapshot — stays on application for regulatory audit trail
     monthlyIncome: number | null;
 
     // Repayment
     repaymentType: string;
 
-    // Approval details â€” populated by credit manager
+    // Approval details — populated by credit manager
     approvedAmount: Rupees | null;
-    interestRate: number | null;   // Annual % e.g. 18.00
+    interestRate: number | null;
     processingFee: Rupees | null;
     processingFeeGst: Rupees | null;
 
@@ -49,13 +68,13 @@ export interface LoanApplication {
     updatedAt: Date;
 }
 
-// â”€â”€â”€ Active loan account â€” created on disbursement â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Active loan account — created on disbursement ────────────────────────────
 
 export interface LoanAccount {
     id: string;
     applicationId: string;
     userId: string;
-    accountNumber: string;   // Human-readable: FHR-2026-000001
+    accountNumber: string;
 
     principalAmount: Rupees;
     interestRate: number;
@@ -74,7 +93,7 @@ export interface LoanAccount {
     updatedAt: Date;
 }
 
-// â”€â”€â”€ Input / output DTOs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Input / output DTOs ───────────────────────────────────────────────────────
 
 export interface CreateLoanApplicationInput {
     userId: string;
@@ -85,21 +104,17 @@ export interface CreateLoanApplicationInput {
     purpose: string;
     storeName: string;
     storeCity: string;
-
-    // Address fields
-    flatHouseNo: string | null;
-    streetArea: string | null;
-    city: string | null;
-    pincode: string | null;
-    state: string | null;
-
-    // Employment fields
-    employmentType: string | null;
-    employerName: string | null;
     monthlyIncome: number | null;
-
-    // Repayment
     repaymentType: string;
+
+    // Customer profile fields — upserted to customers table
+    flatHouseNo?: string | null;
+    streetArea?: string | null;
+    city?: string | null;
+    state?: string | null;
+    pincode?: string | null;
+    employmentType?: string | null;
+    employerName?: string | null;
 }
 
 export interface SubmitLoanApplicationInput {
@@ -132,8 +147,7 @@ export interface ListLoansInput extends PaginationParams {
     toDate?: Date;
 }
 
-// â”€â”€â”€ Safe public response shapes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// What we expose through the API â€” no internal DB ids beyond what's necessary
+// ─── Safe public response shapes ──────────────────────────────────────────────
 
 export interface LoanApplicationResponse {
     id: string;
@@ -149,25 +163,15 @@ export interface LoanApplicationResponse {
     purpose: string;
     storeName: string;
     storeCity: string;
-
-    // Address fields
-    flatHouseNo: string | null;
-    streetArea: string | null;
-    city: string | null;
-    pincode: string | null;
-    state: string | null;
-
-    // Employment fields
-    employmentType: string | null;
-    employerName: string | null;
     monthlyIncome: number | null;
-
-    // Repayment
     repaymentType: string;
     rejectionReason: string | null;
     appliedAt: Date;
     updatedAt: Date;
     reviewedAt: Date | null;
+
+    // Customer profile — joined from customers table
+    customer: CustomerProfile | null;
 }
 
 export interface LoanAccountResponse {
@@ -184,7 +188,7 @@ export interface LoanAccountResponse {
     closedAt: Date | null;
 }
 
-// â”€â”€â”€ EMI preview â€” shown to customer before applying â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── EMI preview — shown to customer before applying ──────────────────────────
 
 export interface EmiPreviewInput {
     amount: Rupees;
@@ -197,10 +201,10 @@ export interface EmiPreviewResult {
     totalAmount: Rupees;
     totalInterest: Rupees;
     processingFee: Rupees;
-    effectiveRate: number;   // APR
+    effectiveRate: number;
 }
 
-// â”€â”€â”€ Status transition metadata â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Status transition metadata ───────────────────────────────────────────────
 
 export interface StatusTransitionResult {
     loanId: string;
@@ -208,4 +212,3 @@ export interface StatusTransitionResult {
     currentStatus: LoanStatus;
     transitionedAt: Date;
 }
-

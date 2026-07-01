@@ -21,6 +21,7 @@ model users {
   kyc_documents     kyc_documents?
   loan_accounts     loan_accounts[]
   loan_applications loan_applications[]
+  customer          customers?
 
   @@index([phone])
   @@index([email])
@@ -92,6 +93,24 @@ model agents {
   @@index([agent_code])
 }
 
+model customers {
+  id              String   @id @default(uuid()) @db.Uuid
+  user_id         String   @unique @db.Uuid
+  flat_house_no   String?  @db.VarChar(100)
+  street_area     String?  @db.VarChar(200)
+  city            String?  @db.VarChar(100)
+  state           String?  @db.VarChar(100)
+  pincode         String?  @db.VarChar(6)
+  employment_type String?  @db.VarChar(30)
+  employer_name   String?  @db.VarChar(200)
+  created_at      DateTime @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime @updatedAt @db.Timestamptz(6)
+  user              users               @relation(fields: [user_id], references: [id])
+  loan_applications loan_applications[]
+
+  @@index([user_id])
+}
+
 model loan_applications {
   id                   String                 @id @default(uuid()) @db.Uuid
   user_id              String                 @db.Uuid
@@ -122,6 +141,8 @@ model loan_applications {
   state                String?                @db.VarChar(100)
   street_area          String?                @db.VarChar(200)
   repayment_type       String                 @default("MONTHLY_EMI") @db.VarChar(20)
+  customer_id          String?                @db.Uuid
+  customer             customers?             @relation(fields: [customer_id], references: [id])
   bureau_reports       bureau_reports?
   collateral_gold      collateral_gold?
   collateral_property  collateral_property?
@@ -136,6 +157,7 @@ model loan_applications {
   @@index([status, applied_at])
   @@index([agent_id, status])
   @@index([applied_at])
+  @@index([customer_id])
 }
 
 model loan_accounts {

@@ -44,32 +44,32 @@ export const createLoanSchema = Joi.object({
         .max(100)
         .required(),
 
-   storeCity: Joi.string()
+    storeCity: Joi.string()
         .trim()
         .min(2)
         .max(100)
         .required(),
 
-    // Address fields — Step 2 of loan application screen
-    flatHouseNo: Joi.string().trim().max(100).optional(),
-    streetArea:  Joi.string().trim().max(200).optional(),
-    city:        Joi.string().trim().max(100).optional(),
-    pincode:     Joi.string().length(6).pattern(/^\d{6}$/).optional()
-                    .messages({ 'string.pattern.base': 'Pincode must be 6 digits' }),
-    state:       Joi.string().trim().max(100).optional(),
+    // Income snapshot — stays on loan application
+    monthlyIncome: Joi.number().positive().optional(),
 
-    // Employment fields — Step 2 of loan application screen
+    // Repayment type
+    repaymentType: Joi.string()
+        .valid('MONTHLY_EMI', 'INTEREST_ONLY', 'BULLET')
+        .default('MONTHLY_EMI')
+        .optional(),
+
+    // Customer profile fields — upserted to customers table
+    flatHouseNo:    Joi.string().trim().max(100).optional(),
+    streetArea:     Joi.string().trim().max(200).optional(),
+    city:           Joi.string().trim().max(100).optional(),
+    pincode:        Joi.string().length(6).pattern(/^\d{6}$/).optional()
+                        .messages({ 'string.pattern.base': 'Pincode must be 6 digits' }),
+    state:          Joi.string().trim().max(100).optional(),
     employmentType: Joi.string()
                         .valid('SALARIED', 'SELF_EMPLOYED', 'BUSINESS_OWNER')
                         .optional(),
     employerName:   Joi.string().trim().max(200).optional(),
-    monthlyIncome:  Joi.number().positive().optional(),
-
-    // Repayment type — from Loan Amount & Tenure screen
-    repaymentType: Joi.string()
-                       .valid('MONTHLY_EMI', 'INTEREST_ONLY', 'BULLET')
-                       .default('MONTHLY_EMI')
-                       .optional(),
 });
 
 // ─── EMI preview (no auth needed) ─────────────────────────────────────────────
@@ -81,7 +81,7 @@ export const emiPreviewSchema = Joi.object({
 
     interestRate: Joi.number()
         .positive()
-        .max(60)     // 60% p.a. absolute ceiling
+        .max(60)
         .precision(2)
         .required(),
 });
