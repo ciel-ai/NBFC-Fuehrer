@@ -1,0 +1,114 @@
+/* Only transform/opacity are animated — GPU-composited, no layout thrashing.
+   No JS animation loops. prefers-reduced-motion is respected at the bottom. */
+
+.nbfc-shell {
+  background: var(--nbfc-page, #e9ebef);
+  min-height: 100vh;
+}
+
+.nbfc-sidebar {
+  background: linear-gradient(180deg, #0b1e39 0%, #0f2a4d 100%);
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+
+.nbfc-sidebar .ant-menu {
+  background: transparent !important;
+  border-inline-end: none !important;
+}
+
+.nbfc-sidebar .ant-menu-item {
+  color: #c3d4ec !important;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.nbfc-sidebar .ant-menu-item-selected {
+  background: rgba(90, 169, 230, 0.22) !important;
+}
+
+.nbfc-card {
+  transform: translateZ(0);
+  transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.nbfc-card:hover {
+  transform: translateY(-2px) translateZ(0);
+}
+
+.nbfc-accent-card {
+  background: linear-gradient(160deg, #5aa9e6 0%, #3c86c4 100%);
+  color: #fff;
+}
+.nbfc-accent-card .ant-typography,
+.nbfc-accent-card .ant-statistic-title,
+.nbfc-accent-card .ant-statistic-content {
+  color: #fff !important;
+}
+
+.nbfc-gauge-track {
+  width: 150px;
+  height: 75px;
+  border-radius: 150px 150px 0 0;
+  border: 16px solid #dceefb;
+  border-bottom: none;
+  position: relative;
+  overflow: hidden;
+  margin: 0 auto;
+}
+.nbfc-gauge-fill {
+  position: absolute;
+  inset: -16px;
+  border-radius: 150px 150px 0 0;
+  border: 16px solid #5aa9e6;
+  border-bottom: none;
+  clip-path: polygon(0 0, 68% 0, 68% 100%, 0 100%);
+  transform-origin: bottom center;
+  animation: nbfc-gauge-in 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes nbfc-gauge-in {
+  from { transform: scaleY(0); opacity: 0; }
+  to { transform: scaleY(1); opacity: 1; }
+}
+
+.nbfc-bar {
+  border-radius: 8px 8px 0 0;
+  background: #5aa9e6;
+  transform-origin: bottom;
+  animation: nbfc-bar-in 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes nbfc-bar-in {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+
+.nbfc-slot {
+  border-radius: 50%;
+  aspect-ratio: 1;
+  border: 1.5px dashed #e5e7eb;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.nbfc-slot.tint {
+  background: #dceefb;
+  border: none;
+}
+.nbfc-slot.on {
+  background: #5aa9e6;
+  border: none;
+}
+
+.nbfc-meeting-panel {
+  background: #1b1d22;
+  color: #fff;
+  border-radius: 16px;
+  padding: 14px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nbfc-gauge-fill,
+  .nbfc-bar,
+  .nbfc-card {
+    animation: none !important;
+    transition: none !important;
+  }
+}
