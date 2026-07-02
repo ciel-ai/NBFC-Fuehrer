@@ -107,6 +107,7 @@ model customers {
   updated_at      DateTime @updatedAt @db.Timestamptz(6)
   user              users               @relation(fields: [user_id], references: [id])
   loan_applications loan_applications[]
+  appointments    appointments[]
 
   @@index([user_id])
 }
@@ -151,6 +152,7 @@ model loan_applications {
   agent                agents?                @relation(fields: [agent_id], references: [id])
   user                 users                  @relation(fields: [user_id], references: [id])
   underwriting_reports underwriting_reports[]
+  appointments    appointments[]
 
   @@index([user_id])
   @@index([agent_id])
@@ -546,6 +548,7 @@ model branches {
   updated_at                                   DateTime      @default(now()) @db.Timestamptz(6)
   admin_users                                  admin_users[]
   admin_users_branches_manager_idToadmin_users admin_users?  @relation("branches_manager_idToadmin_users", fields: [manager_id], references: [id], onUpdate: NoAction)
+  appointments  appointments[]
 
   @@index([city])
   @@index([is_active])
@@ -623,6 +626,30 @@ model bureau_reports {
 
   @@index([loan_id])
   @@index([score])
+}
+
+
+model appointments {
+  id              String   @id @default(uuid()) @db.Uuid
+  loan_id         String   @db.Uuid
+  branch_id       String   @db.Uuid
+  customer_id     String   @db.Uuid
+  preferred_date  DateTime @db.Date
+  preferred_slot  String   @db.VarChar(50)
+  status          String   @default("BOOKED") @db.VarChar(30)
+  visit_notes     String?  @db.VarChar(500)
+  arrived_at      DateTime? @db.Timestamptz(6)
+  created_at      DateTime @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime @updatedAt @db.Timestamptz(6)
+  loan_application loan_applications @relation(fields: [loan_id], references: [id])
+  branch          branches           @relation(fields: [branch_id], references: [id])
+  customer        customers          @relation(fields: [customer_id], references: [id])
+
+  @@index([loan_id])
+  @@index([branch_id])
+  @@index([customer_id])
+  @@index([status])
+  @@index([preferred_date])
 }
 
 model collateral_gold {

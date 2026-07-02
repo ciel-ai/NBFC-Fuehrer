@@ -151,6 +151,8 @@ const STATUS_LABELS: Record<LoanStatus, string> = {
     [LOAN_STATUS.KYC_PENDING]: 'KYC Pending',
     [LOAN_STATUS.KYC_REJECTED]: 'KYC Rejected',
     [LOAN_STATUS.UNDERWRITING]: 'Under Review',
+    [LOAN_STATUS.APPOINTMENT_BOOKED]: 'Appointment Booked',
+    [LOAN_STATUS.APPRAISAL_PENDING]: 'Appraisal Pending',
     [LOAN_STATUS.PENDING_APPROVAL]: 'Pending Approval',
     [LOAN_STATUS.APPROVED]: 'Approved',
     [LOAN_STATUS.REJECTED]: 'Rejected',
