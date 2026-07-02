@@ -23,7 +23,7 @@ const router = Router();
 // GET /applications?status=&loanType=&from=&to=
 router.get('/', requireAuth(), async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-        const { status, page, limit, fromDate, toDate, sortBy, sortOrder } = req.query;
+        const { status, productType, page, limit, fromDate, toDate, sortBy, sortOrder } = req.query;
 
         const filters: any = {
             page: page ? parseInt(page as string, 10) : 1,
@@ -31,6 +31,8 @@ router.get('/', requireAuth(), async (req: AuthRequest, res: Response, next: Nex
             sortBy: (sortBy as string) ?? 'appliedAt',
             sortOrder: (sortOrder as string) ?? 'desc',
         };
+
+        if (productType) filters.productType = productType as string;
 
         // Status bucket presets per frontend spec — map to underlying single status
         // until the repository supports an `in` filter natively.
