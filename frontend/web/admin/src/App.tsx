@@ -2,7 +2,8 @@ import React from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { App as AntApp, Button, ConfigProvider, Result } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import { antdTheme } from './theme';
+import { nbfcTheme } from './theme/nbfcTheme';
+import './styles/nbfc-ui.css';
 import { useAuthStore } from './store/authStore';
 import { canAccess } from './auth/rbac';
 import type { ModuleKey } from './auth/rbac';
@@ -11,6 +12,11 @@ import AppLayout from './layouts/AppLayout';
 import Dashboard from './pages/Dashboard';
 import ApplicationsList from './pages/applications/ApplicationsList';
 import ApplicationDetails from './pages/applications/ApplicationDetails';
+import CustomersList from './pages/customers/CustomersList';
+import CustomerDetails from './pages/customers/CustomerDetails';
+import Appraisals from './pages/appraisals/Appraisals';
+import AgentManagement from './pages/agents/AgentManagement';
+import BranchManagement from './pages/branches/BranchManagement';
 import CreditQueue from './pages/credit/CreditQueue';
 import FinanceQueue from './pages/finance/FinanceQueue';
 import LoanAccounts from './pages/lms/LoanAccounts';
@@ -41,7 +47,7 @@ const RequireModule: React.FC<{ module: ModuleKey; children: React.ReactNode }> 
 };
 
 const App: React.FC = () => (
-  <ConfigProvider theme={antdTheme}>
+  <ConfigProvider theme={nbfcTheme}>
     <AntApp>
       <BrowserRouter>
         <Routes>
@@ -56,6 +62,11 @@ const App: React.FC = () => (
             <Route path="applications/finance-pending" element={<RequireModule module="applications"><ApplicationsList preset="finance-pending" /></RequireModule>} />
             <Route path="applications/disbursed" element={<RequireModule module="applications"><ApplicationsList preset="disbursed" /></RequireModule>} />
             <Route path="applications/view/:id" element={<RequireModule module="applications"><ApplicationDetails /></RequireModule>} />
+
+            <Route path="customers" element={<RequireModule module="customers"><CustomersList /></RequireModule>} />
+            <Route path="customers/:mobile" element={<RequireModule module="customers"><CustomerDetails /></RequireModule>} />
+
+            <Route path="appraisals" element={<RequireModule module="appraisals"><Appraisals /></RequireModule>} />
 
             <Route path="credit" element={<Navigate to="/credit/pending" replace />} />
             <Route path="credit/:tab" element={<RequireModule module="credit"><CreditQueue /></RequireModule>} />
@@ -76,6 +87,9 @@ const App: React.FC = () => (
 
             <Route path="reports" element={<Navigate to="/reports/los" replace />} />
             <Route path="reports/:tab" element={<RequireModule module="reports"><Reports /></RequireModule>} />
+
+            <Route path="agents" element={<RequireModule module="agents"><AgentManagement /></RequireModule>} />
+            <Route path="branches" element={<RequireModule module="branches"><BranchManagement /></RequireModule>} />
 
             <Route path="users" element={<RequireModule module="users"><UserManagement /></RequireModule>} />
             <Route path="audit" element={<RequireModule module="audit"><AuditLogs /></RequireModule>} />

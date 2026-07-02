@@ -1,38 +1,46 @@
-import React from 'react';
-import { App, Button, Card, Col, Form, Input, InputNumber, Row, Select, Switch, Table, Tabs, Tag } from 'antd';
+import React, { useState } from 'react';
+import { App, Button, Card, Col, Drawer, Form, Input, InputNumber, Row, Select, Switch, Table, Tabs, Tag } from 'antd';
 import {
-  ApiOutlined, BankOutlined, BellOutlined, SafetyOutlined, SettingOutlined, SaveOutlined,
+  ApiOutlined, BankOutlined, BellOutlined, EditOutlined, SafetyOutlined, SettingOutlined, SaveOutlined,
 } from '@ant-design/icons';
 import PageHeader from '../../components/PageHeader';
 import { SectionTitle } from '../../components/InfoGrid';
 import { LoanTypeTag } from '../../components/StatusTag';
 import { useAppStore } from '../../store/appStore';
 import { useAuthStore } from '../../store/authStore';
-import type { LoanType } from '../../types';
+import type { ProductConfig } from '../../types';
 
 const panel: React.CSSProperties = { border: '1px solid #e7ebf3' };
-
-interface ProductRow {
-  key: LoanType;
-  product: string;
-  minAmount: number;
-  maxAmount: number;
-  rateRange: string;
-  maxTenure: string;
-  processingFee: string;
-  active: boolean;
-}
-
-const PRODUCTS: ProductRow[] = [
-  { key: 'CDL', product: 'Consumer Durable Loan', minAmount: 10000, maxAmount: 250000, rateRange: '14% – 21%', maxTenure: '24 months', processingFee: '2.5%', active: true },
-  { key: 'GOLD', product: 'Gold Loan', minAmount: 25000, maxAmount: 1000000, rateRange: '9.5% – 14%', maxTenure: '36 months', processingFee: '0.5%', active: true },
-  { key: 'HOUSING', product: 'Affordable Housing Loan', minAmount: 500000, maxAmount: 3500000, rateRange: '8.75% – 11.5%', maxTenure: '240 months', processingFee: '1.0%', active: true },
-];
 
 const Settings: React.FC = () => {
   const { message } = App.useApp();
   const user = useAuthStore((s) => s.user)!;
   const logAudit = useAppStore((s) => s.logAudit);
+  const productConfigs = useAppStore((s) => s.productConfigs);
+  const updateProductConfig = useAppStore((s) => s.updateProductConfig);
+  const actor = { name: user.name, role: user.role };
+
+  const [editingProduct, setEditingProduct] = useState<ProductConfig | null>(null);
+  const [productForm] = Form.useForm();
+
+  const openProduct = (p: ProductConfig): void => {
+    setEditingProduct(p);
+    productForm.setFieldsValue({
+      minAmount: p.minAmount, maxAmount: p.maxAmount, minRate: p.minRate, maxRate: p.maxRate,
+      maxTenure: p.maxTenure, processingFeePct: p.processingFeePct, maxLtv: p.maxLtv, active: p.active,
+    });
+  };
+
+  const submitProduct = (values: any): void => {
+    if (!editingProduct) return;
+    updateProductConfig(editingProduct.key, {
+      minAmount: values.minAmount, maxAmount: values.maxAmount, minRate: values.minRate, maxRate: values.maxRate,
+      maxTenure: values.maxTenure, processingFeePct: values.processingFeePct,
+      maxLtv: editingProduct.key === 'CDL' ? undefined : values.maxLtv, active: values.active,
+    }, actor);
+    message.success(`${editingProduct.product} updated`);
+    setEditingProduct(null);
+  };
 
   const saved = (section: string): void => {
     logAudit({ user: user.name, role: String(user.role), module: 'Settings', action: `Updated ${section}`, entity: 'Platform Config' });
@@ -85,26 +93,32 @@ const Settings: React.FC = () => {
             label: <span><SettingOutlined /> Loan Products</span>,
             children: (
               <Card variant="borderless" style={panel} styles={{ body: { padding: '8px 10px' } }}>
-                <Table<ProductRow>
-                  dataSource={PRODUCTS}
+                <Table<ProductConfig>
+                  dataSource={productConfigs}
                   rowKey="key"
                   size="middle"
                   pagination={false}
+                  scroll={{ x: 980 }}
                   columns={[
                     { title: 'Product', dataIndex: 'product', render: (v: string, r) => <span><LoanTypeTag type={r.key} /> <span style={{ fontWeight: 600, marginLeft: 8 }}>{v}</span></span> },
                     { title: 'Min Ticket', dataIndex: 'minAmount', align: 'right', render: (v: number) => <span className="tnum">₹{v.toLocaleString('en-IN')}</span> },
                     { title: 'Max Ticket', dataIndex: 'maxAmount', align: 'right', render: (v: number) => <span className="tnum">₹{v.toLocaleString('en-IN')}</span> },
-                    { title: 'Rate Band', dataIndex: 'rateRange' },
-                    { title: 'Max Tenure', dataIndex: 'maxTenure' },
-                    { title: 'Processing Fee', dataIndex: 'processingFee' },
+                    { title: 'Rate Band', key: 'rate', render: (_, r) => <span className="tnum">{r.minRate}% – {r.maxRate}%</span> },
+                    { title: 'Max Tenure', dataIndex: 'maxTenure', align: 'right', render: (v: number) => <span className="tnum">{v} mo</span> },
+                    { title: 'Proc. Fee', dataIndex: 'processingFeePct', align: 'right', render: (v: number) => <span className="tnum">{v}%</span> },
+                    { title: 'Max LTV', dataIndex: 'maxLtv', align: 'right', render: (v?: number) => v === undefined ? <span style={{ color: '#cbd5e1' }}>n/a</span> : <span className="tnum" style={{ fontWeight: 600 }}>{v}%</span> },
                     {
-                      title: 'Status', dataIndex: 'active', width: 110,
-                      render: (v: boolean) => <Switch defaultChecked={v} size="small" onChange={(c) => { saved('Product Config'); void c; }} />,
+                      title: 'Status', dataIndex: 'active', width: 100,
+                      render: (v: boolean, r) => <Switch checked={v} size="small" onChange={(c) => updateProductConfig(r.key, { active: c }, actor)} />,
+                    },
+                    {
+                      title: 'Action', key: 'action', width: 90, fixed: 'right',
+                      render: (_, r) => <Button size="small" icon={<EditOutlined />} onClick={() => openProduct(r)}>Edit</Button>,
                     },
                   ]}
                 />
                 <div style={{ padding: '12px 14px', fontSize: 12, color: '#94a3b8' }}>
-                  Rate bands and fee structures apply to new sanctions only. Existing loans retain contracted terms.
+                  Rate bands, fees and LTV limits apply to new sanctions only. Existing loans retain contracted terms.
                 </div>
               </Card>
             ),
@@ -203,6 +217,48 @@ const Settings: React.FC = () => {
           },
         ]}
       />
+
+      <Drawer
+        title={<span><SettingOutlined style={{ marginRight: 8, color: '#2563eb' }} />Edit Product — {editingProduct?.product}</span>}
+        width={460}
+        open={!!editingProduct}
+        onClose={() => setEditingProduct(null)}
+        destroyOnHidden
+        footer={
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+            <Button onClick={() => setEditingProduct(null)}>Cancel</Button>
+            <Button type="primary" icon={<SaveOutlined />} onClick={() => productForm.submit()}>Save Changes</Button>
+          </div>
+        }
+      >
+        {editingProduct && (
+          <Form form={productForm} layout="vertical" onFinish={submitProduct} requiredMark={false}>
+            <SectionTitle>Ticket Size</SectionTitle>
+            <Row gutter={12}>
+              <Col span={12}><Form.Item label="Min Amount (₹)" name="minAmount" rules={[{ required: true }]}><InputNumber style={{ width: '100%' }} min={1000} step={1000} /></Form.Item></Col>
+              <Col span={12}><Form.Item label="Max Amount (₹)" name="maxAmount" rules={[{ required: true }]}><InputNumber style={{ width: '100%' }} min={1000} step={10000} /></Form.Item></Col>
+            </Row>
+            <SectionTitle style={{ marginTop: 6 }}>Interest &amp; Fees</SectionTitle>
+            <Row gutter={12}>
+              <Col span={12}><Form.Item label="Min Rate (% p.a.)" name="minRate" rules={[{ required: true }]}><InputNumber style={{ width: '100%' }} min={1} max={36} step={0.25} /></Form.Item></Col>
+              <Col span={12}><Form.Item label="Max Rate (% p.a.)" name="maxRate" rules={[{ required: true }]}><InputNumber style={{ width: '100%' }} min={1} max={36} step={0.25} /></Form.Item></Col>
+              <Col span={12}><Form.Item label="Max Tenure (months)" name="maxTenure" rules={[{ required: true }]}><InputNumber style={{ width: '100%' }} min={1} max={360} /></Form.Item></Col>
+              <Col span={12}><Form.Item label="Processing Fee (%)" name="processingFeePct" rules={[{ required: true }]}><InputNumber style={{ width: '100%' }} min={0} max={5} step={0.1} /></Form.Item></Col>
+            </Row>
+            {editingProduct.key !== 'CDL' && (
+              <>
+                <SectionTitle style={{ marginTop: 6 }}>Collateral</SectionTitle>
+                <Form.Item label="Max LTV (%)" name="maxLtv" rules={[{ required: true, message: 'Set the LTV cap' }]} extra="Maximum loan-to-value against collateral for new sanctions.">
+                  <InputNumber style={{ width: '100%' }} min={10} max={90} />
+                </Form.Item>
+              </>
+            )}
+            <Form.Item label="Product Active" name="active" valuePropName="checked">
+              <Switch checkedChildren="Active" unCheckedChildren="Inactive" />
+            </Form.Item>
+          </Form>
+        )}
+      </Drawer>
     </div>
   );
 };

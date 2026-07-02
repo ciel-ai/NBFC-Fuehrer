@@ -3,6 +3,7 @@ import type {
   Address, AppDocument, AppNotification, AppStatus, AuditLog, BureauAccount,
   BureauReport, CustomerProfile, EmiRow, KycInfo, LoanAccount, LoanApplication, LoanType,
   PortalUser, Repayment, LoanCharge, TimelineEvent, RiskGrade, CollectionStatus,
+  Branch, Agent, ProductConfig,
 } from '../types';
 import { calcEmi } from '../utils/format';
 
@@ -751,9 +752,42 @@ const notifications: AppNotification[] = [
 allRepayments.sort((a, b) => dayjs(b.date).valueOf() - dayjs(a.date).valueOf());
 allCharges.sort((a, b) => dayjs(b.date).valueOf() - dayjs(a.date).valueOf());
 
+// ─── Branches ───────────────────────────────────────────────────────────────
+const ALL_PRODUCTS: LoanType[] = ['CDL', 'GOLD', 'HOUSING'];
+const branches: Branch[] = [
+  { id: 'BR-001', code: 'HO-MUM', name: 'Head Office — Mumbai', city: 'Mumbai', state: 'Maharashtra', address: '12th Floor, Lotus Corporate Park, Goregaon East, Mumbai 400063', manager: 'Sudhanshu Shekhar', phone: '022 4066 1200', products: ALL_PRODUCTS, openedOn: at(1900), status: 'ACTIVE' },
+  { id: 'BR-002', code: 'MUM-AND', name: 'Mumbai Andheri', city: 'Mumbai', state: 'Maharashtra', address: 'Unit 4, Andheri Kurla Road, Andheri East, Mumbai 400059', manager: 'Rohit Malhotra', phone: '022 2836 7788', products: ['CDL', 'GOLD'], openedOn: at(1400), status: 'ACTIVE' },
+  { id: 'BR-003', code: 'DEL-KB', name: 'Delhi Karol Bagh', city: 'New Delhi', state: 'Delhi', address: '9 Ajmal Khan Road, Karol Bagh, New Delhi 110005', manager: 'Neha Bansal', phone: '011 4155 3300', products: ['CDL', 'HOUSING'], openedOn: at(1250), status: 'ACTIVE' },
+  { id: 'BR-004', code: 'BLR-KOR', name: 'Bengaluru Koramangala', city: 'Bengaluru', state: 'Karnataka', address: '80 Feet Road, 4th Block, Koramangala, Bengaluru 560034', manager: 'Devika Rao', phone: '080 4123 6600', products: ALL_PRODUCTS, openedOn: at(1100), status: 'ACTIVE' },
+  { id: 'BR-005', code: 'CHN-TN', name: 'Chennai T Nagar', city: 'Chennai', state: 'Tamil Nadu', address: 'Usman Road, T Nagar, Chennai 600017', manager: 'Kavita Krishnan', phone: '044 4855 9900', products: ['GOLD'], openedOn: at(980), status: 'ACTIVE' },
+  { id: 'BR-006', code: 'HYD-BJH', name: 'Hyderabad Banjara Hills', city: 'Hyderabad', state: 'Telangana', address: 'Road No. 12, Banjara Hills, Hyderabad 500034', manager: 'Manoj Pillai', phone: '040 4023 1177', products: ['GOLD', 'HOUSING'], openedOn: at(860), status: 'ACTIVE' },
+  { id: 'BR-007', code: 'PUN-FC', name: 'Pune FC Road', city: 'Pune', state: 'Maharashtra', address: 'Fergusson College Road, Shivajinagar, Pune 411004', manager: 'Arjun Mehta', phone: '020 4120 8844', products: ['CDL', 'HOUSING'], openedOn: at(720), status: 'ACTIVE' },
+  { id: 'BR-008', code: 'JAI-MI', name: 'Jaipur MI Road', city: 'Jaipur', state: 'Rajasthan', address: 'Mirza Ismail Road, Jaipur 302001', manager: 'Sneha Jain', phone: '0141 405 6600', products: ['CDL', 'GOLD'], openedOn: at(540), status: 'ACTIVE' },
+  { id: 'BR-009', code: 'LKO-HZ', name: 'Lucknow Hazratganj', city: 'Lucknow', state: 'Uttar Pradesh', address: 'Hazratganj, Lucknow 226001', manager: 'Akash Dubey', phone: '0522 400 7711', products: ['CDL'], openedOn: at(300), status: 'INACTIVE' },
+];
+
+// ─── Field / DSA agents (commissions & territories) ─────────────────────────
+const agentSourced = (code: string): number => applications.filter((a) => a.createdByCode === code).length;
+const agents: Agent[] = [
+  { id: 'AGT-001', code: 'FSA-021', name: 'Rahul Khanna', phone: '9830014001', email: 'rahul.k@fuehrer-nbfc.in', branch: 'Mumbai Andheri', territory: 'Mumbai West', products: ['CDL'], commissionRate: 1.5, status: 'ACTIVE', joinedOn: at(400), sourced: agentSourced('FSA-021'), disbursedValue: 4820000, commissionEarned: 62300, commissionPending: 10850 },
+  { id: 'AGT-002', code: 'FSA-034', name: 'Sneha Jain', phone: '9830014002', email: 'sneha.j@fuehrer-nbfc.in', branch: 'Jaipur MI Road', territory: 'Jaipur Central', products: ['GOLD'], commissionRate: 0.8, status: 'ACTIVE', joinedOn: at(370), sourced: agentSourced('FSA-034'), disbursedValue: 3110000, commissionEarned: 21400, commissionPending: 4600 },
+  { id: 'AGT-003', code: 'FSA-008', name: 'Vinod Pawar', phone: '9830014003', email: 'vinod.p@fuehrer-nbfc.in', branch: 'Pune FC Road', territory: 'Pune East', products: ['HOUSING'], commissionRate: 1.0, status: 'ACTIVE', joinedOn: at(350), sourced: agentSourced('FSA-008'), disbursedValue: 9650000, commissionEarned: 84200, commissionPending: 18700 },
+  { id: 'AGT-004', code: 'FSA-052', name: 'Akash Dubey', phone: '9830014004', email: 'akash.d@fuehrer-nbfc.in', branch: 'Lucknow Hazratganj', territory: 'Lucknow North', products: ['CDL'], commissionRate: 1.5, status: 'ACTIVE', joinedOn: at(300), sourced: agentSourced('FSA-052'), disbursedValue: 2240000, commissionEarned: 29800, commissionPending: 6900 },
+  { id: 'AGT-005', code: 'FSA-047', name: 'Priyanka Das', phone: '9830014005', email: 'priyanka.d@fuehrer-nbfc.in', branch: 'Chennai T Nagar', territory: 'Chennai South', products: ['GOLD'], commissionRate: 0.8, status: 'ACTIVE', joinedOn: at(280), sourced: agentSourced('FSA-047'), disbursedValue: 1870000, commissionEarned: 12900, commissionPending: 3100 },
+  { id: 'AGT-006', code: 'FSA-019', name: 'Mohammed Asif', phone: '9830014006', email: 'asif.m@fuehrer-nbfc.in', branch: 'Hyderabad Banjara Hills', territory: 'Hyderabad West', products: ['HOUSING'], commissionRate: 1.0, status: 'INACTIVE', joinedOn: at(250), sourced: agentSourced('FSA-019'), disbursedValue: 0, commissionEarned: 0, commissionPending: 0 },
+];
+
+// ─── Product configuration (LTV limits, rate bands) ─────────────────────────
+const productConfigs: ProductConfig[] = [
+  { key: 'CDL', product: 'Consumer Durable Loan', minAmount: 10000, maxAmount: 250000, minRate: 14, maxRate: 21, maxTenure: 24, processingFeePct: 2.5, active: true },
+  { key: 'GOLD', product: 'Gold Loan', minAmount: 25000, maxAmount: 1000000, minRate: 9.5, maxRate: 14, maxTenure: 36, processingFeePct: 0.5, maxLtv: 75, active: true },
+  { key: 'HOUSING', product: 'Affordable Housing Loan', minAmount: 500000, maxAmount: 3500000, minRate: 8.75, maxRate: 11.5, maxTenure: 240, processingFeePct: 1.0, maxLtv: 80, active: true },
+];
+
 export const MOCK = {
   applications, loans, portalUsers, auditLogs, notifications,
   repayments: allRepayments, charges: allCharges,
+  branches, agents, productConfigs,
 };
 
 // ─── Login directory (demo) ─────────────────────────────────────────────────

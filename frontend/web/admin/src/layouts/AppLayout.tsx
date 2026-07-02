@@ -9,6 +9,7 @@ import {
   LogoutOutlined, MenuFoldOutlined, MenuUnfoldOutlined, PhoneOutlined, PlusOutlined,
   QuestionCircleOutlined, SafetyCertificateOutlined, SearchOutlined, SettingOutlined, TeamOutlined,
   WalletOutlined, ExclamationCircleOutlined, ClockCircleOutlined, ThunderboltOutlined,
+  UsergroupAddOutlined, GoldOutlined, ApartmentOutlined, IdcardOutlined,
 } from '@ant-design/icons';
 import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
@@ -67,6 +68,12 @@ const LayoutInner: React.FC<{ user: SessionUser }> = ({ user }) => {
           { key: '/applications/disbursed', label: 'Disbursed' },
         ],
       });
+    }
+    if (canAccess(user.role, 'customers')) {
+      items.push({ key: '/customers', icon: <IdcardOutlined />, label: 'Customers' });
+    }
+    if (canAccess(user.role, 'appraisals')) {
+      items.push({ key: '/appraisals', icon: <GoldOutlined />, label: 'Appraisals' });
     }
     if (canAccess(user.role, 'credit')) {
       items.push({
@@ -130,6 +137,8 @@ const LayoutInner: React.FC<{ user: SessionUser }> = ({ user }) => {
       ].filter((c) => c.show).map(({ key, label }) => ({ key, label }));
       items.push({ key: 'g-reports', icon: <BarChartOutlined />, label: 'Reports', children });
     }
+    if (canAccess(user.role, 'agents')) items.push({ key: '/agents', icon: <UsergroupAddOutlined />, label: 'Agents' });
+    if (canAccess(user.role, 'branches')) items.push({ key: '/branches', icon: <ApartmentOutlined />, label: 'Branches' });
     if (canAccess(user.role, 'users')) items.push({ key: '/users', icon: <TeamOutlined />, label: 'User Management' });
     if (canAccess(user.role, 'audit')) items.push({ key: '/audit', icon: <AuditOutlined />, label: 'Audit Logs' });
     if (canAccess(user.role, 'settings')) items.push({ key: '/settings', icon: <SettingOutlined />, label: 'Settings' });
@@ -297,9 +306,9 @@ const LayoutInner: React.FC<{ user: SessionUser }> = ({ user }) => {
   };
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
+    <Layout className="nbfc-shell" style={{ minHeight: '100vh' }}>
       <Sider
-        className="app-sider"
+        className="app-sider nbfc-sidebar"
         theme="dark"
         collapsible
         collapsed={collapsed}
@@ -459,7 +468,7 @@ const LayoutInner: React.FC<{ user: SessionUser }> = ({ user }) => {
           </div>
         </Header>
 
-        <Content style={{ background: '#f6f8fc' }}>
+        <Content style={{ background: 'var(--page-bg)' }}>
           <div style={{ padding: '24px 28px', maxWidth: 1680, width: '100%', margin: '0 auto' }}>
             <div className="page-fade" key={location.pathname}>
               <Outlet />

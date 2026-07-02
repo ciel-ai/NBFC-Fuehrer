@@ -5,7 +5,11 @@ import { calcEmi } from '../utils/format';
 import type {
   AppNotification, AuditLog, EmiRow, LoanAccount, LoanApplication, PortalUser,
   Repayment, LoanCharge, RiskGrade, Role,
+  Branch, Agent, ProductConfig, GoldCollateral, PropertyDetails,
 } from '../types';
+
+export type GoldAppraisalInput = Omit<GoldCollateral, 'valuedBy' | 'appraisedAt'>;
+export type PropertyAppraisalInput = Omit<PropertyDetails, 'valuedBy' | 'appraisedAt'>;
 
 let seq = 9000;
 const uid = (p: string): string => `${p}-${++seq}`;
@@ -33,6 +37,9 @@ interface AppState {
   notifications: AppNotification[];
   repayments: Repayment[];
   charges: LoanCharge[];
+  branches: Branch[];
+  agents: Agent[];
+  productConfigs: ProductConfig[];
 
   // application workflow
   pickForReview: (appId: string, actor: Actor) => void;
@@ -46,10 +53,27 @@ interface AppState {
   logCollectionNote: (loanNumber: string, note: string, ptpDate: string | undefined, actor: Actor) => void;
   recordPayment: (loanNumber: string, amount: number, mode: Repayment['mode'], actor: Actor) => void;
 
+  // collateral appraisal (ops)
+  saveGoldAppraisal: (appId: string, data: GoldAppraisalInput, actor: Actor) => void;
+  savePropertyAppraisal: (appId: string, data: PropertyAppraisalInput, actor: Actor) => void;
+
   // users
   addUser: (user: Omit<PortalUser, 'id' | 'createdAt'>, actor: Actor) => void;
   updateUser: (id: string, patch: Partial<PortalUser>, actor: Actor) => void;
   toggleUserStatus: (id: string, actor: Actor) => void;
+
+  // branches
+  addBranch: (branch: Omit<Branch, 'id'>, actor: Actor) => void;
+  updateBranch: (id: string, patch: Partial<Branch>, actor: Actor) => void;
+  toggleBranchStatus: (id: string, actor: Actor) => void;
+
+  // agents
+  addAgent: (agent: Omit<Agent, 'id'>, actor: Actor) => void;
+  updateAgent: (id: string, patch: Partial<Agent>, actor: Actor) => void;
+  toggleAgentStatus: (id: string, actor: Actor) => void;
+
+  // product configuration
+  updateProductConfig: (key: ProductConfig['key'], patch: Partial<ProductConfig>, actor: Actor) => void;
 
   // notifications
   markAllRead: () => void;
@@ -92,6 +116,9 @@ export const useAppStore = create<AppState>((set, get) => {
     notifications: MOCK.notifications,
     repayments: MOCK.repayments,
     charges: MOCK.charges,
+    branches: MOCK.branches,
+    agents: MOCK.agents,
+    productConfigs: MOCK.productConfigs,
 
     pickForReview: (appId, actor) => {
       patchApp(appId, (app) => {
@@ -361,6 +388,36 @@ export const useAppStore = create<AppState>((set, get) => {
       audit({ user: actor.name, role: String(actor.role), module: 'Collections', action: isNpa ? 'Recovery Payment' : 'Payment Recorded', entity: loanNumber, newValue: `₹${amount.toLocaleString('en-IN')} via ${mode}` });
     },
 
+    saveGoldAppraisal: (appId, data, actor) => {
+      patchApp(appId, (app) => {
+        const gold: GoldCollateral = { ...data, valuedBy: actor.name, appraisedAt: nowIso() };
+        let next: LoanApplication = {
+          ...app,
+          collateral: { ...app.collateral, gold },
+        };
+        next = pushTimeline(next, 'APPRAISAL', 'Gold Appraisal Recorded', actor, undefined,
+          `${data.netWeightGrams}g net @ ${data.purityKarat}K · valuation ₹${data.valuation.toLocaleString('en-IN')} · LTV ${data.ltv}%`);
+        return next;
+      });
+      const app = get().applications.find((a) => a.id === appId);
+      audit({ user: actor.name, role: String(actor.role), module: 'Appraisals', action: 'Gold Appraisal', entity: app?.appNumber ?? appId, newValue: `₹${data.valuation.toLocaleString('en-IN')} @ ${data.ltv}% LTV` });
+    },
+
+    savePropertyAppraisal: (appId, data, actor) => {
+      patchApp(appId, (app) => {
+        const property: PropertyDetails = { ...data, valuedBy: actor.name, appraisedAt: nowIso() };
+        let next: LoanApplication = {
+          ...app,
+          collateral: { ...app.collateral, property },
+        };
+        next = pushTimeline(next, 'APPRAISAL', 'Property Assessment Recorded', actor, undefined,
+          `${data.type} · market value ₹${data.marketValue.toLocaleString('en-IN')} · LTV ${data.ltv}%`);
+        return next;
+      });
+      const app = get().applications.find((a) => a.id === appId);
+      audit({ user: actor.name, role: String(actor.role), module: 'Appraisals', action: 'Property Assessment', entity: app?.appNumber ?? appId, newValue: `₹${data.marketValue.toLocaleString('en-IN')} @ ${data.ltv}% LTV` });
+    },
+
     addUser: (user, actor) => {
       const id = uid('USR');
       set((s) => ({ users: [...s.users, { ...user, id, createdAt: nowIso() }] }));
@@ -378,6 +435,49 @@ export const useAppStore = create<AppState>((set, get) => {
       const next = before?.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
       set((s) => ({ users: s.users.map((u) => (u.id === id ? { ...u, status: next } : u)) }));
       audit({ user: actor.name, role: String(actor.role), module: 'User Management', action: next === 'ACTIVE' ? 'User Activated' : 'User Deactivated', entity: before?.email ?? id, oldValue: before?.status, newValue: next });
+    },
+
+    addBranch: (branch, actor) => {
+      const id = uid('BR');
+      set((s) => ({ branches: [...s.branches, { ...branch, id }] }));
+      audit({ user: actor.name, role: String(actor.role), module: 'Branches', action: 'Branch Created', entity: branch.code, newValue: branch.name });
+    },
+
+    updateBranch: (id, patch, actor) => {
+      const before = get().branches.find((b) => b.id === id);
+      set((s) => ({ branches: s.branches.map((b) => (b.id === id ? { ...b, ...patch } : b)) }));
+      audit({ user: actor.name, role: String(actor.role), module: 'Branches', action: 'Branch Updated', entity: before?.code ?? id, newValue: patch.name ?? before?.name });
+    },
+
+    toggleBranchStatus: (id, actor) => {
+      const before = get().branches.find((b) => b.id === id);
+      const next = before?.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+      set((s) => ({ branches: s.branches.map((b) => (b.id === id ? { ...b, status: next } : b)) }));
+      audit({ user: actor.name, role: String(actor.role), module: 'Branches', action: next === 'ACTIVE' ? 'Branch Activated' : 'Branch Deactivated', entity: before?.code ?? id, oldValue: before?.status, newValue: next });
+    },
+
+    addAgent: (agent, actor) => {
+      const id = uid('AGT');
+      set((s) => ({ agents: [...s.agents, { ...agent, id }] }));
+      audit({ user: actor.name, role: String(actor.role), module: 'Agents', action: 'Agent Onboarded', entity: agent.code, newValue: `${agent.name} · ${agent.territory}` });
+    },
+
+    updateAgent: (id, patch, actor) => {
+      const before = get().agents.find((a) => a.id === id);
+      set((s) => ({ agents: s.agents.map((a) => (a.id === id ? { ...a, ...patch } : a)) }));
+      audit({ user: actor.name, role: String(actor.role), module: 'Agents', action: 'Agent Updated', entity: before?.code ?? id, newValue: patch.territory ?? before?.territory });
+    },
+
+    toggleAgentStatus: (id, actor) => {
+      const before = get().agents.find((a) => a.id === id);
+      const next = before?.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+      set((s) => ({ agents: s.agents.map((a) => (a.id === id ? { ...a, status: next } : a)) }));
+      audit({ user: actor.name, role: String(actor.role), module: 'Agents', action: next === 'ACTIVE' ? 'Agent Activated' : 'Agent Deactivated', entity: before?.code ?? id, oldValue: before?.status, newValue: next });
+    },
+
+    updateProductConfig: (key, patch, actor) => {
+      set((s) => ({ productConfigs: s.productConfigs.map((p) => (p.key === key ? { ...p, ...patch } : p)) }));
+      audit({ user: actor.name, role: String(actor.role), module: 'Settings', action: `Updated ${key} Product Config`, entity: 'Product Config', newValue: Object.keys(patch).join(', ') });
     },
 
     markAllRead: () => set((s) => ({ notifications: s.notifications.map((n) => ({ ...n, read: true })) })),

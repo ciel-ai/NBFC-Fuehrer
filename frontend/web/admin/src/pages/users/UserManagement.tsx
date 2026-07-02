@@ -16,12 +16,8 @@ import { StatusTag } from '../../components/StatusTag';
 import { fmtDate, fmtTimeAgo, initials } from '../../utils/format';
 import type { PortalUser, Role } from '../../types';
 
-const BRANCHES = [
-  'Head Office — Mumbai', 'Mumbai Andheri', 'Delhi Karol Bagh', 'Bengaluru Koramangala',
-  'Chennai T Nagar', 'Hyderabad Banjara Hills', 'Pune FC Road', 'Jaipur MI Road', 'Lucknow Hazratganj',
-];
-
 const ASSIGNABLE_ROLES: Role[] = [
+  'ADMIN',
   'SALES_CDL', 'SALES_GOLD', 'SALES_HOUSING',
   'CREDIT_CDL', 'CREDIT_GOLD', 'CREDIT_HOUSING',
   'FINANCE_CDL', 'FINANCE_GOLD', 'FINANCE_HOUSING',
@@ -31,6 +27,7 @@ const UserManagement: React.FC = () => {
   const { message, modal } = App.useApp();
   const sessionUser = useAuthStore((s) => s.user)!;
   const users = useAppStore((s) => s.users);
+  const branches = useAppStore((s) => s.branches);
   const addUser = useAppStore((s) => s.addUser);
   const updateUser = useAppStore((s) => s.updateUser);
   const toggleUserStatus = useAppStore((s) => s.toggleUserStatus);
@@ -256,7 +253,7 @@ const UserManagement: React.FC = () => {
             <Input placeholder="name@fuehrer-nbfc.in" />
           </Form.Item>
           <Form.Item label="Branch" name="branch" rules={[{ required: true, message: 'Select branch' }]}>
-            <Select placeholder="Select branch" options={BRANCHES.map((b) => ({ value: b, label: b }))} showSearch />
+            <Select placeholder="Select branch" options={branches.map((b) => ({ value: b.name, label: b.name }))} showSearch />
           </Form.Item>
           <Form.Item label="Role" name="role" rules={[{ required: true }]}>
             <Select

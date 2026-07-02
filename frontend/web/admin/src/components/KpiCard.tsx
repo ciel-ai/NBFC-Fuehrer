@@ -12,7 +12,7 @@ interface KpiCardProps {
 
 const KpiCard: React.FC<KpiCardProps> = ({ label, value, sub, icon, tint, onClick }) => (
   <Card
-    className="kpi-card"
+    className="kpi-card nbfc-card"
     variant="borderless"
     style={{
       border: '1px solid #e4e8ee',

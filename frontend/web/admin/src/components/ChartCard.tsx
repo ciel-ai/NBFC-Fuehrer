@@ -12,7 +12,7 @@ interface ChartCardProps {
 /** Standard analytics card wrapper with a fixed-height chart area. */
 const ChartCard: React.FC<ChartCardProps> = ({ title, subtitle, extra, height = 280, children }) => (
   <Card
-    className="lift"
+    className="lift nbfc-card"
     variant="borderless"
     style={{ border: '1px solid #e4e8ee', height: '100%' }}
     styles={{ body: { padding: '17px 20px 12px' } }}

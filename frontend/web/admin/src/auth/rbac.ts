@@ -3,11 +3,15 @@ import type { LoanType, Role } from '../types';
 export type ModuleKey =
   | 'dashboard'
   | 'applications'
+  | 'customers'
+  | 'appraisals'
   | 'credit'
   | 'finance'
   | 'lms'
   | 'collections'
   | 'reports'
+  | 'agents'
+  | 'branches'
   | 'users'
   | 'audit'
   | 'settings';
@@ -23,11 +27,11 @@ interface RoleMeta {
   modules: ModuleKey[];
 }
 
-const CREDIT_MODULES: ModuleKey[] = ['dashboard', 'applications', 'credit', 'reports'];
-const FINANCE_MODULES: ModuleKey[] = ['dashboard', 'applications', 'finance', 'lms', 'reports'];
+const CREDIT_MODULES: ModuleKey[] = ['dashboard', 'applications', 'customers', 'appraisals', 'credit', 'reports'];
+const FINANCE_MODULES: ModuleKey[] = ['dashboard', 'applications', 'customers', 'finance', 'lms', 'reports'];
 const ALL_MODULES: ModuleKey[] = [
-  'dashboard', 'applications', 'credit', 'finance', 'lms',
-  'collections', 'reports', 'users', 'audit', 'settings',
+  'dashboard', 'applications', 'customers', 'appraisals', 'credit', 'finance', 'lms',
+  'collections', 'reports', 'agents', 'branches', 'users', 'audit', 'settings',
 ];
 
 export const ROLE_META: Record<Role, RoleMeta> = {

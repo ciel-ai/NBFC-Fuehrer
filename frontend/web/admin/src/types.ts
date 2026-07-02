@@ -168,6 +168,7 @@ export interface GoldCollateral {
   ltv: number; // %
   items: { description: string; weightGrams: number }[];
   valuedBy: string;
+  appraisedAt?: string;
 }
 
 export interface PropertyDetails {
@@ -177,6 +178,8 @@ export interface PropertyDetails {
   ltv: number; // %
   builder?: string;
   constructionStage?: string;
+  valuedBy?: string;
+  appraisedAt?: string;
 }
 
 export interface CustomerProfile {
@@ -321,6 +324,51 @@ export interface PortalUser {
   status: 'ACTIVE' | 'INACTIVE';
   lastLoginAt?: string;
   createdAt: string;
+}
+
+export interface Branch {
+  id: string;
+  code: string;
+  name: string;
+  city: string;
+  state: string;
+  address: string;
+  manager: string;
+  phone: string;
+  products: LoanType[];
+  openedOn: string;
+  status: 'ACTIVE' | 'INACTIVE';
+}
+
+export interface Agent {
+  id: string;
+  code: string; // e.g. FSA-021
+  name: string;
+  phone: string;
+  email: string;
+  branch: string;
+  territory: string;
+  products: LoanType[];
+  commissionRate: number; // % of disbursed value
+  status: 'ACTIVE' | 'INACTIVE';
+  joinedOn: string;
+  sourced: number; // applications sourced
+  disbursedValue: number; // ₹ converted to live loans
+  commissionEarned: number; // ₹ paid to date
+  commissionPending: number; // ₹ accrued, not yet paid
+}
+
+export interface ProductConfig {
+  key: LoanType;
+  product: string;
+  minAmount: number;
+  maxAmount: number;
+  minRate: number; // % p.a.
+  maxRate: number; // % p.a.
+  maxTenure: number; // months
+  processingFeePct: number;
+  maxLtv?: number; // % — collateral products only (Gold, Housing)
+  active: boolean;
 }
 
 export interface AuditLog {
