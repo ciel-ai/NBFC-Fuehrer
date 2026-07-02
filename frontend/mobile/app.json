@@ -1,0 +1,78 @@
+{
+  "expo": {
+    "name": "Fuehrer",
+    "slug": "fuehrer-nbfc",
+    "scheme": "fuehrer",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#156FE8"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.fuehrer.nbfc",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "Required to capture photos of identity documents and your selfie for KYC.",
+        "NSFaceIDUsageDescription": "Used to authenticate your identity securely.",
+        "NSPhotoLibraryUsageDescription": "Required to upload income proof and bank statements.",
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": false
+        }
+      }
+    },
+    "android": {
+      "package": "com.fuehrer.nbfc",
+      "adaptiveIcon": {
+        "backgroundColor": "#1A56DB",
+        "foregroundImage": "./assets/android-icon-foreground.png"
+      },
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT"
+      ],
+      "blockedPermissions": [
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "./plugins/withCertificatePinning",
+      "expo-router",
+      "expo-secure-store",
+      "expo-font",
+      "expo-local-authentication",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Fuehrer NBFC to access your camera for KYC verification."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Fuehrer NBFC to access your photos to upload identity documents and income proof."
+        }
+      ],
+      "@react-native-community/datetimepicker"
+    ],
+    "extra": {
+      "eas": {
+        "//": "TODO(owner): run `npx eas init` to replace this with your real EAS projectId (UUID). Required for EAS builds.",
+        "projectId": "TODO_RUN_npx_eas_init"
+      }
+    }
+  }
+}

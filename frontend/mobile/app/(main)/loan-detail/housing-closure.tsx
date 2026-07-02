@@ -1,0 +1,163 @@
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, Pressable, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { router, useLocalSearchParams } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { useQueryClient } from '@tanstack/react-query';
+import { Colors } from '@/src/core/theme/colors';
+import { FontFamily, FontSize, Typography } from '@/src/core/theme/typography';
+import { Spacing, BorderRadius, Shadow } from '@/src/core/theme/spacing';
+import { Header } from '@/src/shared/components/common/Header';
+import { Button } from '@/src/shared/components/common/Button';
+import { LoadingSpinner } from '@/src/shared/components/common/LoadingSpinner';
+import { useServices } from '@/src/core/services/ServiceProvider';
+import type { HousingClosureResult } from '@/src/entities/housingLoan';
+
+export default function HousingClosureScreen() {
+  const { id } = useLocalSearchParams<{ id?: string }>();
+  const { loanService, housingLoanService } = useServices();
+  const queryClient = useQueryClient();
+  const loanId = id ?? 'L1';
+
+  const [outstanding, setOutstanding] = useState<number | null>(null);
+  const [loadingQuote, setLoadingQuote] = useState(true);
+  const [agreed, setAgreed] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const [result, setResult] = useState<HousingClosureResult | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    loanService
+      .getLoanById(loanId)
+      .then((l) => { if (mounted) setOutstanding(l.outstandingAmount); })
+      .catch(() => { if (mounted) setOutstanding(0); })
+      .finally(() => { if (mounted) setLoadingQuote(false); });
+    return () => { mounted = false; };
+  }, [loanService, loanId]);
+
+  const closeLoan = async () => {
+    setClosing(true);
+    try {
+      const data = await housingLoanService.closeLoan(loanId);
+      setResult(data);
+      await queryClient.invalidateQueries({ queryKey: ['activeLoans'] });
+    } catch {
+      Alert.alert('Closure failed', 'Please try again.');
+    } finally {
+      setClosing(false);
+    }
+  };
+
+  if (loadingQuote) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Header title="Loan Closure" showBack />
+        <View style={styles.center}><LoadingSpinner size={40} color={Colors.primary} /></View>
+      </SafeAreaView>
+    );
+  }
+
+  if (result) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Header title="Loan Closed" showBack />
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          <View style={styles.heroCard}>
+            <View style={styles.successCircle}><Ionicons name="checkmark" size={48} color={Colors.textWhite} /></View>
+            <Text style={styles.title}>Loan closed</Text>
+            <Text style={styles.subtitle}>Your housing loan is fully repaid and closed.</Text>
+          </View>
+          <View style={styles.stepsCard}>
+            {[
+              ['Final EMI paid', result.finalEmiPaid],
+              ['Loan marked closed', result.status === 'closed'],
+              ['Original property documents released', result.propertyDocsReleased],
+              ['NOC generated', !!result.nocRef],
+              ['NOC stored in AWS S3', !!result.nocS3Url],
+              ['NACH mandate cancelled (Razorpay)', result.mandateCancelled],
+              ['Customer notified', result.customerNotified],
+            ].map(([label, done]) => (
+              <View key={label as string} style={styles.stepRow}>
+                <Ionicons name={done ? 'checkmark-circle' : 'ellipse-outline'} size={20} color={done ? Colors.success : Colors.textDisabled} />
+                <Text style={styles.stepText}>{label}</Text>
+              </View>
+            ))}
+          </View>
+          <View style={styles.card}>
+            <View style={styles.row}><Text style={styles.key}>NOC reference</Text><Text style={styles.value}>{result.nocRef}</Text></View>
+          </View>
+          <Button title="View NOC" onPress={() => router.push({ pathname: '/(main)/loan-detail/noc', params: { id: loanId } })} />
+          <Pressable style={styles.link} onPress={() => router.replace('/(main)/(tabs)/loans')}>
+            <Text style={styles.linkText}>Back to My Loans</Text>
+          </Pressable>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <Header title="Loan Closure" showBack />
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.amountCard}>
+          <Text style={styles.amountLabel}>Outstanding to close</Text>
+          <Text style={styles.amount}>{outstanding != null ? `₹${outstanding.toLocaleString('en-IN')}` : '—'}</Text>
+          <Text style={styles.amountSub}>Pay the final outstanding to close this loan.</Text>
+        </View>
+
+        <View style={styles.stepsCard}>
+          {[
+            'Collect the final outstanding',
+            'Mark the loan account closed',
+            'Release original property documents to you',
+            'Generate the NOC and store it in AWS S3',
+            'Cancel the NACH mandate via Razorpay',
+            'Notify you',
+          ].map((step, i) => (
+            <View key={step} style={styles.stepNumRow}>
+              <View style={styles.stepNum}><Text style={styles.stepNumText}>{i + 1}</Text></View>
+              <Text style={styles.stepText}>{step}</Text>
+            </View>
+          ))}
+        </View>
+
+        <Pressable style={styles.agreeRow} onPress={() => setAgreed((v) => !v)} accessibilityRole="checkbox" accessibilityState={{ checked: agreed }}>
+          <View style={[styles.checkbox, agreed && styles.checkboxChecked]}>{agreed && <Ionicons name="checkmark" size={12} color={Colors.textWhite} />}</View>
+          <Text style={styles.agreeText}>I want to close this loan, collect my property documents, and cancel auto-debit.</Text>
+        </Pressable>
+
+        <Button title="Pay & Close Loan" disabled={!agreed || closing} loading={closing} onPress={closeLoan} />
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: Colors.backgroundLight },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  content: { padding: Spacing.md, gap: Spacing.md },
+  heroCard: { alignItems: 'center', gap: Spacing.sm, backgroundColor: Colors.background, borderRadius: BorderRadius.lg, padding: Spacing.lg, borderWidth: 1, borderColor: Colors.border, ...Shadow.small },
+  successCircle: { width: 88, height: 88, borderRadius: 44, backgroundColor: Colors.success, alignItems: 'center', justifyContent: 'center' },
+  title: { fontFamily: FontFamily.bold, fontSize: FontSize['2xl'], color: Colors.primary, textAlign: 'center' },
+  subtitle: { ...Typography.body, color: Colors.textSecondary, textAlign: 'center', lineHeight: 22 },
+  amountCard: { alignItems: 'center', backgroundColor: Colors.primary, borderRadius: BorderRadius.lg, padding: Spacing.xl },
+  amountLabel: { ...Typography.caption, color: 'rgba(255,255,255,0.78)' },
+  amount: { fontFamily: FontFamily.bold, fontSize: FontSize['5xl'], color: Colors.textWhite, marginVertical: 4 },
+  amountSub: { ...Typography.caption, color: 'rgba(255,255,255,0.78)', textAlign: 'center' },
+  stepsCard: { backgroundColor: Colors.background, borderRadius: BorderRadius.lg, padding: Spacing.md, gap: Spacing.md, borderWidth: 1, borderColor: Colors.border, ...Shadow.small },
+  stepNumRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  stepNum: { width: 24, height: 24, borderRadius: 12, backgroundColor: Colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
+  stepNumText: { fontFamily: FontFamily.bold, color: Colors.primary, fontSize: FontSize.xs },
+  stepRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  stepText: { ...Typography.caption, color: Colors.textPrimary, flex: 1, lineHeight: 18 },
+  card: { backgroundColor: Colors.background, borderRadius: BorderRadius.lg, paddingHorizontal: Spacing.md, borderWidth: 1, borderColor: Colors.border, ...Shadow.small },
+  row: { flexDirection: 'row', justifyContent: 'space-between', gap: Spacing.md, paddingVertical: Spacing.md },
+  key: { ...Typography.body, color: Colors.textSecondary },
+  value: { fontFamily: FontFamily.semiBold, fontSize: FontSize.sm, color: Colors.textPrimary, textAlign: 'right', flex: 1 },
+  agreeRow: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm },
+  checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center' },
+  checkboxChecked: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  agreeText: { ...Typography.caption, color: Colors.textSecondary, flex: 1, lineHeight: 18 },
+  link: { alignItems: 'center', paddingVertical: Spacing.sm },
+  linkText: { fontFamily: FontFamily.semiBold, fontSize: FontSize.sm, color: Colors.primary },
+});

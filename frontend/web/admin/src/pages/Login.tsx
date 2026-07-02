@@ -1,0 +1,296 @@
+import React, { useEffect, useState } from 'react';
+import { App, Button, Checkbox, ConfigProvider, Form, Input, Typography } from 'antd';
+import {
+  ArrowLeftOutlined, ArrowRightOutlined, BankOutlined, LockOutlined, MobileOutlined,
+  SafetyCertificateOutlined, UserOutlined,
+} from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
+import { useAuthStore } from '../store/authStore';
+import { useAppStore } from '../store/appStore';
+import { DEMO_ADMIN, OTP_CODE } from '../data/mock';
+import { ROLE_META } from '../auth/rbac';
+
+type Portal = 'Admin' | 'Credit Team' | 'Finance Team';
+
+const TABS: { label: string; value: Portal; icon: React.ReactNode }[] = [
+  { label: 'Admin', value: 'Admin', icon: <UserOutlined /> },
+  { label: 'Credit', value: 'Credit Team', icon: <SafetyCertificateOutlined /> },
+  { label: 'Finance', value: 'Finance Team', icon: <BankOutlined /> },
+];
+
+/** Vivid royal-blue used only on the login surface (app chrome stays institutional navy). */
+const LOGIN_BLUE = '#2563eb';
+
+const loginTheme = {
+  token: {
+    colorPrimary: LOGIN_BLUE,
+    colorLink: LOGIN_BLUE,
+    colorLinkHover: '#1d57d6',
+    borderRadius: 9,
+    controlHeight: 38,
+    controlHeightLG: 40,
+    fontSize: 13,
+  },
+};
+
+const Login: React.FC = () => {
+  const { message } = App.useApp();
+  const navigate = useNavigate();
+  const login = useAuthStore((s) => s.login);
+  const user = useAuthStore((s) => s.user);
+  const portalUsers = useAppStore((s) => s.users);
+
+  const findOtpUser = (phone: string, family: 'CREDIT' | 'FINANCE') =>
+    portalUsers.find((u) => u.phone === phone && u.role.startsWith(family) && u.status === 'ACTIVE');
+
+  const [portal, setPortal] = useState<Portal>('Admin');
+  const [otpStage, setOtpStage] = useState<'phone' | 'otp'>('phone');
+  const [phone, setPhone] = useState('');
+  const [resendIn, setResendIn] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [adminForm] = Form.useForm();
+  const [phoneForm] = Form.useForm();
+  const [otpForm] = Form.useForm();
+
+  useEffect(() => {
+    if (user) navigate('/dashboard', { replace: true });
+  }, [user, navigate]);
+
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const t = setInterval(() => setResendIn((v) => v - 1), 1000);
+    return () => clearInterval(t);
+  }, [resendIn]);
+
+  const finishLogin = (u: { id: string; name: string; role: any; email: string; phone: string; branch: string }): void => {
+    login({ ...u, loginAt: new Date().toISOString() });
+    message.success(`Welcome back, ${u.name.split(' ')[0]}`);
+    navigate('/dashboard', { replace: true });
+  };
+
+  const handleAdmin = (values: { username: string; password: string }): void => {
+    setLoading(true);
+    setTimeout(() => {
+      setLoading(false);
+      if (values.username === DEMO_ADMIN.username && values.password === DEMO_ADMIN.password) {
+        const u = DEMO_ADMIN.user;
+        finishLogin({ id: u.id, name: u.name, role: u.role, email: u.email, phone: u.phone, branch: u.branch });
+      } else {
+        message.error('Invalid username or password');
+      }
+    }, 500);
+  };
+
+  const sendOtp = (values: { phone: string }): void => {
+    const family = portal === 'Credit Team' ? 'CREDIT' : 'FINANCE';
+    const found = findOtpUser(values.phone, family);
+    if (!found) {
+      const other = portalUsers.find((u) => u.phone === values.phone);
+      if (other && ROLE_META[other.role].family === 'SALES') {
+        message.warning(`${other.name} is a Sales user — the Sales team signs in on the FUEHRER mobile app, not the web dashboard.`);
+      } else if (other && other.status === 'INACTIVE') {
+        message.error('This account has been deactivated. Contact the administrator.');
+      } else if (other) {
+        message.error(`This number is registered as ${ROLE_META[other.role].label} — switch to the correct portal tab.`);
+      } else {
+        message.error(`No active ${portal} user is registered with this mobile number`);
+      }
+      return;
+    }
+    setPhone(values.phone);
+    setOtpStage('otp');
+    setResendIn(30);
+    message.success(`OTP sent to +91 ${values.phone} (use ${OTP_CODE})`);
+  };
+
+  const verifyOtp = (values: { otp: string }): void => {
+    setLoading(true);
+    setTimeout(() => {
+      setLoading(false);
+      if (values.otp !== OTP_CODE) {
+        message.error('Incorrect OTP — please retry');
+        return;
+      }
+      const family = portal === 'Credit Team' ? 'CREDIT' : 'FINANCE';
+      const u = findOtpUser(phone, family);
+      if (u) finishLogin({ id: u.id, name: u.name, role: u.role, email: u.email, phone: u.phone, branch: u.branch });
+    }, 500);
+  };
+
+  const switchPortal = (p: Portal): void => {
+    setPortal(p);
+    setOtpStage('phone');
+  };
+
+  const resetOtpFlow = (): void => {
+    setOtpStage('phone');
+    otpForm.resetFields();
+  };
+
+  const demoFill = (p: Portal, value: string): void => {
+    setPortal(p);
+    setOtpStage('phone');
+    if (p === 'Admin') {
+      adminForm.setFieldsValue({ username: DEMO_ADMIN.username, password: DEMO_ADMIN.password });
+    } else {
+      phoneForm.setFieldsValue({ phone: value });
+    }
+  };
+
+  return (
+    <div className="login-bg">
+      {/* decorative field — fixed & clipped so it never blocks page scroll */}
+      <div className="lb-field">
+        <div className="lb-deco lb-circles" />
+        <div className="lb-deco lb-shape-tr" />
+        <div className="lb-deco lb-shape-br" />
+        <div className="lb-deco lb-dots lb-dots-tl" />
+        <div className="lb-deco lb-dots lb-dots-br" />
+        <div className="lb-deco lb-lines" />
+        <span className="lb-deco lb-dot lb-dot-1" />
+        <span className="lb-deco lb-ring lb-ring-1" />
+      </div>
+
+      <ConfigProvider theme={loginTheme}>
+        <div className="login-stage">
+          <div className="login-card auth-rise">
+            {/* brand lockup */}
+            <div style={{ textAlign: 'center' }}>
+              <div className="login-logo">F</div>
+              <div style={{ marginTop: 11, fontSize: 16.5, fontWeight: 800, color: '#10202f', letterSpacing: 0.3 }}>
+                FUEHRER CAPITAL
+              </div>
+              <div style={{ marginTop: 3, fontSize: 12, color: '#8a97a6' }}>Lending Operations Suite</div>
+            </div>
+
+            {/* welcome */}
+            <div style={{ textAlign: 'center', marginTop: 16 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: LOGIN_BLUE }}>Welcome back</div>
+              <h1 style={{ margin: '4px 0 0', fontSize: 19, fontWeight: 800, color: '#10202f', letterSpacing: -0.3 }}>
+                Sign in to your account
+              </h1>
+              <div style={{ marginTop: 4, fontSize: 12.5, color: '#7c8896' }}>Enter your credentials to continue</div>
+            </div>
+
+            {/* portal tabs */}
+            <div className="seg" style={{ marginTop: 16 }}>
+              {TABS.map((t) => (
+                <button
+                  key={t.value}
+                  type="button"
+                  className={`seg-item${portal === t.value ? ' active' : ''}`}
+                  onClick={() => switchPortal(t.value)}
+                >
+                  {t.icon}
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
+            {/* form */}
+            <div style={{ marginTop: 16 }}>
+              {portal === 'Admin' ? (
+                <Form form={adminForm} layout="vertical" onFinish={handleAdmin} requiredMark={false}>
+                  <Form.Item label="Username" name="username" rules={[{ required: true, message: 'Enter your username' }]}>
+                    <Input size="large" prefix={<UserOutlined style={{ color: '#94a3b8' }} />} placeholder="Enter your username" autoFocus />
+                  </Form.Item>
+                  <Form.Item label="Password" name="password" rules={[{ required: true, message: 'Enter your password' }]} style={{ marginBottom: 14 }}>
+                    <Input.Password size="large" prefix={<LockOutlined style={{ color: '#94a3b8' }} />} placeholder="Enter your password" />
+                  </Form.Item>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+                    <Checkbox defaultChecked>
+                      <span style={{ color: '#4a5663', fontSize: 13.5 }}>Remember me</span>
+                    </Checkbox>
+                    <Button type="link" size="small" style={{ padding: 0, fontWeight: 600 }}
+                      onClick={() => message.info('Contact your administrator to reset your password.')}>
+                      Forgot password?
+                    </Button>
+                  </div>
+                  <Button type="primary" size="large" htmlType="submit" block loading={loading}
+                    icon={!loading ? <ArrowRightOutlined /> : undefined} iconPosition="end">
+                    Sign in
+                  </Button>
+                </Form>
+              ) : otpStage === 'phone' ? (
+                <Form form={phoneForm} layout="vertical" onFinish={sendOtp} requiredMark={false}>
+                  <Form.Item
+                    label="Phone Number"
+                    name="phone"
+                    rules={[
+                      { required: true, message: 'Enter your mobile number' },
+                      { pattern: /^[6-9]\d{9}$/, message: 'Enter a valid 10-digit mobile number' },
+                    ]}
+                    style={{ marginBottom: 22 }}
+                  >
+                    <Input size="large" addonBefore="+91" prefix={<MobileOutlined style={{ color: '#94a3b8' }} />}
+                      placeholder="Enter your phone number" maxLength={10} autoFocus />
+                  </Form.Item>
+                  <Button type="primary" size="large" htmlType="submit" block
+                    icon={<ArrowRightOutlined />} iconPosition="end">
+                    Send OTP
+                  </Button>
+                </Form>
+              ) : (
+                <Form form={otpForm} layout="vertical" onFinish={verifyOtp} requiredMark={false}>
+                  <div style={{ marginBottom: 18 }}>
+                    <Button type="link" size="small" icon={<ArrowLeftOutlined />} onClick={resetOtpFlow} style={{ paddingLeft: 0 }}>
+                      Change number
+                    </Button>
+                    <div style={{ fontSize: 13.5, color: '#4a5663', marginTop: 4 }}>
+                      Enter the 6-digit OTP sent to <strong>+91 {phone}</strong>
+                    </div>
+                  </div>
+                  <Form.Item name="otp" rules={[{ required: true, message: 'Enter the OTP' }, { len: 6, message: 'OTP is 6 digits' }]}>
+                    <Input.OTP length={6} size="large" autoFocus style={{ width: '100%' }} />
+                  </Form.Item>
+                  <Button type="primary" size="large" htmlType="submit" block loading={loading} style={{ marginTop: 4 }}>
+                    Verify &amp; Sign In
+                  </Button>
+                  <div style={{ textAlign: 'center', marginTop: 14, fontSize: 12.5, color: '#7c8896' }}>
+                    {resendIn > 0 ? (
+                      <>Resend OTP in 00:{String(resendIn).padStart(2, '0')}</>
+                    ) : (
+                      <Button type="link" size="small" onClick={() => { setResendIn(30); message.success(`OTP re-sent (use ${OTP_CODE})`); }}>
+                        Resend OTP
+                      </Button>
+                    )}
+                  </div>
+                </Form>
+              )}
+            </div>
+          </div>
+
+          {/* footer trust */}
+          <div className="login-foot">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, fontSize: 13.5, fontWeight: 600 }}>
+              <SafetyCertificateOutlined />
+              Secure &amp; compliant platform
+            </div>
+            <div style={{ marginTop: 8, fontSize: 12.5, color: 'rgba(255,255,255,0.78)' }}>
+              256-bit encryption &nbsp;·&nbsp; RBI Compliant &nbsp;·&nbsp; Trusted by NBFCs
+            </div>
+          </div>
+
+          {/* demo access (demo build helper) */}
+          <div className="login-demo">
+            <div className="login-demo-title">Demo access — click to fill</div>
+            <div className="login-demo-chips">
+              <button className="demo-chip" onClick={() => demoFill('Admin', '')}>Admin · admin / admin@123</button>
+              <button className="demo-chip" onClick={() => demoFill('Credit Team', '9810012001')}>{ROLE_META.CREDIT_CDL.short} · 9810012001</button>
+              <button className="demo-chip" onClick={() => demoFill('Credit Team', '9810012002')}>{ROLE_META.CREDIT_GOLD.short} · 9810012002</button>
+              <button className="demo-chip" onClick={() => demoFill('Credit Team', '9810012003')}>{ROLE_META.CREDIT_HOUSING.short} · 9810012003</button>
+              <button className="demo-chip" onClick={() => demoFill('Finance Team', '9820013001')}>{ROLE_META.FINANCE_CDL.short} · 9820013001</button>
+              <button className="demo-chip" onClick={() => demoFill('Finance Team', '9820013002')}>{ROLE_META.FINANCE_GOLD.short} · 9820013002</button>
+              <button className="demo-chip" onClick={() => demoFill('Finance Team', '9820013003')}>{ROLE_META.FINANCE_HOUSING.short} · 9820013003</button>
+            </div>
+            <Typography.Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.72)', display: 'block', marginTop: 10 }}>
+              OTP for all demo logins: <strong style={{ color: '#fff' }}>{OTP_CODE}</strong>
+            </Typography.Text>
+          </div>
+        </div>
+      </ConfigProvider>
+    </div>
+  );
+};
+
+export default Login;

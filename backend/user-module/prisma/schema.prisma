@@ -1,0 +1,182 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String              @id @default(uuid())
+  phone             String              @unique
+  name              String?
+  email             String?
+  panNumber         String?
+  aadhaarNumber     String?
+  isKycDone         Boolean             @default(false)
+  // App-facing KYC states: none | started | in_progress | verified
+  // (the KYC module historically wrote PENDING/VERIFIED; the auth layer
+  //  normalizes to lowercase for the mobile app — see userService)
+  kycStatus         String              @default("none")
+  isActive          Boolean             @default(true)
+
+  // Role field — required by business module JWT and RBAC
+  // Valid values: CUSTOMER | SALES_CDL | SALES_GOLD | SALES_HOUSING
+  role              String              @default("CUSTOMER")
+
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  kycDetail         KycDetail?
+  eNachMandate      ENachMandate?
+  blacklistedTokens TokenBlacklist[]
+  loan_applications loan_applications[]
+  agent             SalesAgent?
+
+  @@map("users")
+}
+
+// Sales agents are pre-seeded by admin; one row per agent user.
+// product is the lowercase app product code: cdl | gold | housing
+model SalesAgent {
+  id      String @id @default(uuid())
+  userId  String @unique
+  user    User   @relation(fields: [userId], references: [id])
+  product String
+  branch  String
+  fdoCode String
+  name    String
+
+  @@map("sales_agents")
+}
+
+// Refresh tokens are rotated on every /auth/refresh. We store only the
+// SHA-256 hash; revokedAt is set when a token is rotated or on logout.
+model RefreshToken {
+  id        String    @id @default(uuid())
+  tokenHash String    @unique
+  userId    String
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model agents {
+  id        String   @id
+  name      String
+  phone     String   @unique
+  email     String?
+  gstNumber String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+}
+
+model audit_logs {
+  id                String            @id
+  applicationId     String
+  action            String
+  performedBy       String
+  details           String?
+  createdAt         DateTime          @default(now())
+  loan_applications loan_applications @relation(fields: [applicationId], references: [id])
+}
+
+model emi_schedule {
+  id                String            @id
+  applicationId     String
+  instalmentNo      Int
+  dueDate           DateTime
+  amount            Float
+  status            String            @default("PENDING")
+  retryCount        Int               @default(0)
+  paidAt            DateTime?
+  createdAt         DateTime          @default(now())
+  loan_applications loan_applications @relation(fields: [applicationId], references: [id])
+}
+
+model loan_applications {
+  id                 String         @id
+  userId             String
+  productType        String
+  amount             Float
+  tenure             Int
+  annualInterestRate Float          @default(18)
+  merchantId         String?
+  status             String         @default("PENDING")
+  cibilScore         Int?
+  fraudScore         Float?
+  rejectionReason    String?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime
+  audit_logs         audit_logs[]
+  emi_schedule       emi_schedule[]
+  users              User           @relation(fields: [userId], references: [id])
+  payments           payments[]
+}
+
+model payments {
+  id                String            @id
+  applicationId     String
+  amount            Float
+  type              String
+  status            String            @default("PENDING")
+  razorpayId        String?
+  createdAt         DateTime          @default(now())
+  loan_applications loan_applications @relation(fields: [applicationId], references: [id])
+}
+
+model OtpVerification {
+  id        String   @id @default(uuid())
+  phone     String
+  otp       String
+  expiresAt DateTime
+  isUsed    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([phone, createdAt])
+  @@map("otp_verifications")
+}
+
+model KycDetail {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  panNumber       String?
+  panVerified     Boolean  @default(false)
+  aadhaarNumber   String?
+  aadhaarVerified Boolean  @default(false)
+  selfieVerified  Boolean  @default(false)
+  eSignStatus     String   @default("PENDING")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id])
+
+  @@map("kyc_details")
+}
+
+model ENachMandate {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  mandateId String   @unique
+  status    String   @default("PENDING")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@map("enach_mandates")
+}
+
+model TokenBlacklist {
+  id        String   @id @default(uuid())
+  tokenHash String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("token_blacklist")
+}
