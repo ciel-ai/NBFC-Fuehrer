@@ -1,130 +1,198 @@
 ﻿// src/modules/goldLoans/goldLoans.controller.ts
-import type { Response, NextFunction } from 'express';
-import type { AuthRequest } from '@/types/express';
-import { HTTP } from '@/config/constants';
-import { successResponse } from '@/types/common.types';
+import type { Request, Response, NextFunction } from 'express';
 import { goldLoansService } from './goldLoans.service';
-import type {
-    GoldEligibilityRequest,
-    GoldLoanAppointmentRequest,
-} from './goldLoans.types';
 
 export const goldLoansController = {
 
     // GET /gold-loans/rate
-    getRate(_req: AuthRequest, res: Response, next: NextFunction) {
+    getRate(req: Request, res: Response, next: NextFunction) {
         try {
-            const result = goldLoansService.getGoldRate();
-            res.status(HTTP.OK).json(successResponse(result));
-        } catch (err) { next(err); }
+            const rate = goldLoansService.getGoldRate();
+            res.json({ success: true, data: rate });
+        } catch (err) {
+            next(err);
+        }
     },
 
     // POST /gold-loans/eligibility
-    calculateEligibility(req: AuthRequest, res: Response, next: NextFunction) {
+    calculateEligibility(req: Request, res: Response, next: NextFunction) {
         try {
-            const body = req.body as GoldEligibilityRequest;
-            const result = goldLoansService.calculateEligibility(body);
-            res.status(HTTP.OK).json(successResponse(result));
-        } catch (err) { next(err); }
+            const result = goldLoansService.calculateEligibility(req.body);
+            res.json({ success: true, data: result });
+        } catch (err) {
+            next(err);
+        }
     },
 
-    // GET /gold-loans/branches/nearby
-    getNearbyBranches(_req: AuthRequest, res: Response, next: NextFunction) {
+    // GET /gold-loans/branches
+    async getNearbyBranches(req: Request, res: Response, next: NextFunction) {
         try {
-            const result = goldLoansService.getNearbyBranches();
-            res.status(HTTP.OK).json(successResponse(result));
-        } catch (err) { next(err); }
+            const branches = await goldLoansService.getNearbyBranches();
+            res.json({ success: true, data: branches });
+        } catch (err) {
+            next(err);
+        }
     },
 
     // POST /gold-loans/appointments
-    bookAppointment(req: AuthRequest, res: Response, next: NextFunction) {
+    async bookAppointment(req: Request, res: Response, next: NextFunction) {
         try {
-            const body = req.body as GoldLoanAppointmentRequest;
-            const result = goldLoansService.bookAppointment(body);
-            res.status(HTTP.CREATED).json(successResponse(result, 'Appointment booked successfully'));
-        } catch (err) { next(err); }
+            const { loanId, branchId, preferredDate, preferredSlot } = req.body;
+        const userId = req.user!.id;
+
+            const appointment = await goldLoansService.bookAppointment({
+                loanId,
+                branchId,
+                preferredDate,
+                preferredSlot,
+                userId,
+            });
+            res.status(201).json({ success: true, data: appointment });
+        } catch (err) {
+            next(err);
+        }
+    },
+
+    // GET /gold-loans/appointments/:id
+    async getAppointment(req: Request, res: Response, next: NextFunction) {
+        try {
+            const appointment = await goldLoansService.getAppointment(req.params.id!);
+            res.json({ success: true, data: appointment });
+        } catch (err) {
+            next(err);
+        }
+    },
+
+    // POST /gold-loans/appointments/:id/arrive
+    async markArrived(req: Request, res: Response, next: NextFunction) {
+        try {
+            const appointment = await goldLoansService.markArrived(req.params.id!);
+            res.json({ success: true, data: appointment });
+        } catch (err) {
+            next(err);
+        }
+    },
+
+    // POST /gold-loans/applications/:id/appraise
+    async submitAppraisal(req: Request, res: Response, next: NextFunction) {
+        try {
+            const {
+                netWeightGrams,
+                grossWeightGrams,
+                purityKarat,
+                ratePerGram,
+                items,
+                valuedBy,
+            } = req.body;
+
+            const result = await goldLoansService.submitAppraisal({
+                loanId:           req.params.id!,
+                netWeightGrams,
+                grossWeightGrams,
+                purityKarat,
+                ratePerGram,
+                items,
+                valuedBy,
+            });
+            res.json({ success: true, data: result });
+        } catch (err) {
+            next(err);
+        }
     },
 
     // GET /gold-loans/applications/:id/appraisal
-    async getAppraisalResult(req: AuthRequest, res: Response, next: NextFunction) {
+    async getAppraisalResult(req: Request, res: Response, next: NextFunction) {
         try {
-            const id = req.params['id'] as string;
-            const result = await goldLoansService.getAppraisalResult(id);
-            res.status(HTTP.OK).json(successResponse(result));
-        } catch (err) { next(err); }
+            const result = await goldLoansService.getAppraisalResult(req.params.id!);
+            res.json({ success: true, data: result });
+        } catch (err) {
+            next(err);
+        }
     },
 
     // POST /gold-loans/applications/:id/accept-final-amount
-    async acceptFinalAmount(req: AuthRequest, res: Response, next: NextFunction) {
+    async acceptFinalAmount(req: Request, res: Response, next: NextFunction) {
         try {
-            const id = req.params['id'] as string;
-            const { amount } = req.body as { amount: number };
-            const result = await goldLoansService.acceptFinalAmount(id, amount);
-            res.status(HTTP.OK).json(successResponse(result));
-        } catch (err) { next(err); }
+            const result = await goldLoansService.acceptFinalAmount(
+                req.params.id!,
+                req.body.amount,
+            );
+            res.json({ success: true, data: result });
+        } catch (err) {
+            next(err);
+        }
     },
 
     // POST /gold-loans/applications/:id/agreement
-    async generateAgreement(req: AuthRequest, res: Response, next: NextFunction) {
+    async generateAgreement(req: Request, res: Response, next: NextFunction) {
         try {
-            const id = req.params['id'] as string;
-            const result = await goldLoansService.generateAgreement(id);
-            res.status(HTTP.OK).json(successResponse(result, 'Agreement generated'));
-        } catch (err) { next(err); }
+            const result = await goldLoansService.generateAgreement(req.params.id!);
+            res.json({ success: true, data: result });
+        } catch (err) {
+            next(err);
+        }
     },
 
     // POST /gold-loans/applications/:id/esign
-    async completeESign(req: AuthRequest, res: Response, next: NextFunction) {
+    async completeESign(req: Request, res: Response, next: NextFunction) {
         try {
-            const id = req.params['id'] as string;
-            const { otp } = req.body as { otp: string };
-            const result = await goldLoansService.completeESign(id, otp);
-            res.status(HTTP.OK).json(successResponse(result, 'Agreement signed successfully'));
-        } catch (err) { next(err); }
+            const result = await goldLoansService.completeESign(
+                req.params.id!,
+                req.body.otp,
+            );
+            res.json({ success: true, data: result });
+        } catch (err) {
+            next(err);
+        }
     },
 
     // POST /gold-loans/applications/:id/nach
-    async initiateNach(req: AuthRequest, res: Response, next: NextFunction) {
+    async initiateNach(req: Request, res: Response, next: NextFunction) {
         try {
-            const id = req.params['id'] as string;
-            const result = await goldLoansService.initiateNach(id);
-            res.status(HTTP.OK).json(successResponse(result, 'NACH mandate initiated'));
-        } catch (err) { next(err); }
+            const result = await goldLoansService.initiateNach(req.params.id!);
+            res.json({ success: true, data: result });
+        } catch (err) {
+            next(err);
+        }
     },
 
     // GET /gold-loans/applications/:id/disbursal
-    async getDisbursalStatus(req: AuthRequest, res: Response, next: NextFunction) {
+    async getDisbursalStatus(req: Request, res: Response, next: NextFunction) {
         try {
-            const id = req.params['id'] as string;
-            const result = await goldLoansService.getDisbursalStatus(id);
-            res.status(HTTP.OK).json(successResponse(result));
-        } catch (err) { next(err); }
+            const result = await goldLoansService.getDisbursalStatus(req.params.id!);
+            res.json({ success: true, data: result });
+        } catch (err) {
+            next(err);
+        }
     },
 
     // GET /gold-loans/:id/monitoring
-    async getMonitoring(req: AuthRequest, res: Response, next: NextFunction) {
+    async getMonitoring(req: Request, res: Response, next: NextFunction) {
         try {
-            const id = req.params['id'] as string;
-            const result = await goldLoansService.getMonitoring(id);
-            res.status(HTTP.OK).json(successResponse(result));
-        } catch (err) { next(err); }
+            const result = await goldLoansService.getMonitoring(req.params.id!);
+            res.json({ success: true, data: result });
+        } catch (err) {
+            next(err);
+        }
     },
 
     // GET /gold-loans/:id/closure-quote
-    async getClosureQuote(req: AuthRequest, res: Response, next: NextFunction) {
+    async getClosureQuote(req: Request, res: Response, next: NextFunction) {
         try {
-            const id = req.params['id'] as string;
-            const result = await goldLoansService.getClosureQuote(id);
-            res.status(HTTP.OK).json(successResponse(result));
-        } catch (err) { next(err); }
+            const result = await goldLoansService.getClosureQuote(req.params.id!);
+            res.json({ success: true, data: result });
+        } catch (err) {
+            next(err);
+        }
     },
 
     // POST /gold-loans/applications/:id/compliance
-    async runCompliance(req: AuthRequest, res: Response, next: NextFunction) {
+    async runCompliance(req: Request, res: Response, next: NextFunction) {
         try {
-            const id = req.params['id'] as string;
-            const result = await goldLoansService.runCompliance(id);
-            res.status(HTTP.OK).json(successResponse(result));
-        } catch (err) { next(err); }
+            const result = await goldLoansService.runCompliance(req.params.id!);
+            res.json({ success: true, data: result });
+        } catch (err) {
+            next(err);
+        }
     },
 };

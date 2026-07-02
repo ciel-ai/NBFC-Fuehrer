@@ -6,7 +6,7 @@ import { ROLE } from '@/config/constants';
 
 const router = Router();
 
-// ─── Public routes (no auth needed) ──────────────────────────────────────────
+// ─── Public routes ────────────────────────────────────────────────────────────
 
 // GET /gold-loans/rate
 router.get('/rate', goldLoansController.getRate);
@@ -14,15 +14,15 @@ router.get('/rate', goldLoansController.getRate);
 // POST /gold-loans/eligibility
 router.post('/eligibility', goldLoansController.calculateEligibility);
 
-// GET /gold-loans/branches/nearby
+// ─── Customer routes ──────────────────────────────────────────────────────────
+
+// GET /gold-loans/branches
 router.get(
-    '/branches/nearby',
+    '/branches',
     requireAuth(),
     allowRoles(ROLE.CUSTOMER),
     goldLoansController.getNearbyBranches,
 );
-
-// ─── Customer routes ──────────────────────────────────────────────────────────
 
 // POST /gold-loans/appointments
 router.post(
@@ -32,12 +32,12 @@ router.post(
     goldLoansController.bookAppointment,
 );
 
-// POST /gold-loans/applications/:id/compliance
-router.post(
-    '/applications/:id/compliance',
+// GET /gold-loans/appointments/:id
+router.get(
+    '/appointments/:id',
     requireAuth(),
-    allowRoles(ROLE.CUSTOMER),
-    goldLoansController.runCompliance,
+    allowRoles(ROLE.CUSTOMER, ROLE.OPS_EXECUTIVE, ROLE.CREDIT_MANAGER),
+    goldLoansController.getAppointment,
 );
 
 // GET /gold-loans/applications/:id/appraisal
@@ -87,6 +87,34 @@ router.get(
     allowRoles(ROLE.CUSTOMER, ROLE.FINANCE, ROLE.SUPER_ADMIN),
     goldLoansController.getDisbursalStatus,
 );
+
+// POST /gold-loans/applications/:id/compliance
+router.post(
+    '/applications/:id/compliance',
+    requireAuth(),
+    allowRoles(ROLE.CUSTOMER),
+    goldLoansController.runCompliance,
+);
+
+// ─── Branch staff routes ──────────────────────────────────────────────────────
+
+// POST /gold-loans/appointments/:id/arrive
+router.post(
+    '/appointments/:id/arrive',
+    requireAuth(),
+    allowRoles(ROLE.OPS_EXECUTIVE, ROLE.SUPER_ADMIN),
+    goldLoansController.markArrived,
+);
+
+// POST /gold-loans/applications/:id/appraise
+router.post(
+    '/applications/:id/appraise',
+    requireAuth(),
+    allowRoles(ROLE.OPS_EXECUTIVE, ROLE.SUPER_ADMIN),
+    goldLoansController.submitAppraisal,
+);
+
+// ─── Monitoring routes ────────────────────────────────────────────────────────
 
 // GET /gold-loans/:id/monitoring
 router.get(
