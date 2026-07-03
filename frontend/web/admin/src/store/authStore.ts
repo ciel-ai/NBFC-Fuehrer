@@ -14,7 +14,8 @@ export interface SessionUser {
 
 interface AuthState {
   user: SessionUser | null;
-  login: (user: SessionUser) => void;
+  token: string | null;
+  login: (user: SessionUser, token: string) => void;
   logout: () => void;
 }
 
@@ -22,8 +23,9 @@ export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
       user: null,
-      login: (user) => set({ user }),
-      logout: () => set({ user: null }),
+      token: null,
+      login: (user, token) => set({ user, token }),
+      logout: () => set({ user: null, token: null }),
     }),
     { name: 'fuehrer-nbfc-auth' },
   ),
