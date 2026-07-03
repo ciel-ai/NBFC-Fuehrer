@@ -46,6 +46,14 @@ export const ROLE_META: Record<Role, RoleMeta> = {
   SALES_CDL: { label: 'Sales · Consumer Durable', short: 'Sales CDL', family: 'SALES', loanType: 'CDL', color: '#0e7490', modules: [] },
   SALES_GOLD: { label: 'Sales · Gold Loans', short: 'Sales Gold', family: 'SALES', loanType: 'GOLD', color: '#0e7490', modules: [] },
   SALES_HOUSING: { label: 'Sales · Affordable Housing', short: 'Sales Housing', family: 'SALES', loanType: 'HOUSING', color: '#0e7490', modules: [] },
+  // ── Backend role aliases (returned by the API). Not loan-type scoped → see all products.
+  //    Review the module/family mapping to match your backend's intended permissions. ──
+  SUPER_ADMIN: { label: 'Super Admin', short: 'Super Admin', family: 'ADMIN', color: '#0f2c4f', modules: ALL_MODULES },
+  CREDIT_MANAGER: { label: 'Credit Manager', short: 'Credit Mgr', family: 'CREDIT', color: '#b26a00', modules: CREDIT_MODULES },
+  OPS_EXECUTIVE: { label: 'Ops Executive', short: 'Ops', family: 'CREDIT', color: '#0e7490', modules: ['dashboard', 'applications', 'customers', 'appraisals', 'reports'] },
+  FINANCE: { label: 'Finance', short: 'Finance', family: 'FINANCE', color: '#1d7a46', modules: FINANCE_MODULES },
+  COLLECTION_AGENT: { label: 'Collections Agent', short: 'Collections', family: 'FINANCE', color: '#c0392b', modules: ['dashboard', 'collections', 'reports'] },
+  AGENT: { label: 'Field Agent', short: 'Agent', family: 'SALES', color: '#0e7490', modules: [] },
 };
 
 export const canAccess = (role: Role, module: ModuleKey): boolean =>
