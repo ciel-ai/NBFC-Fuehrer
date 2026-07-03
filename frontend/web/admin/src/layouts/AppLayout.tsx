@@ -8,8 +8,8 @@ import {
   DownOutlined, FileTextOutlined, FolderOpenOutlined,
   LogoutOutlined, MenuFoldOutlined, MenuUnfoldOutlined, PhoneOutlined, PlusOutlined,
   QuestionCircleOutlined, SafetyCertificateOutlined, SearchOutlined, SettingOutlined, TeamOutlined,
-  WalletOutlined, ExclamationCircleOutlined, ClockCircleOutlined, ThunderboltOutlined,
-  UsergroupAddOutlined, GoldOutlined, ApartmentOutlined, IdcardOutlined,
+   ExclamationCircleOutlined, ClockCircleOutlined, ThunderboltOutlined,
+  UsergroupAddOutlined, GoldOutlined, ApartmentOutlined, IdcardOutlined, WalletOutlined,
 } from '@ant-design/icons';
 import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
@@ -100,20 +100,7 @@ const LayoutInner: React.FC<{ user: SessionUser }> = ({ user }) => {
         ],
       });
     }
-    if (canAccess(user.role, 'lms')) {
-      items.push({
-        key: 'g-lms',
-        icon: <WalletOutlined />,
-        label: 'LMS',
-        children: [
-          { key: '/lms/accounts', label: 'Loan Accounts' },
-          { key: '/lms/emi-schedule', label: 'EMI Schedule' },
-          { key: '/lms/repayments', label: 'Repayments' },
-          { key: '/lms/charges', label: 'Charges' },
-          { key: '/lms/documents', label: 'Documents' },
-        ],
-      });
-    }
+    
     if (canAccess(user.role, 'collections')) {
       items.push({
         key: 'g-collections',
@@ -148,7 +135,7 @@ const LayoutInner: React.FC<{ user: SessionUser }> = ({ user }) => {
   // longest matching menu key → selected
   const selectedKey = useMemo(() => {
     if (location.pathname.startsWith('/applications/view')) return '/applications';
-    if (location.pathname.startsWith('/lms/accounts')) return '/lms/accounts';
+    
     const keys: string[] = [];
     const collect = (items: MenuProps['items']): void => {
       items?.forEach((it: any) => {
@@ -167,7 +154,7 @@ const LayoutInner: React.FC<{ user: SessionUser }> = ({ user }) => {
     key.startsWith('/applications') ? 'g-applications'
     : key.startsWith('/credit') ? 'g-credit'
     : key.startsWith('/finance') ? 'g-finance'
-    : key.startsWith('/lms') ? 'g-lms'
+    
     : key.startsWith('/collections') ? 'g-collections'
     : key.startsWith('/reports') ? 'g-reports' : '';
 
@@ -416,7 +403,6 @@ const LayoutInner: React.FC<{ user: SessionUser }> = ({ user }) => {
                 const [kind, id] = value.split(':');
                 setSearchValue('');
                 if (kind === 'app') navigate(`/applications/view/${id}`);
-                else navigate(`/lms/accounts/${id}`);
               }}
               style={{ width: 480, maxWidth: '46vw' }}
             >

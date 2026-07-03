@@ -15,6 +15,7 @@ export type AppStatus =
   | 'CLOSED';
 
 export type Role =
+  // Product-based roles (Admin Panel)
   | 'ADMIN'
   | 'CREDIT_CDL'
   | 'CREDIT_GOLD'
@@ -22,11 +23,18 @@ export type Role =
   | 'FINANCE_CDL'
   | 'FINANCE_GOLD'
   | 'FINANCE_HOUSING'
-  // Sales roles are provisioned here by Admin but sign in only on the
+  // Sales roles — provisioned here by Admin but sign in only on the
   // React Native field app — the web dashboard rejects their login.
   | 'SALES_CDL'
   | 'SALES_GOLD'
-  | 'SALES_HOUSING';
+  | 'SALES_HOUSING'
+  // Backend roles
+  | 'SUPER_ADMIN'
+  | 'CREDIT_MANAGER'
+  | 'OPS_EXECUTIVE'
+  | 'FINANCE'
+  | 'COLLECTION_AGENT'
+  | 'AGENT';
 
 export type RiskGrade = 'A' | 'B' | 'C' | 'D';
 
