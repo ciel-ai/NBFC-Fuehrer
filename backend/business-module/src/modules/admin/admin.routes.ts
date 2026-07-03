@@ -24,6 +24,23 @@ const router = Router();
 // All admin routes require SUPER_ADMIN
 const SUPER_ADMIN_ONLY = [ROLE.SUPER_ADMIN];
 
+// ─── Admin auth ───────────────────────────────────────────────────────────────
+
+router.post(
+    '/auth/login',
+    validateBody(Joi.object({
+        email:    Joi.string().email().required(),
+        password: Joi.string().required(),
+    })),
+    adminController.login,
+);
+
+router.get(
+    '/auth/me',
+    requireAuth(),
+    adminController.me,
+);
+
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 router.get(
     '/dashboard',

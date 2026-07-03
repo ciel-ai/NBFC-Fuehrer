@@ -179,6 +179,106 @@ async getLoanDetail(req: AuthRequest, res: Response, next: NextFunction) {
     } catch (err) { next(err); }
 },
 
+// POST /admin/auth/login
+    async login(req: AuthRequest, res: Response, next: NextFunction) {
+        try {
+            const { email, password } = req.body as { email: string; password: string };
+            const bcrypt = await import('bcryptjs');
+            const jwt = await import('jsonwebtoken');
+            const { prisma } = await import('@/config/database');
+            const { env } = await import('@/config/env');
+
+            const user = await prisma.admin_users.findUnique({
+                where: { email },
+            });
+
+            if (!user || !user.password_hash) {
+                res.status(HTTP.UNAUTHORIZED).json({ success: false, message: 'Invalid email or password' });
+                return;
+            }
+
+            if (user.is_active === false) {
+                res.status(HTTP.UNAUTHORIZED).json({ success: false, message: 'Account is deactivated. Contact administrator.' });
+                return;
+            }
+
+            const valid = await bcrypt.compare(password, user.password_hash);
+            if (!valid) {
+                res.status(HTTP.UNAUTHORIZED).json({ success: false, message: 'Invalid email or password' });
+                return;
+            }
+
+            // Update last login
+            await prisma.admin_users.update({
+                where: { id: user.id },
+                data: { last_login_at: new Date(), updated_at: new Date() },
+            });
+
+            const token = jwt.sign(
+                {
+                    id:       user.id,
+                    role:     user.role,
+                    email:    user.email,
+                    branchId: user.branch_id,
+                },
+                env.auth.jwtSecret,
+                { expiresIn: '12h' },
+            );
+
+            res.status(HTTP.OK).json({
+                success: true,
+                data: {
+                    token,
+                    user: {
+                        id:       user.id,
+                        fullName: user.full_name,
+                        email:    user.email,
+                        phone:    user.phone,
+                        role:     user.role,
+                        branchId: user.branch_id,
+                    },
+                },
+            });
+        } catch (err) { next(err); }
+    },
+
+    // GET /admin/auth/me
+    async me(req: AuthRequest, res: Response, next: NextFunction) {
+        try {
+            const user = getAuthUser(req);
+            const { prisma } = await import('@/config/database');
+
+            const adminUser = await prisma.admin_users.findUnique({
+                where: { id: user.id },
+                select: {
+                    id:        true,
+                    full_name: true,
+                    email:     true,
+                    phone:     true,
+                    role:      true,
+                    branch_id: true,
+                    is_active: true,
+                },
+            });
+
+            if (!adminUser || !adminUser.is_active) {
+                res.status(HTTP.UNAUTHORIZED).json({ success: false, message: 'Account not found or deactivated' });
+                return;
+            }
+
+            res.status(HTTP.OK).json({
+                success: true,
+                data: {
+                    id:       adminUser.id,
+                    fullName: adminUser.full_name,
+                    email:    adminUser.email,
+                    phone:    adminUser.phone,
+                    role:     adminUser.role,
+                    branchId: adminUser.branch_id,
+                },
+            });
+        } catch (err) { next(err); }
+    },
 };
 
 

@@ -37,6 +37,7 @@ export interface LoanApplication {
     userId: string;
     agentId: string | null;
     customerId: string | null;
+    customer?: CustomerProfile | null;
     status: LoanStatus;
 
     // Request details
