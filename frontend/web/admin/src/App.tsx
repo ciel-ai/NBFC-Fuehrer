@@ -19,6 +19,7 @@ import AgentManagement from './pages/agents/AgentManagement';
 import BranchManagement from './pages/branches/BranchManagement';
 import CreditQueue from './pages/credit/CreditQueue';
 import FinanceQueue from './pages/finance/FinanceQueue';
+import { useAppStore } from './store/appStore';
 
 import Collections from './pages/collections/Collections';
 import Reports from './pages/reports/Reports';
@@ -44,9 +45,23 @@ const RequireModule: React.FC<{ module: ModuleKey; children: React.ReactNode }> 
   return <>{children}</>;
 };
 
+const AppInitializer: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const user = useAuthStore((s) => s.user);
+  const initializeFromApi = useAppStore((s) => s.initializeFromApi);
+
+  React.useEffect(() => {
+    if (user) {
+      initializeFromApi();
+    }
+  }, [user, initializeFromApi]);
+
+  return <>{children}</>;
+};
+
 const App: React.FC = () => (
   <ConfigProvider theme={nbfcTheme}>
     <AntApp>
+      <AppInitializer>
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
@@ -90,6 +105,7 @@ const App: React.FC = () => (
           </Route>
         </Routes>
       </BrowserRouter>
+      </AppInitializer>
     </AntApp>
   </ConfigProvider>
 );
