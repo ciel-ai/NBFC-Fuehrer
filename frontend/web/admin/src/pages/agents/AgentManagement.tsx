@@ -9,6 +9,7 @@ import {
 } from '@ant-design/icons';
 import { useAppStore } from '../../store/appStore';
 import { useAuthStore } from '../../store/authStore';
+import { agentsApi } from '../../api/agents.api';
 import PageHeader from '../../components/PageHeader';
 import KpiCard from '../../components/KpiCard';
 import { LoanTypeTag, StatusTag } from '../../components/StatusTag';
@@ -31,6 +32,19 @@ const AgentManagement: React.FC = () => {
   const updateAgent = useAppStore((s) => s.updateAgent);
   const toggleAgentStatus = useAppStore((s) => s.toggleAgentStatus);
 
+  const [realAgents, setRealAgents] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(false);
+
+  React.useEffect(() => {
+    setLoading(true);
+    agentsApi.list({ limit: 100 })
+      .then((res) => { if (res.data?.length) setRealAgents(res.data); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const agentList = realAgents.length > 0 ? realAgents : agents;
+
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ACTIVE' | 'INACTIVE' | undefined>();
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -41,12 +55,12 @@ const AgentManagement: React.FC = () => {
 
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return agents.filter((a) => {
+    return agentList.filter((a: any) => {
       if (statusFilter && a.status !== statusFilter) return false;
       if (q && !`${a.name} ${a.code} ${a.phone} ${a.territory} ${a.branch}`.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [agents, search, statusFilter]);
+  }, [agentList, search, statusFilter]);
 
   const openCreate = (): void => {
     setEditing(null);
@@ -101,10 +115,10 @@ const AgentManagement: React.FC = () => {
     },
     { title: 'Territory', dataIndex: 'territory', width: 150, render: (v: string) => <span style={{ fontSize: 12.5, color: '#475569' }}><EnvironmentOutlined style={{ marginRight: 6, color: '#94a3b8' }} />{v}</span> },
     { title: 'Branch', dataIndex: 'branch', width: 175, render: (v: string) => <span style={{ fontSize: 12.5, color: '#64748b' }}>{v}</span> },
-    { title: 'Products', dataIndex: 'products', width: 150, render: (p: LoanType[]) => <span style={{ display: 'inline-flex', gap: 5, flexWrap: 'wrap' }}>{p.map((t) => <LoanTypeTag key={t} type={t} />)}</span> },
-    { title: 'Sourced', dataIndex: 'sourced', width: 90, align: 'center', render: (v: number) => <span className="tnum" style={{ fontWeight: 600 }}>{v}</span>, sorter: (a, b) => a.sourced - b.sourced },
-    { title: 'Disbursed', dataIndex: 'disbursedValue', width: 115, align: 'right', render: (v: number) => <span className="tnum">{inrCompact(v)}</span>, sorter: (a, b) => a.disbursedValue - b.disbursedValue },
-    { title: 'Rate', dataIndex: 'commissionRate', width: 80, align: 'right', render: (v: number) => <span className="tnum">{v}%</span> },
+    { title: 'Products', dataIndex: 'products', width: 150, render: (p: LoanType[]) => <span style={{ display: 'inline-flex', gap: 5, flexWrap: 'wrap' }}>{(p ?? []).map((t) => <LoanTypeTag key={t} type={t} />)}</span> },
+    { title: 'Sourced', dataIndex: 'sourced', width: 90, align: 'center', render: (v: number) => <span className="tnum" style={{ fontWeight: 600 }}>{v ?? 0}</span>, sorter: (a, b) => (a.sourced ?? 0) - (b.sourced ?? 0) },
+    { title: 'Disbursed', dataIndex: 'disbursedValue', width: 115, align: 'right', render: (v: number) => <span className="tnum">{inrCompact(v ?? 0)}</span>, sorter: (a, b) => (a.disbursedValue ?? 0) - (b.disbursedValue ?? 0) },
+    { title: 'Rate', dataIndex: 'commissionRate', width: 80, align: 'right', render: (v: number) => <span className="tnum">{v ?? 0}%</span> },
     {
       title: 'Commission',
       key: 'commission',
@@ -112,11 +126,11 @@ const AgentManagement: React.FC = () => {
       align: 'right',
       render: (_, r) => (
         <div style={{ textAlign: 'right' }}>
-          <div className="tnum" style={{ fontWeight: 600, color: '#0f766e' }}>{inr(r.commissionEarned)}</div>
-          {r.commissionPending > 0 && <div className="tnum" style={{ fontSize: 11, color: '#b45309' }}>{inr(r.commissionPending)} pending</div>}
+          <div className="tnum" style={{ fontWeight: 600, color: '#0f766e' }}>{inr(r.commissionEarned ?? 0)}</div>
+          {(r.commissionPending ?? 0) > 0 && <div className="tnum" style={{ fontSize: 11, color: '#b45309' }}>{inr(r.commissionPending)} pending</div>}
         </div>
       ),
-      sorter: (a, b) => a.commissionEarned - b.commissionEarned,
+      sorter: (a, b) => (a.commissionEarned ?? 0) - (b.commissionEarned ?? 0),
     },
     { title: 'Status', dataIndex: 'status', width: 95, render: (s: string) => <StatusTag status={s} /> },
     {
@@ -137,16 +151,16 @@ const AgentManagement: React.FC = () => {
     },
   ];
 
-  const activeCount = agents.filter((a) => a.status === 'ACTIVE').length;
-  const totalDisbursed = agents.reduce((s, a) => s + a.disbursedValue, 0);
-  const commissionPaid = agents.reduce((s, a) => s + a.commissionEarned, 0);
-  const commissionPending = agents.reduce((s, a) => s + a.commissionPending, 0);
+  const activeCount = agentList.filter((a: any) => a.status === 'ACTIVE').length;
+  const totalDisbursed = agentList.reduce((s: number, a: any) => s + (a.disbursedValue ?? 0), 0);
+  const commissionPaid = agentList.reduce((s: number, a: any) => s + (a.commissionEarned ?? 0), 0);
+  const commissionPending = agentList.reduce((s: number, a: any) => s + (a.commissionPending ?? 0), 0);
 
   const handleExport = (): void => {
     exportCsv(
       `agents-${new Date().toISOString().slice(0, 10)}`,
       ['Code', 'Name', 'Phone', 'Email', 'Branch', 'Territory', 'Products', 'Sourced', 'Disbursed', 'Rate %', 'Commission Earned', 'Commission Pending', 'Status'],
-      rows.map((a) => [a.code, a.name, a.phone, a.email, a.branch, a.territory, a.products.join(' / '), a.sourced, a.disbursedValue, a.commissionRate, a.commissionEarned, a.commissionPending, a.status]),
+      rows.map((a: any) => [a.code, a.name, a.phone, a.email, a.branch, a.territory, (a.products ?? []).join(' / '), a.sourced ?? 0, a.disbursedValue ?? 0, a.commissionRate ?? 0, a.commissionEarned ?? 0, a.commissionPending ?? 0, a.status]),
     );
   };
 
@@ -164,7 +178,7 @@ const AgentManagement: React.FC = () => {
       />
 
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-        <Col xs={24} sm={12} xl={6}><KpiCard label="Active Agents" value={activeCount} sub={`${agents.length} total`} icon={<TeamOutlined />} tint="#0e7490" /></Col>
+        <Col xs={24} sm={12} xl={6}><KpiCard label="Active Agents" value={activeCount} sub={`${agentList.length} total`} icon={<TeamOutlined />} tint="#0e7490" /></Col>
         <Col xs={24} sm={12} xl={6}><KpiCard label="Disbursed via Agents" value={inrCompact(totalDisbursed)} sub="lifetime" icon={<DollarOutlined />} tint="#2563eb" /></Col>
         <Col xs={24} sm={12} xl={6}><KpiCard label="Commission Paid" value={inrCompact(commissionPaid)} sub="to date" icon={<DollarOutlined />} tint="#047857" /></Col>
         <Col xs={24} sm={12} xl={6}><KpiCard label="Commission Pending" value={inrCompact(commissionPending)} sub="accrued, unpaid" icon={<DollarOutlined />} tint="#d97706" /></Col>
@@ -194,6 +208,7 @@ const AgentManagement: React.FC = () => {
           columns={columns}
           rowKey="id"
           size="middle"
+          loading={loading}
           scroll={{ x: 1280 }}
           pagination={{ pageSize: 10, showTotal: (t) => `${t} agents` }}
         />

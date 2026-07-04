@@ -16,6 +16,7 @@ import { exportCsv } from '../../utils/csv';
 import { dpdBucket, fmtDate, inr, inrCompact } from '../../utils/format';
 import { recoveryThisMonth } from '../../utils/analytics';
 import type { LoanAccount, Repayment } from '../../types';
+import { collectionsApi } from '../../api/collections.api';
 
 type CollTab = 'due-today' | 'overdue' | 'npa' | 'recovery';
 
@@ -35,7 +36,13 @@ const Collections: React.FC = () => {
   const loans = useAppStore((s) => s.loans);
   const repayments = useAppStore((s) => s.repayments);
   const logCollectionNote = useAppStore((s) => s.logCollectionNote);
+const [realCases, setRealCases] = React.useState<any[]>([]);
 
+  React.useEffect(() => {
+    collectionsApi.listCases({ limit: 100 })
+      .then((res) => { if (res.data?.length) setRealCases(res.data); })
+      .catch(() => {});
+  }, []);
   const [search, setSearch] = useState('');
   const [noteLoan, setNoteLoan] = useState<LoanAccount | null>(null);
   const [noteForm] = Form.useForm();

@@ -9,6 +9,7 @@ import { LoanTypeTag } from '../../components/StatusTag';
 import { useAppStore } from '../../store/appStore';
 import { useAuthStore } from '../../store/authStore';
 import type { ProductConfig } from '../../types';
+import { settingsApi } from '../../api/settings.api';
 
 const panel: React.CSSProperties = { border: '1px solid #e7ebf3' };
 
@@ -30,6 +31,9 @@ const Settings: React.FC = () => {
       maxTenure: p.maxTenure, processingFeePct: p.processingFeePct, maxLtv: p.maxLtv, active: p.active,
     });
   };
+  React.useEffect(() => {
+    settingsApi.getAll().catch(() => {});
+  }, []);
 
   const submitProduct = (values: any): void => {
     if (!editingProduct) return;
