@@ -237,7 +237,7 @@ const Dashboard: React.FC = () => {
         <div className="panel">
           <div className="panel-head">
             <span className="panel-title">{user.role === 'ADMIN' ? 'Portfolio' : 'Summary'}</span>
-            <span style={{ fontSize: 12, color: '#94a3b8' }}>{scope ? LOAN_TYPE_META[scope].short : 'all products'}</span>
+            <span style={{ fontSize: 12, color: '#94a3b8' }}>{user.role === 'ADMIN' ? 'all products' : LOAN_TYPE_META[scope!].short}</span>
           </div>
           {summary.map((s) => (
             <div key={s.label} className="stat-row">

@@ -7,8 +7,8 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { useAppStore } from '../store/appStore';
+import { DEMO_ADMIN, OTP_CODE } from '../data/mock';
 import { ROLE_META } from '../auth/rbac';
-import { authApi } from '../api/auth.api';
 
 type Portal = 'Admin' | 'Credit Team' | 'Finance Team';
 
@@ -62,29 +62,23 @@ const Login: React.FC = () => {
     return () => clearInterval(t);
   }, [resendIn]);
 
-  const finishLogin = (u: { id: string; name: string; role: any; email: string; phone: string; branch: string }, token: string): void => {
-    login({ ...u, loginAt: new Date().toISOString() }, token);
+  const finishLogin = (u: { id: string; name: string; role: any; email: string; phone: string; branch: string }): void => {
+    login({ ...u, loginAt: new Date().toISOString() });
     message.success(`Welcome back, ${u.name.split(' ')[0]}`);
     navigate('/dashboard', { replace: true });
   };
 
-  const handleAdmin = async (values: { username: string; password: string }): Promise<void> => {
+  const handleAdmin = (values: { username: string; password: string }): void => {
     setLoading(true);
-    try {
-      const result = await authApi.login({ email: values.username, password: values.password });
-      finishLogin({
-        id:     result.user.id,
-        name:   result.user.fullName,
-        role:   result.user.role as any,
-        email:  result.user.email,
-        phone:  result.user.phone,
-        branch: result.user.branchId ?? 'Head Office',
-      }, result.token);
-    } catch {
-      message.error('Invalid email or password');
-    } finally {
+    setTimeout(() => {
       setLoading(false);
-    }
+      if (values.username === DEMO_ADMIN.username && values.password === DEMO_ADMIN.password) {
+        const u = DEMO_ADMIN.user;
+        finishLogin({ id: u.id, name: u.name, role: u.role, email: u.email, phone: u.phone, branch: u.branch });
+      } else {
+        message.error('Invalid username or password');
+      }
+    }, 500);
   };
 
   const sendOtp = (values: { phone: string }): void => {
@@ -106,20 +100,20 @@ const Login: React.FC = () => {
     setPhone(values.phone);
     setOtpStage('otp');
     setResendIn(30);
-    message.success(`OTP sent to +91 ${values.phone} (use ${123456})`);
+    message.success(`OTP sent to +91 ${values.phone} (use ${OTP_CODE})`);
   };
 
   const verifyOtp = (values: { otp: string }): void => {
     setLoading(true);
     setTimeout(() => {
       setLoading(false);
-      if (values.otp !== '123456') {
+      if (values.otp !== OTP_CODE) {
         message.error('Incorrect OTP — please retry');
         return;
       }
       const family = portal === 'Credit Team' ? 'CREDIT' : 'FINANCE';
       const u = findOtpUser(phone, family);
-      if (u) finishLogin({ id: u.id, name: u.name, role: u.role, email: u.email, phone: u.phone, branch: u.branch }, '');
+      if (u) finishLogin({ id: u.id, name: u.name, role: u.role, email: u.email, phone: u.phone, branch: u.branch });
     }, 500);
   };
 
@@ -137,7 +131,7 @@ const Login: React.FC = () => {
     setPortal(p);
     setOtpStage('phone');
     if (p === 'Admin') {
-      adminForm.setFieldsValue({ username: 'admin@fuehrer.in', password: 'admin@123' });
+      adminForm.setFieldsValue({ username: DEMO_ADMIN.username, password: DEMO_ADMIN.password });
     } else {
       phoneForm.setFieldsValue({ phone: value });
     }
@@ -197,8 +191,8 @@ const Login: React.FC = () => {
             <div style={{ marginTop: 16 }}>
               {portal === 'Admin' ? (
                 <Form form={adminForm} layout="vertical" onFinish={handleAdmin} requiredMark={false}>
-                  <Form.Item label="Email" name="username" rules={[{ required: true, message: 'Enter your email' }]}>
-                    <Input size="large" prefix={<UserOutlined style={{ color: '#94a3b8' }} />} placeholder="Enter your email address" autoFocus />
+                  <Form.Item label="Username" name="username" rules={[{ required: true, message: 'Enter your username' }]}>
+                    <Input size="large" prefix={<UserOutlined style={{ color: '#94a3b8' }} />} placeholder="Enter your username" autoFocus />
                   </Form.Item>
                   <Form.Item label="Password" name="password" rules={[{ required: true, message: 'Enter your password' }]} style={{ marginBottom: 14 }}>
                     <Input.Password size="large" prefix={<LockOutlined style={{ color: '#94a3b8' }} />} placeholder="Enter your password" />
@@ -256,7 +250,7 @@ const Login: React.FC = () => {
                     {resendIn > 0 ? (
                       <>Resend OTP in 00:{String(resendIn).padStart(2, '0')}</>
                     ) : (
-                      <Button type="link" size="small" onClick={() => { setResendIn(30); message.success(`OTP re-sent (use ${123456})`); }}>
+                      <Button type="link" size="small" onClick={() => { setResendIn(30); message.success(`OTP re-sent (use ${OTP_CODE})`); }}>
                         Resend OTP
                       </Button>
                     )}
@@ -290,7 +284,7 @@ const Login: React.FC = () => {
               <button className="demo-chip" onClick={() => demoFill('Finance Team', '9820013003')}>{ROLE_META.FINANCE_HOUSING.short} · 9820013003</button>
             </div>
             <Typography.Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.72)', display: 'block', marginTop: 10 }}>
-              OTP for all demo logins: <strong style={{ color: '#fff' }}>{123456}</strong>
+              OTP for all demo logins: <strong style={{ color: '#fff' }}>{OTP_CODE}</strong>
             </Typography.Text>
           </div>
         </div>

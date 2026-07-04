@@ -7,6 +7,7 @@ export type ModuleKey =
   | 'appraisals'
   | 'credit'
   | 'finance'
+  | 'lms'
   | 'collections'
   | 'reports'
   | 'agents'
@@ -15,7 +16,7 @@ export type ModuleKey =
   | 'audit'
   | 'settings';
 
-export type RoleFamily = 'ADMIN' | 'CREDIT' | 'FINANCE' | 'SALES' | 'COLLECTION';
+export type RoleFamily = 'ADMIN' | 'CREDIT' | 'FINANCE' | 'SALES';
 
 interface RoleMeta {
   label: string;
@@ -27,15 +28,13 @@ interface RoleMeta {
 }
 
 const CREDIT_MODULES: ModuleKey[] = ['dashboard', 'applications', 'customers', 'appraisals', 'credit', 'reports'];
-const FINANCE_MODULES: ModuleKey[] = ['dashboard', 'applications', 'customers', 'finance', 'reports'];
-const COLLECTION_MODULES: ModuleKey[] = ['dashboard', 'applications', 'customers', 'collections', 'reports'];
+const FINANCE_MODULES: ModuleKey[] = ['dashboard', 'applications', 'customers', 'finance', 'lms', 'reports'];
 const ALL_MODULES: ModuleKey[] = [
-  'dashboard', 'applications', 'customers', 'appraisals', 'credit', 'finance',
+  'dashboard', 'applications', 'customers', 'appraisals', 'credit', 'finance', 'lms',
   'collections', 'reports', 'agents', 'branches', 'users', 'audit', 'settings',
 ];
 
 export const ROLE_META: Record<Role, RoleMeta> = {
-  // ── Frontend product-based roles ──────────────────────────────────────────
   ADMIN: { label: 'Administrator', short: 'Admin', family: 'ADMIN', color: '#0f2c4f', modules: ALL_MODULES },
   CREDIT_CDL: { label: 'Credit · Consumer Durable', short: 'Credit CDL', family: 'CREDIT', loanType: 'CDL', color: '#b26a00', modules: CREDIT_MODULES },
   CREDIT_GOLD: { label: 'Credit · Gold Loans', short: 'Credit Gold', family: 'CREDIT', loanType: 'GOLD', color: '#b26a00', modules: CREDIT_MODULES },
@@ -47,23 +46,23 @@ export const ROLE_META: Record<Role, RoleMeta> = {
   SALES_CDL: { label: 'Sales · Consumer Durable', short: 'Sales CDL', family: 'SALES', loanType: 'CDL', color: '#0e7490', modules: [] },
   SALES_GOLD: { label: 'Sales · Gold Loans', short: 'Sales Gold', family: 'SALES', loanType: 'GOLD', color: '#0e7490', modules: [] },
   SALES_HOUSING: { label: 'Sales · Affordable Housing', short: 'Sales Housing', family: 'SALES', loanType: 'HOUSING', color: '#0e7490', modules: [] },
-
-  // ── Backend roles ─────────────────────────────────────────────────────────
+  // ── Backend role aliases (returned by the API). Not loan-type scoped → see all products.
+  //    Review the module/family mapping to match your backend's intended permissions. ──
   SUPER_ADMIN: { label: 'Super Admin', short: 'Super Admin', family: 'ADMIN', color: '#0f2c4f', modules: ALL_MODULES },
   CREDIT_MANAGER: { label: 'Credit Manager', short: 'Credit Mgr', family: 'CREDIT', color: '#b26a00', modules: CREDIT_MODULES },
-  OPS_EXECUTIVE: { label: 'Ops Executive', short: 'Ops', family: 'CREDIT', color: '#b26a00', modules: CREDIT_MODULES },
+  OPS_EXECUTIVE: { label: 'Ops Executive', short: 'Ops', family: 'CREDIT', color: '#0e7490', modules: ['dashboard', 'applications', 'customers', 'appraisals', 'reports'] },
   FINANCE: { label: 'Finance', short: 'Finance', family: 'FINANCE', color: '#1d7a46', modules: FINANCE_MODULES },
-  COLLECTION_AGENT: { label: 'Collection Agent', short: 'Collection', family: 'COLLECTION', color: '#c0392b', modules: COLLECTION_MODULES },
-  AGENT: { label: 'Agent', short: 'Agent', family: 'SALES', color: '#0e7490', modules: [] },
+  COLLECTION_AGENT: { label: 'Collections Agent', short: 'Collections', family: 'FINANCE', color: '#c0392b', modules: ['dashboard', 'collections', 'reports'] },
+  AGENT: { label: 'Field Agent', short: 'Agent', family: 'SALES', color: '#0e7490', modules: [] },
 };
 
 export const canAccess = (role: Role, module: ModuleKey): boolean =>
-  ROLE_META[role]?.modules.includes(module) ?? false;
+  ROLE_META[role].modules.includes(module);
 
 /** Loan-type scope for the role; undefined = sees all types (admin). */
-export const scopedLoanType = (role: Role): LoanType | undefined => ROLE_META[role]?.loanType;
+export const scopedLoanType = (role: Role): LoanType | undefined => ROLE_META[role].loanType;
 
-export const roleFamily = (role: Role): RoleFamily => ROLE_META[role]?.family ?? 'ADMIN';
+export const roleFamily = (role: Role): RoleFamily => ROLE_META[role].family;
 
 export const LOAN_TYPE_META: Record<LoanType, { label: string; short: string; color: string; bg: string }> = {
   CDL: { label: 'Consumer Durable Loan', short: 'CDL', color: '#2563eb', bg: '#eef3f9' },

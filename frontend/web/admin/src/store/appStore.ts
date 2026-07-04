@@ -2,8 +2,6 @@ import { create } from 'zustand';
 import dayjs from 'dayjs';
 import { MOCK } from '../data/mock';
 import { calcEmi } from '../utils/format';
-import { applicationsApi } from '../api/applications.api';
-import { dashboardApi } from '../api/dashboard.api';
 import type {
   AppNotification, AuditLog, EmiRow, LoanAccount, LoanApplication, PortalUser,
   Repayment, LoanCharge, RiskGrade, Role,
@@ -42,7 +40,6 @@ interface AppState {
   branches: Branch[];
   agents: Agent[];
   productConfigs: ProductConfig[];
-  dashboardSummary: Record<string, any> | null;
 
   // application workflow
   pickForReview: (appId: string, actor: Actor) => void;
@@ -80,7 +77,6 @@ interface AppState {
 
   // notifications
   markAllRead: () => void;
-  initializeFromApi: () => Promise<void>;
 
   logAudit: (entry: Omit<AuditLog, 'id' | 'at' | 'ip'>) => void;
 }
@@ -123,7 +119,6 @@ export const useAppStore = create<AppState>((set, get) => {
     branches: MOCK.branches,
     agents: MOCK.agents,
     productConfigs: MOCK.productConfigs,
-    dashboardSummary: null,
 
     pickForReview: (appId, actor) => {
       patchApp(appId, (app) => {
@@ -253,6 +248,7 @@ export const useAppStore = create<AppState>((set, get) => {
       const loanNumber = `FNLN-${app.loanType}-${String(86000 + state.loans.length).padStart(5, '0')}`;
       const utr = `${mode}R5${Math.floor(2026000000 + Math.random() * 999999)}`;
 
+      // amortization
       let due = dayjs().add(1, 'month').date(5);
       if (due.diff(dayjs(), 'day') < 18) due = due.add(1, 'month');
       const r = rate / 12 / 100;
@@ -482,82 +478,6 @@ export const useAppStore = create<AppState>((set, get) => {
     updateProductConfig: (key, patch, actor) => {
       set((s) => ({ productConfigs: s.productConfigs.map((p) => (p.key === key ? { ...p, ...patch } : p)) }));
       audit({ user: actor.name, role: String(actor.role), module: 'Settings', action: `Updated ${key} Product Config`, entity: 'Product Config', newValue: Object.keys(patch).join(', ') });
-    },
-
-    initializeFromApi: async () => {
-      try {
-        const result = await applicationsApi.list({ limit: 100, sortBy: 'appliedAt', sortOrder: 'desc' });
-        const backendApps = result.data ?? [];
-        const mapped = backendApps.map((a: any) => ({
-          id: a.id,
-          appNumber: a.referenceNumber ?? a.id.slice(0, 8).toUpperCase(),
-          loanType: a.productType === 'GOLD_LOAN' ? 'GOLD' : a.productType === 'HOUSING_LOAN' ? 'HOUSING' : 'CDL',
-          status: (() => {
-            const s = a.status;
-            if (['DRAFT', 'KYC_PENDING'].includes(s)) return 'SUBMITTED';
-            if (['UNDERWRITING', 'PENDING_APPROVAL', 'APPOINTMENT_BOOKED', 'APPRAISAL_PENDING', 'PROPERTY_ASSESSMENT'].includes(s)) return 'CREDIT_PENDING';
-            if (s === 'APPROVED') return 'CREDIT_APPROVED';
-            if (s === 'REJECTED') return 'CREDIT_REJECTED';
-            if (s === 'ESIGN_PENDING') return 'FINANCE_PENDING';
-            if (s === 'DISBURSED') return 'DISBURSED';
-            if (s === 'ACTIVE') return 'ACTIVE';
-            if (s === 'CLOSED') return 'CLOSED';
-            return 'SUBMITTED';
-          })(),
-          customer: {
-            name: a.customer?.fullName ?? 'Unknown',
-            dob: '', age: 0, gender: 'Male' as const, maritalStatus: 'Single' as const,
-            fatherOrSpouseName: '', mobile: '', email: '', dependents: 0,
-            currentAddress: {
-              line1: a.customer?.flatHouseNo ?? '',
-              city: a.customer?.city ?? '',
-              state: a.customer?.state ?? '',
-              pincode: a.customer?.pincode ?? '',
-            },
-            permanentAddress: { line1: '', city: '', state: '', pincode: '' },
-            employment: {
-              type: 'Salaried' as const,
-              employer: a.customer?.employerName ?? '',
-              designation: '',
-              yearsInJob: 0,
-            },
-            income: {
-              monthlyIncome: a.monthlyIncome ?? 0,
-              otherIncome: 0,
-              existingObligations: 0,
-              foir: 0,
-            },
-          },
-          kyc: {
-            aadhaarMasked: '', aadhaarVerified: false,
-            panNumber: '', panVerified: false,
-            videoKycStatus: 'NOT_REQUIRED' as const,
-          },
-          documents: [],
-          bureau: {
-            score: 0, reportDate: '', enquiries6m: 0,
-            totalAccounts: 0, activeAccounts: 0, overdueAccounts: 0,
-            oldestAccountYears: 0, paymentHistory: [], accounts: [],
-          },
-          loan: {
-            amount: a.amountRequested ?? 0,
-            tenureMonths: a.tenureMonths ?? 12,
-            interestRate: a.interestRate ?? 0,
-            purpose: a.purpose ?? '',
-            emi: a.monthlyEmi ?? 0,
-            scheme: '',
-          },
-          source: 'Mobile App' as const,
-          createdBy: '', createdByCode: '', branch: '',
-          createdAt: a.appliedAt ?? new Date().toISOString(),
-          updatedAt: a.updatedAt ?? new Date().toISOString(),
-          timeline: [],
-        }));
-        const summary = await dashboardApi.getKpis().catch(() => null);
-        set({ applications: mapped, dashboardSummary: summary });
-      } catch (err) {
-        console.warn('API init failed, keeping mock data', err);
-      }
     },
 
     markAllRead: () => set((s) => ({ notifications: s.notifications.map((n) => ({ ...n, read: true })) })),
