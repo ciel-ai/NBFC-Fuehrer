@@ -20,6 +20,7 @@ import { collectionsWebRouter } from './collections/collections.routes';
 import { reportsWebRouter }     from './reports/reports.routes';
 import { branchesWebRouter }    from './branches/branches.routes';
 import { appraisalsWebRouter }  from './appraisals/appraisals.routes';
+import { lmsRouter }            from './lms/lms.routes';
 
 const router = Router();
 
@@ -37,5 +38,6 @@ router.use('/collections',   collectionsWebRouter);
 router.use('/reports',       reportsWebRouter);
 router.use('/branches',      branchesWebRouter);
 router.use('/appraisals',    appraisalsWebRouter);
+router.use('/lms',           lmsRouter);
 
 export { router as webRouter };
