@@ -129,7 +129,7 @@ const Appraisals: React.FC = () => {
   };
 
   const columns: TableProps<LoanApplication>['columns'] = [
-    { title: 'Application', dataIndex: 'appNumber', width: 165, render: (v: string) => <span style={{ fontWeight: 600, color: '#2563eb', fontSize: 12.5 }}>{v}</span> },
+    { title: 'Application', dataIndex: 'appNumber', width: 165, render: (v: string) => <span style={{ fontWeight: 600, color: '#4f46e5', fontSize: 12.5 }}>{v}</span> },
     {
       title: 'Customer',
       dataIndex: ['customer', 'name'],
@@ -202,7 +202,7 @@ const Appraisals: React.FC = () => {
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
         <Col xs={24} sm={12} xl={6}><KpiCard label="Gold — Pending" value={pendingGold} sub="awaiting appraisal" icon={<GoldOutlined />} tint="#b45309" /></Col>
         <Col xs={24} sm={12} xl={6}><KpiCard label="Property — Pending" value={pendingProp} sub="awaiting assessment" icon={<HomeOutlined />} tint="#6d4ea8" /></Col>
-        <Col xs={24} sm={12} xl={6}><KpiCard label="Gold Files" value={collateralApps.filter((a) => a.loanType === 'GOLD').length} sub="total gold applications" icon={<GoldOutlined />} tint="#2563eb" /></Col>
+        <Col xs={24} sm={12} xl={6}><KpiCard label="Gold Files" value={collateralApps.filter((a) => a.loanType === 'GOLD').length} sub="total gold applications" icon={<GoldOutlined />} tint="#4f46e5" /></Col>
         <Col xs={24} sm={12} xl={6}><KpiCard label="Property Files" value={collateralApps.filter((a) => a.loanType === 'HOUSING').length} sub="total housing applications" icon={<HomeOutlined />} tint="#0e7490" /></Col>
       </Row>
 

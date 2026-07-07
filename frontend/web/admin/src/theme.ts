@@ -12,11 +12,11 @@ export const BRAND = {
   product: 'Lending Operations Suite',
 
   // Brand / primary — bright royal blue (the floating-panel design language)
-  primary: '#2563eb',
-  primaryDark: '#1d57d6',
-  primaryDeep: '#1746a8',
-  primarySoft: '#eaf1fe', // selected / hover wash
-  accent: '#3b78f6', // lighter blue, used sparingly
+  primary: '#4f46e5',
+  primaryDark: '#4338ca',
+  primaryDeep: '#3730a3',
+  primarySoft: '#eef2ff', // selected / hover wash
+  accent: '#6366f1', // lighter blue, used sparingly
   violet: '#6d4ea8',
 
   // Navigation surface (light, hairline-defined)
@@ -29,7 +29,7 @@ export const BRAND = {
   success: '#1d7a46',
   warning: '#b26a00',
   error: '#c0392b',
-  info: '#2563eb',
+  info: '#4f46e5',
 
   // Text — cool near-black ink → muted slate
   textHead: '#10202f',
@@ -147,7 +147,7 @@ export const antdTheme: ThemeConfig = {
     Input: {
       controlHeight: 36,
       controlHeightLG: 44,
-      activeShadow: '0 0 0 3px rgba(37, 99, 235, 0.14)',
+      activeShadow: '0 0 0 3px rgba(79, 70, 229, 0.14)',
       paddingInline: 12,
       borderRadius: 8,
     },
@@ -177,7 +177,7 @@ export const antdTheme: ThemeConfig = {
 
 /** Loan-type series colors used across all charts — restrained, distinct */
 export const CHART_COLORS = {
-  CDL: '#2563eb',
+  CDL: '#4f46e5',
   GOLD: '#b26a00',
   HOUSING: '#6d4ea8',
   green: '#1d7a46',

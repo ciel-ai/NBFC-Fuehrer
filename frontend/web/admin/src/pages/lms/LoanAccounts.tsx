@@ -49,7 +49,7 @@ const LoanAccounts: React.FC = () => {
       title: 'Loan Number',
       dataIndex: 'loanNumber',
       width: 185,
-      render: (v: string) => <span style={{ fontWeight: 600, color: '#2563eb', fontSize: 12.5 }}>{v}</span>,
+      render: (v: string) => <span style={{ fontWeight: 600, color: '#4f46e5', fontSize: 12.5 }}>{v}</span>,
     },
     {
       title: 'Customer',
@@ -143,7 +143,7 @@ const LoanAccounts: React.FC = () => {
 
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
         <Col xs={24} sm={12} xl={6}><KpiCard label="Active Book" value={open.length} sub="open loan accounts" icon={<WalletOutlined />} tint="#7c3aed" /></Col>
-        <Col xs={24} sm={12} xl={6}><KpiCard label="Book Outstanding" value={inrCompact(bookSize)} sub="principal outstanding" icon={<FundOutlined />} tint="#2563eb" /></Col>
+        <Col xs={24} sm={12} xl={6}><KpiCard label="Book Outstanding" value={inrCompact(bookSize)} sub="principal outstanding" icon={<FundOutlined />} tint="#4f46e5" /></Col>
         <Col xs={24} sm={12} xl={6}><KpiCard label="Overdue Accounts" value={overdueCount} sub="DPD 1–90" icon={<WarningOutlined />} tint="#ea580c" /></Col>
         <Col xs={24} sm={12} xl={6}><KpiCard label="NPA Accounts" value={npaCount} sub="DPD 90+" icon={<CheckCircleOutlined />} tint="#dc2626" /></Col>
       </Row>

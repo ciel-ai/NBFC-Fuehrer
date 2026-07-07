@@ -2,7 +2,7 @@ import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { App as AntApp, Button, ConfigProvider, Empty, Result } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import { nbfcTheme } from './theme/nbfcTheme';
+import { antdTheme } from './theme';
 import './styles/nbfc-ui.css';
 import { useAuthStore } from './store/authStore';
 import { canAccess } from './auth/rbac';
@@ -63,7 +63,7 @@ const renderEmpty = (componentName?: string): React.ReactNode =>
     : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} />;
 
 const App: React.FC = () => (
-  <ConfigProvider theme={nbfcTheme} renderEmpty={renderEmpty}>
+  <ConfigProvider theme={antdTheme} renderEmpty={renderEmpty}>
     <AntApp>
       <ErrorBoundary>
         <BrowserRouter>

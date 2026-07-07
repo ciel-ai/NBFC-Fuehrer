@@ -37,7 +37,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
   render(): React.ReactNode {
     if (this.state.error) {
       return (
-        <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#E9EBEF' }}>
+        <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f7f8fa' }}>
           <Result
             status="500"
             title="Something went wrong"

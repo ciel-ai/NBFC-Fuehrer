@@ -223,7 +223,7 @@ const Settings: React.FC = () => {
       />
 
       <Drawer
-        title={<span><SettingOutlined style={{ marginRight: 8, color: '#2563eb' }} />Edit Product — {editingProduct?.product}</span>}
+        title={<span><SettingOutlined style={{ marginRight: 8, color: '#4f46e5' }} />Edit Product — {editingProduct?.product}</span>}
         width={460}
         open={!!editingProduct}
         onClose={() => setEditingProduct(null)}

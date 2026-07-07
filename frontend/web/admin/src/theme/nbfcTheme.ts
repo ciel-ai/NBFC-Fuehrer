@@ -2,13 +2,13 @@ import type { ThemeConfig } from 'antd';
 
 // ---- Design tokens: "Ice Blue" NBFC theme ----
 export const nbfcColors = {
-  page: '#E9EBEF',
+  page: '#f7f8fa',
   card: '#FFFFFF',
   ink: '#15181D',
   inkSoft: '#8A8F98',
-  accent: '#5AA9E6',
+  accent: '#6366f1',
   accentSoft: '#DCEEFB',
-  accentDeep: '#3C86C4',
+  accentDeep: '#4f46e5',
   darkPill: '#1B1D22',
   green: '#2FBE7A',
   greenSoft: '#DFF6EA',
@@ -44,7 +44,7 @@ export const nbfcTheme: ThemeConfig = {
     },
     Menu: {
       itemBorderRadius: 10,
-      itemSelectedBg: 'rgba(90,169,230,0.18)',
+      itemSelectedBg: 'rgba(99,102,241,0.18)',
       itemSelectedColor: '#FFFFFF',
       darkItemBg: 'transparent',
     },

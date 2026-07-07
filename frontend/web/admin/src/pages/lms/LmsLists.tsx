@@ -65,7 +65,7 @@ export const EmiSchedulePage: React.FC = () => {
   const collected = rows.filter((r) => r.status === 'PAID').reduce((s, r) => s + r.emi, 0);
 
   const cols: TableProps<DemandRow>['columns'] = [
-    { title: 'Loan Number', dataIndex: 'loanNumber', width: 185, render: (v: string) => <span style={{ fontWeight: 600, color: '#2563eb', fontSize: 12.5 }}>{v}</span> },
+    { title: 'Loan Number', dataIndex: 'loanNumber', width: 185, render: (v: string) => <span style={{ fontWeight: 600, color: '#4f46e5', fontSize: 12.5 }}>{v}</span> },
     { title: 'Customer', dataIndex: 'customerName', render: (v: string) => <span style={{ fontWeight: 600 }}>{v}</span> },
     { title: 'Type', dataIndex: 'loanType', width: 90, render: (t) => <LoanTypeTag type={t} /> },
     { title: 'EMI #', dataIndex: 'seq', width: 75, align: 'center' },
@@ -130,7 +130,7 @@ export const RepaymentsPage: React.FC = () => {
 
   const cols: TableProps<Repayment>['columns'] = [
     { title: 'Date', dataIndex: 'date', width: 170, render: (v: string) => <span style={{ fontSize: 12.5, color: '#475569' }}>{fmtDateTime(v)}</span>, sorter: (a, b) => dayjs(a.date).valueOf() - dayjs(b.date).valueOf(), defaultSortOrder: 'descend' },
-    { title: 'Loan Number', dataIndex: 'loanNumber', width: 185, render: (v: string) => <span style={{ fontWeight: 600, color: '#2563eb', fontSize: 12.5 }}>{v}</span> },
+    { title: 'Loan Number', dataIndex: 'loanNumber', width: 185, render: (v: string) => <span style={{ fontWeight: 600, color: '#4f46e5', fontSize: 12.5 }}>{v}</span> },
     { title: 'Customer', dataIndex: 'customerName', render: (v: string) => <span style={{ fontWeight: 600 }}>{v}</span> },
     { title: 'Type', dataIndex: 'loanType', width: 90, render: (t) => <LoanTypeTag type={t} /> },
     { title: 'Amount', dataIndex: 'amount', align: 'right', width: 120, render: (v: number) => <span className="tnum" style={{ fontWeight: 600 }}>{inr(v)}</span>, sorter: (a, b) => a.amount - b.amount },
@@ -197,7 +197,7 @@ export const ChargesPage: React.FC = () => {
 
   const cols: TableProps<LoanCharge>['columns'] = [
     { title: 'Date', dataIndex: 'date', width: 125, render: (v: string) => <span style={{ fontSize: 12.5, color: '#475569' }}>{fmtDate(v)}</span>, sorter: (a, b) => dayjs(a.date).valueOf() - dayjs(b.date).valueOf(), defaultSortOrder: 'descend' },
-    { title: 'Loan Number', dataIndex: 'loanNumber', width: 185, render: (v: string) => <span style={{ fontWeight: 600, color: '#2563eb', fontSize: 12.5 }}>{v}</span> },
+    { title: 'Loan Number', dataIndex: 'loanNumber', width: 185, render: (v: string) => <span style={{ fontWeight: 600, color: '#4f46e5', fontSize: 12.5 }}>{v}</span> },
     { title: 'Customer', dataIndex: 'customerName', render: (v: string) => <span style={{ fontWeight: 600 }}>{v}</span> },
     { title: 'Type', dataIndex: 'loanType', width: 90, render: (t) => <LoanTypeTag type={t} /> },
     { title: 'Charge', dataIndex: 'type', width: 170, render: (v: string) => <span style={{ fontSize: 12.5, fontWeight: 600 }}>{v.replace(/_/g, ' ')}</span> },
@@ -297,7 +297,7 @@ export const DocumentsPage: React.FC = () => {
   const cols: TableProps<DocRow>['columns'] = [
     { title: 'Document', dataIndex: 'name', render: (v: string, r) => <div><div style={{ fontWeight: 600, fontSize: 12.5 }}>{v}</div><div style={{ fontSize: 11, color: '#94a3b8' }}>{r.fileName} · {(r.sizeKB / 1024).toFixed(1)} MB</div></div> },
     { title: 'Category', dataIndex: 'category', width: 110, render: (v: string) => <Tag style={{ borderRadius: 6, fontSize: 11 }}>{v}</Tag> },
-    { title: 'Loan Account', dataIndex: 'loanNumber', width: 185, render: (v?: string) => <span style={{ fontWeight: 600, color: '#2563eb', fontSize: 12.5 }}>{v}</span> },
+    { title: 'Loan Account', dataIndex: 'loanNumber', width: 185, render: (v?: string) => <span style={{ fontWeight: 600, color: '#4f46e5', fontSize: 12.5 }}>{v}</span> },
     { title: 'Customer', dataIndex: 'customerName', width: 170, render: (v: string) => <span style={{ fontWeight: 600 }}>{v}</span> },
     { title: 'Type', dataIndex: 'loanType', width: 90, render: (t) => <LoanTypeTag type={t} /> },
     { title: 'Uploaded', dataIndex: 'uploadedAt', width: 120, render: (v: string) => <span style={{ fontSize: 12.5, color: '#64748b' }}>{fmtDate(v)}</span> },

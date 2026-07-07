@@ -51,7 +51,7 @@ const FinanceQueue: React.FC = () => {
       dataIndex: 'appNumber',
       render: (v: string, r) => (
         <div>
-          <div style={{ fontWeight: 600, color: '#2563eb', fontSize: 12.5 }}>{v}</div>
+          <div style={{ fontWeight: 600, color: '#4f46e5', fontSize: 12.5 }}>{v}</div>
           <div style={{ fontWeight: 600, color: '#1e293b', marginTop: 2 }}>{r.customer.name}</div>
         </div>
       ),

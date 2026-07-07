@@ -179,7 +179,7 @@ const AgentManagement: React.FC = () => {
 
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
         <Col xs={24} sm={12} xl={6}><KpiCard label="Active Agents" value={activeCount} sub={`${agentList.length} total`} icon={<TeamOutlined />} tint="#0e7490" /></Col>
-        <Col xs={24} sm={12} xl={6}><KpiCard label="Disbursed via Agents" value={inrCompact(totalDisbursed)} sub="lifetime" icon={<DollarOutlined />} tint="#2563eb" /></Col>
+        <Col xs={24} sm={12} xl={6}><KpiCard label="Disbursed via Agents" value={inrCompact(totalDisbursed)} sub="lifetime" icon={<DollarOutlined />} tint="#4f46e5" /></Col>
         <Col xs={24} sm={12} xl={6}><KpiCard label="Commission Paid" value={inrCompact(commissionPaid)} sub="to date" icon={<DollarOutlined />} tint="#047857" /></Col>
         <Col xs={24} sm={12} xl={6}><KpiCard label="Commission Pending" value={inrCompact(commissionPending)} sub="accrued, unpaid" icon={<DollarOutlined />} tint="#d97706" /></Col>
       </Row>

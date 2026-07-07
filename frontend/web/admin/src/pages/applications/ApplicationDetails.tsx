@@ -74,7 +74,7 @@ const ApplicationDetails: React.FC = () => {
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
           <div style={{ display: 'flex', gap: 16, alignItems: 'center', minWidth: 0 }}>
             <Button shape="circle" icon={<ArrowLeftOutlined />} onClick={() => navigate(-1)} />
-            <Avatar size={52} style={{ background: '#2563eb', fontWeight: 600, fontSize: 17, minWidth: 52 }}>
+            <Avatar size={52} style={{ background: '#4f46e5', fontWeight: 600, fontSize: 17, minWidth: 52 }}>
               {initials(app.customer.name)}
             </Avatar>
             <div style={{ minWidth: 0 }}>
@@ -85,7 +85,7 @@ const ApplicationDetails: React.FC = () => {
                 {app.creditDecision && <RiskGradeTag grade={app.creditDecision.riskGrade} />}
               </div>
               <div style={{ display: 'flex', gap: 16, marginTop: 6, fontSize: 12.5, color: '#7c8aa3', flexWrap: 'wrap' }}>
-                <span style={{ fontWeight: 600, color: '#2563eb' }}>{app.appNumber}</span>
+                <span style={{ fontWeight: 600, color: '#4f46e5' }}>{app.appNumber}</span>
                 <span>+91 {app.customer.mobile}</span>
                 <span>{app.branch}</span>
                 <span>Updated {fmtTimeAgo(app.updatedAt)}</span>

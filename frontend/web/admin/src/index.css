@@ -7,20 +7,20 @@
    ==========================================================================*/
 
 :root {
-  /* Ice Blue theme */
-  --brand: #3c86c4;
-  --brand-dark: #3178b3;
-  --brand-deep: #2b6698;
-  --brand-soft: #dceefb;
-  --accent: #5aa9e6;
-  --page-bg: #e9ebef;
-  --ink: #15181d;
-  --body: #4a5663;
-  --muted: #8a8f98;
+  /* Indigo minimal theme — modern fintech */
+  --brand: #4f46e5;
+  --brand-dark: #4338ca;
+  --brand-deep: #3730a3;
+  --brand-soft: #eef2ff;
+  --accent: #6366f1;
+  --page-bg: #f7f8fa;
+  --ink: #111827;
+  --body: #4b5563;
+  --muted: #9ca3af;
   --line: #e4e8ee;
   --line-soft: #eef1f5;
   --sider-w: 248px;
-  --nbfc-page: #e9ebef;
+  --nbfc-page: #f7f8fa;
 }
 
 * {
@@ -36,7 +36,7 @@ body,
 }
 
 body {
-  font-family: 'Manrope', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+  font-family: 'Inter', 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
     'Helvetica Neue', Arial, sans-serif;
   background: var(--page-bg);
   color: var(--ink);
@@ -97,8 +97,8 @@ body {
 
 /* full-height deep-navy sidebar (Ice Blue) */
 .app-sider {
-  background: linear-gradient(180deg, #0b1e39 0%, #0f2a4d 100%) !important;
-  border-right: none;
+  background: #ffffff !important;
+  border-right: 1px solid var(--line);
   position: relative;
 }
 .app-sider::after {
@@ -108,9 +108,7 @@ body {
   right: 0;
   bottom: 0;
   height: 240px;
-  background:
-    radial-gradient(130% 70% at 16% 100%, rgba(255, 255, 255, 0.1), transparent 62%),
-    radial-gradient(90% 50% at 100% 100%, rgba(255, 255, 255, 0.06), transparent 60%);
+  background: none;
   pointer-events: none;
 }
 
@@ -136,9 +134,9 @@ body {
   justify-content: center;
   font-weight: 800;
   font-size: 18px;
-  color: #3c86c4;
-  background: #ffffff;
-  box-shadow: 0 4px 12px rgba(8, 28, 70, 0.22);
+  color: #ffffff;
+  background: var(--brand);
+  box-shadow: 0 4px 10px rgba(79, 70, 229, 0.28);
   letter-spacing: 0.5px;
 }
 
@@ -153,18 +151,18 @@ body {
   height: 46px !important;
   border: none !important;
   border-radius: 12px !important;
-  background: #ffffff !important;
-  color: #3c86c4 !important;
+  background: var(--brand) !important;
+  color: #ffffff !important;
   font-weight: 700 !important;
   font-size: 14px !important;
-  box-shadow: 0 6px 16px rgba(8, 28, 70, 0.18) !important;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25) !important;
   transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease !important;
 }
 .new-app-btn:hover {
-  background: #eef6fd !important;
-  color: #2b6698 !important;
+  background: var(--brand-dark) !important;
+  color: #ffffff !important;
   transform: translateY(-1px);
-  box-shadow: 0 10px 22px rgba(8, 28, 70, 0.24) !important;
+  box-shadow: 0 8px 18px rgba(79, 70, 229, 0.3) !important;
 }
 
 /* white-on-blue menu — colours come from a scoped ConfigProvider; tweaks here */
@@ -176,7 +174,7 @@ body {
   display: none;
 }
 .app-sider .ant-menu-submenu-arrow {
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--muted);
 }
 .app-sider .ant-menu-item,
 .app-sider .ant-menu-submenu-title {
@@ -191,18 +189,18 @@ body {
   font-weight: 700;
   letter-spacing: 1.1px;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--muted);
 }
 .sider-foot {
   position: relative;
   z-index: 1;
   margin-top: auto;
   padding: 14px 20px 18px;
-  border-top: 1px solid rgba(255, 255, 255, 0.14);
-  color: rgba(255, 255, 255, 0.72);
+  border-top: 1px solid var(--line-soft);
+  color: var(--body);
 }
 .sider-link {
-  color: #fff;
+  color: var(--brand);
   font-weight: 600;
   font-size: 12.5px;
   cursor: pointer;
@@ -249,12 +247,12 @@ body {
 }
 .qa-card--primary {
   border: none;
-  background: linear-gradient(140deg, #2f6df0, #2563eb);
+  background: linear-gradient(140deg, #2f6df0, #4f46e5);
   color: #fff;
-  box-shadow: 0 12px 26px rgba(37, 99, 235, 0.32);
+  box-shadow: 0 12px 26px rgba(79, 70, 229, 0.32);
 }
 .qa-card--primary:hover {
-  box-shadow: 0 16px 32px rgba(37, 99, 235, 0.4);
+  box-shadow: 0 16px 32px rgba(79, 70, 229, 0.4);
 }
 
 /* ─────────────────────────── cards & hover ─────────────────────────── */
@@ -315,7 +313,7 @@ body {
   height: 20px;
   padding: 0 7px;
   border-radius: 6px;
-  background: #5aa9e6;
+  background: #6366f1;
   color: #fff;
   font-size: 12px;
   font-weight: 700;
@@ -593,7 +591,7 @@ body {
   align-items: center;
   justify-content: center;
   margin: 0 auto;
-  background: linear-gradient(160deg, #5aa9e6 0%, #3c86c4 100%);
+  background: linear-gradient(160deg, #6366f1 0%, #4f46e5 100%);
   color: #fff;
   font-weight: 800;
   font-size: 20px;
@@ -626,11 +624,11 @@ body {
   transition: background 0.15s ease, color 0.15s ease;
 }
 .seg-item:hover {
-  color: #3c86c4;
+  color: #4f46e5;
 }
 .seg-item.active {
   background: #dceefb;
-  color: #3c86c4;
+  color: #4f46e5;
 }
 
 /* footer trust */

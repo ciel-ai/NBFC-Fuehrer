@@ -224,7 +224,7 @@ const UserManagement: React.FC = () => {
       />
 
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-        <Col xs={24} sm={12} xl={6}><KpiCard label="Total Users" value={users.length} sub={`${active} active · ${users.length - active} deactivated`} icon={<TeamOutlined />} tint="#2563eb" /></Col>
+        <Col xs={24} sm={12} xl={6}><KpiCard label="Total Users" value={users.length} sub={`${active} active · ${users.length - active} deactivated`} icon={<TeamOutlined />} tint="#4f46e5" /></Col>
         <Col xs={24} sm={12} xl={6}><KpiCard label="Sales Team" value={salesCount} sub="mobile app field agents" icon={<UserSwitchOutlined />} tint="#0e7490" /></Col>
         <Col xs={24} sm={12} xl={6}><KpiCard label="Credit Team" value={creditCount} sub="underwriters across products" icon={<SafetyCertificateOutlined />} tint="#d97706" /></Col>
         <Col xs={24} sm={12} xl={6}><KpiCard label="Finance Team" value={financeCount} sub="disbursement officers" icon={<BankOutlined />} tint="#047857" /></Col>
@@ -263,7 +263,7 @@ const UserManagement: React.FC = () => {
       <Drawer
         title={
           <span>
-            <UserAddOutlined style={{ marginRight: 8, color: '#2563eb' }} />
+            <UserAddOutlined style={{ marginRight: 8, color: '#4f46e5' }} />
             {editing ? `Edit User — ${editing.name}` : 'Create User'}
           </span>
         }

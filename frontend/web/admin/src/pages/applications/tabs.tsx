@@ -68,7 +68,7 @@ export const OverviewTab: React.FC<{ app: LoanApplication }> = ({ app }) => {
               <InfoItem label="Net Disbursed" value={<span className="tnum" style={{ fontWeight: 700, color: '#0f766e' }}>{inr(app.finance.disbursement.amount)}</span>} />
               <InfoItem label="Mode / UTR" value={`${app.finance.disbursement.mode} · ${app.finance.disbursement.utr}`} />
               <InfoItem label="Date" value={fmtDateTime(app.finance.disbursement.date)} />
-              <InfoItem label="Loan Account" value={<span style={{ fontWeight: 600, color: '#2563eb' }}>{app.loanNumber}</span>} />
+              <InfoItem label="Loan Account" value={<span style={{ fontWeight: 600, color: '#4f46e5' }}>{app.loanNumber}</span>} />
               <InfoItem label="Processed By" value={app.finance.disbursement.processedBy} />
             </InfoGrid>
           </Card>
@@ -124,7 +124,7 @@ export const CustomerTab: React.FC<{ app: LoanApplication }> = ({ app }) => {
           <InfoGrid cols={2}>
             <InfoItem label="Mobile" value={<span><PhoneOutlined style={{ color: '#16a34a', marginRight: 6 }} />+91 {c.mobile}</span>} />
             <InfoItem label="Alternate Mobile" value={c.altMobile ? `+91 ${c.altMobile}` : '—'} />
-            <InfoItem label="Email" value={<span><MailOutlined style={{ color: '#2563eb', marginRight: 6 }} />{c.email}</span>} span={2} />
+            <InfoItem label="Email" value={<span><MailOutlined style={{ color: '#4f46e5', marginRight: 6 }} />{c.email}</span>} span={2} />
           </InfoGrid>
         </Card>
         <Card variant="borderless" style={{ ...panel, marginTop: 16 }} styles={panelBody}>
@@ -240,7 +240,7 @@ export const DocumentsTab: React.FC<{ app: LoanApplication }> = ({ app }) => {
               <Col xs={24} sm={12} lg={8} xl={6} key={d.id}>
                 <Card variant="borderless" style={panel} styles={{ body: { padding: 16 } }}>
                   <div style={{ display: 'flex', gap: 12 }}>
-                    <div style={{ width: 40, height: 40, minWidth: 40, borderRadius: 10, background: d.fileName.endsWith('.pdf') ? '#fef2f2' : '#e8f3fa', color: d.fileName.endsWith('.pdf') ? '#dc2626' : '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17 }}>
+                    <div style={{ width: 40, height: 40, minWidth: 40, borderRadius: 10, background: d.fileName.endsWith('.pdf') ? '#fef2f2' : '#e8f3fa', color: d.fileName.endsWith('.pdf') ? '#dc2626' : '#4f46e5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17 }}>
                       {d.fileName.endsWith('.pdf') ? <FilePdfOutlined /> : <FileImageOutlined />}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -262,7 +262,7 @@ export const DocumentsTab: React.FC<{ app: LoanApplication }> = ({ app }) => {
 
       <Modal open={!!preview} onCancel={() => setPreview(null)} footer={null} width={560} title={preview?.name}>
         <div style={{ height: 380, borderRadius: 12, background: 'repeating-linear-gradient(45deg, #f6f8fc, #f6f8fc 12px, #eef2f9 12px, #eef2f9 24px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, border: '1px dashed #cdd7e8' }}>
-          {preview?.fileName.endsWith('.pdf') ? <FilePdfOutlined style={{ fontSize: 46, color: '#dc2626' }} /> : <FileImageOutlined style={{ fontSize: 46, color: '#2563eb' }} />}
+          {preview?.fileName.endsWith('.pdf') ? <FilePdfOutlined style={{ fontSize: 46, color: '#dc2626' }} /> : <FileImageOutlined style={{ fontSize: 46, color: '#4f46e5' }} />}
           <div style={{ fontWeight: 600, color: '#475569' }}>{preview?.fileName}</div>
           <div style={{ fontSize: 12, color: '#94a3b8' }}>Secure document preview · fetched from encrypted DMS store</div>
           {preview && <StatusTag status={preview.status} size="md" />}

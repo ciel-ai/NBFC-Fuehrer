@@ -109,7 +109,7 @@ const LoanDetails: React.FC = () => {
                 {!live && <Tag style={{ borderRadius: 999, fontSize: 10.5, color: '#92700c', background: '#fdf6e3', borderColor: '#f0e0b0' }}>SAMPLE DATA</Tag>}
               </div>
               <div style={{ display: 'flex', gap: 16, marginTop: 6, fontSize: 12.5, color: '#7c8aa3', flexWrap: 'wrap' }}>
-                <span style={{ fontWeight: 600, color: '#2563eb' }}>{loan.loanNumber}</span>
+                <span style={{ fontWeight: 600, color: '#4f46e5' }}>{loan.loanNumber}</span>
                 <span>+91 {loan.mobile}</span>
                 <span>{loan.branch}</span>
                 {app && (

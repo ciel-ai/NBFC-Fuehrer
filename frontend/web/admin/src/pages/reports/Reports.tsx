@@ -352,7 +352,7 @@ const Reports: React.FC = () => {
                   size="small"
                   pagination={false}
                   columns={[
-                    { title: 'Application', dataIndex: 'appNumber', render: (v: string) => <span style={{ fontWeight: 600, color: '#2563eb', fontSize: 12.5 }}>{v}</span> },
+                    { title: 'Application', dataIndex: 'appNumber', render: (v: string) => <span style={{ fontWeight: 600, color: '#4f46e5', fontSize: 12.5 }}>{v}</span> },
                     { title: 'Customer', render: (_: unknown, r: any) => r.customer.name },
                     { title: 'Net Disbursed', align: 'right' as const, render: (_: unknown, r: any) => <span className="tnum" style={{ fontWeight: 600 }}>{inr(r.finance.disbursement.amount)}</span> },
                     { title: 'Mode', render: (_: unknown, r: any) => r.finance.disbursement.mode },

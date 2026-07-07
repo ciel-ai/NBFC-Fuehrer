@@ -18,13 +18,13 @@ const TABS: { label: string; value: Portal; icon: React.ReactNode }[] = [
 ];
 
 /** Vivid royal-blue used only on the login surface (app chrome stays institutional navy). */
-const LOGIN_BLUE = '#2563eb';
+const LOGIN_BLUE = '#4f46e5';
 
 const loginTheme = {
   token: {
     colorPrimary: LOGIN_BLUE,
     colorLink: LOGIN_BLUE,
-    colorLinkHover: '#1d57d6',
+    colorLinkHover: '#4338ca',
     borderRadius: 9,
     controlHeight: 38,
     controlHeightLG: 40,
