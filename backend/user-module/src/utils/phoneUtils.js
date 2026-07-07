@@ -3,9 +3,6 @@ const AppError = require('./appError');
 const sanitizePhoneInput = (value) => String(value || '').replace(/\D/g, '');
 
 const normalizePhone = (value) => {
-<<<<<<< HEAD
-  const phone = sanitizePhoneInput(value);
-=======
   let phone = sanitizePhoneInput(value);
 
   // Strip Indian country code / trunk prefix so we settle on the 10-digit
@@ -15,7 +12,6 @@ const normalizePhone = (value) => {
   } else if (phone.length === 11 && phone.startsWith('0')) {
     phone = phone.slice(1);
   }
->>>>>>> origin/main
 
   if (phone.length < 10 || phone.length > 15) {
     throw new AppError('Phone number must be between 10 and 15 digits.', 400);

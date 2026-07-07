@@ -11,12 +11,9 @@ export const LOAN_STATUS = {
     KYC_PENDING: 'KYC_PENDING',
     KYC_REJECTED: 'KYC_REJECTED',
     UNDERWRITING: 'UNDERWRITING',
-<<<<<<< HEAD
     APPOINTMENT_BOOKED: 'APPOINTMENT_BOOKED',
     APPRAISAL_PENDING: 'APPRAISAL_PENDING',
     PROPERTY_ASSESSMENT: 'PROPERTY_ASSESSMENT',
-=======
->>>>>>> origin/main
     PENDING_APPROVAL: 'PENDING_APPROVAL',
     APPROVED: 'APPROVED',
     REJECTED: 'REJECTED',
@@ -34,18 +31,12 @@ export type LoanStatus = (typeof LOAN_STATUS)[keyof typeof LOAN_STATUS];
 // Key = current state, Value = array of allowed next states
 export const LOAN_TRANSITIONS: Record<LoanStatus, LoanStatus[]> = {
     [LOAN_STATUS.DRAFT]: [LOAN_STATUS.KYC_PENDING],
-<<<<<<< HEAD
     [LOAN_STATUS.KYC_PENDING]: [LOAN_STATUS.UNDERWRITING, LOAN_STATUS.APPOINTMENT_BOOKED, LOAN_STATUS.KYC_REJECTED],
     [LOAN_STATUS.KYC_REJECTED]: [],
     [LOAN_STATUS.UNDERWRITING]: [LOAN_STATUS.PENDING_APPROVAL, LOAN_STATUS.PROPERTY_ASSESSMENT, LOAN_STATUS.REJECTED],
     [LOAN_STATUS.PROPERTY_ASSESSMENT]: [LOAN_STATUS.PENDING_APPROVAL, LOAN_STATUS.REJECTED],
     [LOAN_STATUS.APPOINTMENT_BOOKED]: [LOAN_STATUS.APPRAISAL_PENDING, LOAN_STATUS.REJECTED],
     [LOAN_STATUS.APPRAISAL_PENDING]: [LOAN_STATUS.PENDING_APPROVAL, LOAN_STATUS.REJECTED],
-=======
-    [LOAN_STATUS.KYC_PENDING]: [LOAN_STATUS.UNDERWRITING, LOAN_STATUS.KYC_REJECTED],
-    [LOAN_STATUS.KYC_REJECTED]: [],
-    [LOAN_STATUS.UNDERWRITING]: [LOAN_STATUS.PENDING_APPROVAL, LOAN_STATUS.REJECTED],
->>>>>>> origin/main
     [LOAN_STATUS.PENDING_APPROVAL]: [LOAN_STATUS.APPROVED, LOAN_STATUS.REJECTED],
     [LOAN_STATUS.APPROVED]: [LOAN_STATUS.ESIGN_PENDING, LOAN_STATUS.REJECTED],
     [LOAN_STATUS.REJECTED]: [],
@@ -132,7 +123,6 @@ export type PaymentChannel = (typeof PAYMENT_CHANNEL)[keyof typeof PAYMENT_CHANN
 // ─── Roles ────────────────────────────────────────────────────────────────────
 
 export const ROLE = {
-<<<<<<< HEAD
     // Mobile app users (kept for compatibility)
     CUSTOMER: 'CUSTOMER',
     AGENT: 'AGENT',
@@ -155,15 +145,6 @@ export const ROLE = {
     FINANCE: 'FINANCE',
     OPS_EXECUTIVE: 'OPS_EXECUTIVE',
     COLLECTION_AGENT: 'COLLECTION_AGENT',
-=======
-    CUSTOMER: 'CUSTOMER',
-    AGENT: 'AGENT',
-    OPS_EXECUTIVE: 'OPS_EXECUTIVE',
-    CREDIT_MANAGER: 'CREDIT_MANAGER',
-    COLLECTION_AGENT: 'COLLECTION_AGENT',
-    FINANCE: 'FINANCE',
-    SUPER_ADMIN: 'SUPER_ADMIN',
->>>>>>> origin/main
 } as const;
 
 export type Role = (typeof ROLE)[keyof typeof ROLE];
@@ -196,11 +177,8 @@ export const PRODUCT_TYPE = {
     CONSUMER_DURABLE: 'CONSUMER_DURABLE',
     TWO_WHEELER: 'TWO_WHEELER',
     EDUCATION_DEVICE: 'EDUCATION_DEVICE',
-<<<<<<< HEAD
     GOLD_LOAN: 'GOLD_LOAN',
     HOUSING_LOAN: 'HOUSING_LOAN',
-=======
->>>>>>> origin/main
 } as const;
 
 export type ProductType = (typeof PRODUCT_TYPE)[keyof typeof PRODUCT_TYPE];
@@ -313,9 +291,5 @@ export const CRON_SCHEDULE = {
     DEBIT_RETRY: '0 11 * * *',   // Daily 11:00 AM IST (after bounce window)
     NPA_WATCH: '0 1 * * *',    // Daily 1:00 AM IST (low traffic window)
     SETTLEMENT: '0 22 * * *',   // Daily 10:00 PM IST
-<<<<<<< HEAD
 } as const;
 
-=======
-} as const;
->>>>>>> origin/main

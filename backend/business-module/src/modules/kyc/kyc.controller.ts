@@ -64,23 +64,14 @@ export const kycController = {
     // POST /kyc/aadhaar/otp-verify
     async verifyAadhaarOtp(req: AuthRequest, res: Response, next: NextFunction) {
         try {
-<<<<<<< HEAD
            const input: AadhaarOtpVerifyInput = {
     userId: req.user.id,
 };
-=======
-            const body = getValidatedBody<{ otp: string; shareCode: string }>(req);
-            const input: AadhaarOtpVerifyInput = {
-                userId: req.user.id,
-                ...body,
-            };
->>>>>>> origin/main
             const result = await kycService.verifyAadhaarOtp(input, req);
             res.status(HTTP.OK).json(successResponse(result, 'Aadhaar verified'));
         } catch (err) { next(err); }
     },
 
-<<<<<<< HEAD
     // POST /kyc/verify-pan
 async verifyPan(req: AuthRequest, res: Response, next: NextFunction) {
     try {
@@ -135,8 +126,6 @@ async verifyGST(req: AuthRequest, res: Response, next: NextFunction) {
     } catch (err) { next(err); }
 },
 
-=======
->>>>>>> origin/main
     // POST /kyc/documents/upload  (multipart — multer runs before this)
     async uploadDocument(req: AuthRequest, res: Response, next: NextFunction) {
         try {

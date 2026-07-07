@@ -155,15 +155,9 @@ export default function ApplicationSubmittedScreen() {
         <Animated.View style={[styles.timeline, cardStyle]}>
           {[
             { icon: 'checkmark-circle' as const, text: 'Application submitted', done: true },
-<<<<<<< HEAD
-            { icon: 'search' as const, text: 'Document verification', done: false },
-            { icon: 'shield-checkmark' as const, text: 'Credit assessment', done: false },
-            { icon: 'thumbs-up' as const, text: 'Approval & disbursement', done: false },
-=======
             { icon: 'shield-checkmark' as const, text: 'Credit team review', done: false },
             { icon: 'cash' as const, text: 'Finance & disbursal', done: false },
             { icon: 'thumbs-up' as const, text: 'Loan active — EMI begins', done: false },
->>>>>>> origin/main
           ].map((step, i) => (
             <View key={i} style={styles.timelineRow}>
               <View style={[styles.timelineIcon, step.done && styles.timelineIconDone]}>

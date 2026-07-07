@@ -54,29 +54,9 @@ export const aadhaarOtpRequestSchema = Joi.object({
 
 // ─── Aadhaar OTP verify ────────────────────────────────────────────────────────
 
-<<<<<<< HEAD
 // Perfios Aadhaar Number Verification does not require OTP or shareCode.
 // The accessKey from consent step is stored in Redis and used automatically.
 export const aadhaarOtpVerifySchema = Joi.object({});
-=======
-export const aadhaarOtpVerifySchema = Joi.object({
-    otp: Joi.string()
-        .length(6)
-        .pattern(/^\d{6}$/)
-        .required()
-        .messages({
-            'string.pattern.base': 'OTP must be exactly 6 digits',
-        }),
-
-    shareCode: Joi.string()
-        .length(4)
-        .pattern(/^\d{4}$/)
-        .required()
-        .messages({
-            'string.pattern.base': 'Share code must be exactly 4 digits',
-        }),
-});
->>>>>>> origin/main
 
 // ─── Document upload ───────────────────────────────────────────────────────────
 
@@ -114,7 +94,6 @@ export const manualOverrideSchema = Joi.object({
 export const userIdParamSchema = Joi.object({
     userId: Joi.string().uuid({ version: 'uuidv4' }).required(),
 });
-<<<<<<< HEAD
 
 export const panVerifySchema = Joi.object({
     fullName: Joi.string().trim().min(2).max(100).required(),
@@ -145,5 +124,3 @@ export const silentBankVerifySchema = Joi.object({
 export const gstVerifySchema = Joi.object({
     gstin: Joi.string().length(15).required(),
 });
-=======
->>>>>>> origin/main

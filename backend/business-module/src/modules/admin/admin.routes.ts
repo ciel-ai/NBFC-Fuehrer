@@ -24,7 +24,6 @@ const router = Router();
 // All admin routes require SUPER_ADMIN
 const SUPER_ADMIN_ONLY = [ROLE.SUPER_ADMIN];
 
-<<<<<<< HEAD
 // ─── Admin auth ───────────────────────────────────────────────────────────────
 
 router.post(
@@ -42,8 +41,6 @@ router.get(
     adminController.me,
 );
 
-=======
->>>>>>> origin/main
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 router.get(
     '/dashboard',
@@ -129,7 +126,6 @@ router.post(
     adminController.setMaintenance,
 );
 
-<<<<<<< HEAD
 router.get('/branches', requireAuth(), allowRoles(...SUPER_ADMIN_ONLY), adminController.listBranches);
 router.post('/branches', requireAuth(), allowRoles(...SUPER_ADMIN_ONLY), validateBody(Joi.object({ name: Joi.string().required(), address: Joi.string().required(), city: Joi.string().required(), state: Joi.string().required(), pincode: Joi.string().required(), phone: Joi.string().optional() })), adminController.createBranch);
 router.patch('/branches/:branchId', requireAuth(), allowRoles(...SUPER_ADMIN_ONLY), adminController.updateBranch);
@@ -138,6 +134,4 @@ router.get('/loans/:loanId', requireAuth(), allowRoles(...SUPER_ADMIN_ONLY), adm
 router.get('/loans', requireAuth(), allowRoles(...SUPER_ADMIN_ONLY), adminController.listAllLoans);
 router.get('/loans/:loanId', requireAuth(), allowRoles(...SUPER_ADMIN_ONLY), adminController.getLoanDetail);
 
-=======
->>>>>>> origin/main
 export { router as adminRouter };

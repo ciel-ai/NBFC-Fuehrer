@@ -9,10 +9,7 @@ import { loansService } from '@/modules/loans';
 import { underwritingRepository } from '@/modules/underwriting';
 import { emiService } from '@/modules/emi';
 import { getPaymentProvider } from '@/providers';
-<<<<<<< HEAD
 import { generateLoanAccountNumber } from '@/utils/referenceNumber.util';
-=======
->>>>>>> origin/main
 import {
     getRedisClient,
     RedisKeys,
@@ -432,11 +429,7 @@ export const disbursementService = {
 
         await prisma.$transaction(async (tx) => {
             // 1. Create loan account
-<<<<<<< HEAD
             const accountNumber = await generateLoanAccountNumber();
-=======
-            const accountNumber = await generateAccountNumber();
->>>>>>> origin/main
 
             const accountRow = await tx.loan_accounts.create({
                 data: {
@@ -633,20 +626,7 @@ const CHECKLIST_MESSAGES: Record<keyof DisbursementChecklist, string> = {
 
 // ─── Account number generator ──────────────────────────────────────────────────
 
-<<<<<<< HEAD
 
-=======
-async function generateAccountNumber(): Promise<string> {
-    const year = new Date().getFullYear();
-    const result = await prisma.$queryRaw<[{ count: bigint }]>`
-    SELECT COUNT(*)::bigint AS count
-    FROM loan_accounts
-    WHERE EXTRACT(YEAR FROM created_at) = ${year}
-  `;
-    const seq = Number(result[0]!.count) + 1;
-    return `FHR-${year}-${String(seq).padStart(6, '0')}`;
-}
->>>>>>> origin/main
 
 // ─── Lazy prisma import to avoid circular dep ──────────────────────────────────
 import { prisma } from '@/config/database';

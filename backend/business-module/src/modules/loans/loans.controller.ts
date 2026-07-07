@@ -132,8 +132,6 @@ export const loansController = {
         } catch (err) { next(err); }
     },
 
-<<<<<<< HEAD
-=======
     // GET /loans/accounts — staff loan book (LMS portal)
     async listAccounts(req: AuthRequest, res: Response, next: NextFunction) {
         try {
@@ -148,7 +146,6 @@ export const loansController = {
         } catch (err) { next(err); }
     },
 
->>>>>>> origin/main
     // GET /loans/accounts/:id
     async getAccount(req: AuthRequest, res: Response, next: NextFunction) {
         try {

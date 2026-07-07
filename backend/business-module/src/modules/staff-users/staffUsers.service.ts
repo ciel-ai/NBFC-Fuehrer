@@ -160,7 +160,7 @@ export async function createUser(
             branch_id: input.branchId ?? null,
             username,
             password_hash: passwordHash,
-            must_reset_pwd: mustReset,
+            must_change_password: mustReset,
             created_by: actor.id,
         } as Prisma.admin_usersUncheckedCreateInput,
         include: { branch: true },
@@ -251,7 +251,7 @@ export async function resetPassword(
         where: { id },
         data: {
             password_hash: await bcrypt.hash(tempPassword, 10),
-            must_reset_pwd: true,
+            must_change_password: true,
             username: u.username ?? u.email,
         },
     });
@@ -271,6 +271,6 @@ export async function listBranches(): Promise<
         name: b.name,
         city: b.city,
         state: b.state,
-        isActive: b.is_active,
+        isActive: b.is_active ?? true,
     }));
 }

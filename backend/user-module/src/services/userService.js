@@ -1,24 +1,15 @@
 const prisma = require('../config/prismaClient');
 const otpService = require('./otpService');
 const AppError = require('../utils/appError');
-<<<<<<< HEAD
-const { generateToken } = require('../utils/jwtUtils');
-=======
 const {
   generateAccessToken,
   generateRefreshToken,
   verifyRefreshToken,
 } = require('../utils/jwtUtils');
->>>>>>> origin/main
 const logger = require('../utils/logger');
 const { normalizePhone } = require('../utils/phoneUtils');
 const { buildUserResponse } = require('../utils/userPresenter');
 const { hashToken } = require('../utils/tokenUtils');
-<<<<<<< HEAD
-
-const registerUser = async (phone, role = 'CUSTOMER') => {
-    const normalizedPhone = normalizePhone(phone);  const existingUser = await prisma.user.findUnique({
-=======
 const { toClientRole, isSalesRole, roleToProduct } = require('../utils/roleUtils');
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
@@ -46,7 +37,6 @@ const persistRefreshToken = (userId, refreshToken) =>
 const registerUser = async (phone, role = 'CUSTOMER') => {
   const normalizedPhone = normalizePhone(phone);
   const existingUser = await prisma.user.findUnique({
->>>>>>> origin/main
     where: {
       phone: normalizedPhone,
     },
@@ -58,17 +48,10 @@ const registerUser = async (phone, role = 'CUSTOMER') => {
 
   const user = await prisma.user.create({
     data: {
-<<<<<<< HEAD
-        phone: normalizedPhone,
-        role,
-    },
-});
-=======
       phone: normalizedPhone,
       role,
     },
   });
->>>>>>> origin/main
   logger.info({
     message: 'User registered successfully.',
     userId: user.id,
@@ -82,24 +65,6 @@ const registerUser = async (phone, role = 'CUSTOMER') => {
 
 const sendOtp = async (phone) => {
   const normalizedPhone = normalizePhone(phone);
-<<<<<<< HEAD
-  const user = await prisma.user.findUnique({
-    where: {
-      phone: normalizedPhone,
-    },
-  });
-
-  if (!user) {
-    throw new AppError('User not found. Please register first.', 404);
-  }
-
-  const otpPayload = await otpService.issueOtp(normalizedPhone);
-
-  return {
-    phone: normalizedPhone,
-    expiresAt: otpPayload.expiresAt,
-    otp: otpPayload.otp,
-=======
 
   // Auto-create a customer if this phone is unknown — customers self-register
   // through this flow. Sales agents are pre-seeded and simply match here.
@@ -122,27 +87,11 @@ const sendOtp = async (phone) => {
   return {
     phone: normalizedPhone,
     expiresIn: OTP_EXPIRES_IN_SECONDS,
->>>>>>> origin/main
   };
 };
 
 const verifyOtp = async (phone, otp) => {
   const normalizedPhone = normalizePhone(phone);
-<<<<<<< HEAD
-  const user = await prisma.user.findUnique({
-    where: {
-      phone: normalizedPhone,
-    },
-  });
-
-  if (!user) {
-    throw new AppError('User not found. Please register first.', 404);
-  }
-
-  await otpService.consumeOtp(normalizedPhone, otp);
-
-  const token = generateToken(user.id, user.phone, user.role);
-=======
 
   const user = await prisma.user.findUnique({
     where: { phone: normalizedPhone },
@@ -164,7 +113,6 @@ const verifyOtp = async (phone, otp) => {
   const clientRole = toClientRole(user.role);
   const isSales = isSalesRole(user.role);
   const kycStatus = toClientKycStatus(user.kycStatus);
->>>>>>> origin/main
 
   logger.info({
     message: 'OTP verified successfully.',
@@ -172,11 +120,6 @@ const verifyOtp = async (phone, otp) => {
     phone: user.phone,
   });
 
-<<<<<<< HEAD
-  return {
-    user: buildUserResponse(user),
-    token,
-=======
   const responseData = {
     accessToken,
     refreshToken,
@@ -258,7 +201,6 @@ const refreshTokens = async (refreshToken) => {
   return {
     accessToken,
     refreshToken: newRefreshToken,
->>>>>>> origin/main
   };
 };
 
@@ -266,11 +208,7 @@ const loginUser = async (phone) => {
   return sendOtp(phone);
 };
 
-<<<<<<< HEAD
-const logoutUser = async (userId, token, tokenExp) => {
-=======
 const logoutUser = async (userId, token, tokenExp, refreshToken) => {
->>>>>>> origin/main
   const user = await prisma.user.findUnique({
     where: {
       id: userId,
@@ -281,25 +219,6 @@ const logoutUser = async (userId, token, tokenExp, refreshToken) => {
     throw new AppError('User not found.', 404);
   }
 
-<<<<<<< HEAD
-  const tokenHash = hashToken(token);
-  const expiresAt = tokenExp ? new Date(tokenExp * 1000) : new Date(Date.now() + (7 * 24 * 60 * 60 * 1000));
-
-  await prisma.tokenBlacklist.upsert({
-    where: {
-      tokenHash,
-    },
-    update: {
-      expiresAt,
-    },
-    create: {
-      tokenHash,
-      userId,
-      expiresAt,
-    },
-  });
-
-=======
   // Blacklist the access token.
   const tokenHash = hashToken(token);
   const expiresAt = tokenExp
@@ -337,7 +256,6 @@ const logoutUser = async (userId, token, tokenExp, refreshToken) => {
     });
   }
 
->>>>>>> origin/main
   logger.info({
     message: 'User logged out successfully.',
     userId,
@@ -348,10 +266,7 @@ const logoutUser = async (userId, token, tokenExp, refreshToken) => {
   };
 };
 
-<<<<<<< HEAD
-=======
 // Flat shape consumed by GET /auth/me (role + kycStatus are always lowercase).
->>>>>>> origin/main
 const getProfile = async (userId) => {
   const user = await prisma.user.findUnique({
     where: {
@@ -364,15 +279,11 @@ const getProfile = async (userId) => {
   }
 
   return {
-<<<<<<< HEAD
-    user: buildUserResponse(user),
-=======
     id: user.id,
     phone: user.phone,
     name: user.name ?? '',
     role: toClientRole(user.role),
     kycStatus: toClientKycStatus(user.kycStatus),
->>>>>>> origin/main
   };
 };
 
@@ -427,10 +338,7 @@ module.exports = {
   registerUser,
   sendOtp,
   verifyOtp,
-<<<<<<< HEAD
-=======
   refreshTokens,
->>>>>>> origin/main
   loginUser,
   logoutUser,
   getProfile,

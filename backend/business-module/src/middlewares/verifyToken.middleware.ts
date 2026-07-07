@@ -8,14 +8,7 @@ import {
     AUTH_ERRORS,
 } from '@/errors';
 import type { AuthenticatedUser } from '@/types/express';
-<<<<<<< HEAD
-=======
-import {
-    isStaffRole,
-    toBusinessRole,
-} from '@/constants/staffRoles.constants';
-import type { StaffRole } from '@/constants/staffRoles.constants';
->>>>>>> origin/main
+import { isStaffRole } from '@/constants/staffRoles.constants';
 
 // ─── Token extraction ──────────────────────────────────────────────────────────
 // Accept: "Bearer <token>" in Authorization header only.
@@ -36,20 +29,17 @@ function verifyJwt(token: string): AuthenticatedUser {
             algorithms: ['HS256'],
         }) as Record<string, unknown>;
 
-<<<<<<< HEAD
-=======
         const rawRole = decoded.role as string;
 
-        // ── Staff tokens (web dashboard / mobile sales) ────────────────────
-        // Issued by staff-auth with the staff vocabulary (ADMIN, CREDIT_GOLD,
-        // …) and the staff id in `sub`. Map onto the business ROLE enum so
-        // allowRoles() works identically for staff and customers, and keep
-        // the original staff role for product-line scoping.
+        // ── Staff tokens (/staff/auth — web dashboard / mobile sales) ──────
+        // Minted with the staff id in `sub` and a staff-vocabulary role.
+        // Staff roles are first-class members of the ROLE hierarchy, so the
+        // role passes through unmapped; the id comes from `sub`.
         if (isStaffRole(rawRole)) {
             return {
                 id:        decoded.sub as string,
                 phone:     (decoded.phone as string) ?? '',
-                role:      toBusinessRole(rawRole as StaffRole),
+                role:      rawRole as AuthenticatedUser['role'],
                 staffRole: rawRole,
                 branchId:  (decoded.branchId as string | null) ?? null,
                 jti:       decoded.jti as string,
@@ -59,7 +49,6 @@ function verifyJwt(token: string): AuthenticatedUser {
         }
 
         // ── Customer/agent tokens (user-module) ────────────────────────────
->>>>>>> origin/main
         // User module issues tokens with userId field.
         // Business module AuthenticatedUser expects id.
         return {
@@ -83,21 +72,14 @@ function verifyJwt(token: string): AuthenticatedUser {
 // with TTL matching the token's remaining lifetime.
 // We check this on every request — O(1) Redis GET is fast enough.
 
-<<<<<<< HEAD
-async function isTokenDenylisted(jti: string): Promise<boolean> {
-    try {
-        const redis = getRedisClient();
-        const result = await redis.get(RedisKeys.tokenDenylist(jti));
-=======
 async function isTokenDenylisted(jti: string, isStaff: boolean): Promise<boolean> {
     try {
         const redis = getRedisClient();
-        // Staff logout denylists under a separate key namespace (staff-auth)
+        // Staff logout denylists under the staff-auth key namespace
         const key = isStaff
             ? RedisKeys.staffTokenDenylist(jti)
             : RedisKeys.tokenDenylist(jti);
         const result = await redis.get(key);
->>>>>>> origin/main
         return result !== null;
     } catch {
         // Redis is unavailable — fail open (allow the request)
@@ -130,11 +112,7 @@ export function verifyToken() {
             const payload = verifyJwt(token);
 
             // Check denylist — handles logout before token expiry
-<<<<<<< HEAD
-            if (await isTokenDenylisted(payload.jti)) {
-=======
             if (await isTokenDenylisted(payload.jti, payload.staffRole !== undefined)) {
->>>>>>> origin/main
                 throw AUTH_ERRORS.tokenRevoked();
             }
 

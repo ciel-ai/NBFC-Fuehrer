@@ -192,20 +192,8 @@ export default function GoldLoanConfirmedScreen() {
 
       <View style={styles.footer}>
         <Button
-<<<<<<< HEAD
-          title="View Appraisal Result"
-          onPress={() =>
-            router.replace({
-              pathname: '/(main)/apply/gold-loan-appraisal-result',
-              params: {
-                applicationId: applicationId ?? referenceId ?? REF_ID,
-              },
-            })
-          }
-=======
           title="Track from My Loans"
           onPress={() => router.replace('/(main)/(tabs)/loans')}
->>>>>>> origin/main
         />
       </View>
     </SafeAreaView>

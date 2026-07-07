@@ -38,10 +38,17 @@ const OTP_STAFF: SeedStaff[] = [
 
 async function main(): Promise<void> {
     // ── 1. Branch ────────────────────────────────────────────────────────────
-    const branch = await prisma.branches.upsert({
+    // branches.name is not unique in this schema — find-or-create by name
+    const branch = await prisma.branches.findFirst({
         where: { name: 'Head Office — Mumbai' },
-        update: {},
-        create: { name: 'Head Office — Mumbai', city: 'Mumbai', state: 'Maharashtra' },
+    }) ?? await prisma.branches.create({
+        data: {
+            name: 'Head Office — Mumbai',
+            city: 'Mumbai',
+            state: 'Maharashtra',
+            address: 'Nariman Point, Mumbai 400021',
+            pincode: '400021',
+        },
     });
     console.log(`Branch ready: ${branch.name} (${branch.id})`);
 

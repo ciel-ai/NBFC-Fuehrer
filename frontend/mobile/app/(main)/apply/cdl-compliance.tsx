@@ -112,14 +112,6 @@ export default function CdlComplianceScreen() {
 
       <View style={styles.footer}>
         <Button
-<<<<<<< HEAD
-          title="Continue to Credit Assessment"
-          disabled={!canContinue}
-          onPress={() =>
-            router.push({
-              pathname: '/(main)/apply/cdl-credit-assessment',
-              params,
-=======
           title="Submit Application"
           disabled={!canContinue}
           onPress={() =>
@@ -129,7 +121,6 @@ export default function CdlComplianceScreen() {
                 productName: params.productName ?? 'Consumer Durable Loan',
                 loanAmount: params.loanAmount ?? params.amount ?? '',
               },
->>>>>>> origin/main
             })
           }
         />

@@ -15,52 +15,15 @@ const generatePlainOtp = () => {
 };
 
 // ─── SMS dispatch ─────────────────────────────────────────────────────────────
-<<<<<<< HEAD
-// MSG91 is primary (DLT registered for India)
-// Falls back to console log in development
-
-const sendOtpSms = async (phone, otp) => {
-    // Development — log to console, never call SMS API
-=======
 // Twilio is used for OTP SMS delivery
 // Falls back to console log in development
 
 const sendOtpSms = async (phone, otp) => {
->>>>>>> origin/main
     if (process.env.NODE_ENV !== 'production') {
         console.log(`\n🔑 OTP for ${phone}: ${otp}\n`);
         return;
     }
 
-<<<<<<< HEAD
-    const authKey  = process.env.MSG91_AUTH_KEY;
-    const templateId = process.env.MSG91_OTP_TEMPLATE_ID;
-
-    if (!authKey || !templateId) {
-        logger.error('MSG91 credentials missing — OTP not sent');
-        throw new AppError('SMS service not configured.', 500);
-    }
-
-    const res = await fetch('https://api.msg91.com/api/v5/otp', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            template_id: templateId,
-            mobile:      `91${phone.replace(/^\+91/, '')}`,
-            authkey:     authKey,
-            otp,
-        }),
-    });
-
-    const data = await res.json();
-
-    if (data.type !== 'success') {
-        logger.error({ message: 'MSG91 OTP send failed', phone, response: data });
-        throw new AppError('Failed to send OTP. Please try again.', 500);
-    }
-
-    logger.info({ message: 'OTP sent via MSG91', phone });
-=======
     const accountSid = process.env.TWILIO_ACCOUNT_SID;
     const authToken  = process.env.TWILIO_AUTH_TOKEN;
     const fromNumber = process.env.TWILIO_PHONE_NUMBER;
@@ -84,7 +47,6 @@ const sendOtpSms = async (phone, otp) => {
         logger.error({ message: 'Twilio OTP send failed', phone, error: err.message });
         throw new AppError('Failed to send OTP. Please try again.', 500);
     }
->>>>>>> origin/main
 };
 
 // ─── Issue OTP ────────────────────────────────────────────────────────────────

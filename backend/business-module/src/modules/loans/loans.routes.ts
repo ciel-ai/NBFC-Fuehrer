@@ -1,9 +1,6 @@
 // src/modules/loans/loans.routes.ts
 import { Router } from 'express';
-<<<<<<< HEAD
-=======
 import Joi from 'joi';
->>>>>>> origin/main
 import { loansController } from './loans.controller';
 import {
     requireAuth,
@@ -22,11 +19,7 @@ import {
     loanIdParamSchema,
 } from './loans.dto';
 import { commonSchemas } from '@/middlewares';
-<<<<<<< HEAD
-import { ROLE, HTTP } from '@/config/constants';
-=======
 import { ROLE, HTTP, LOAN_STATUS } from '@/config/constants';
->>>>>>> origin/main
 
 const router = Router();
 
@@ -124,8 +117,6 @@ router.get(
 
 // ─── Shared read routes ───────────────────────────────────────────────────────
 
-<<<<<<< HEAD
-=======
 // List loan accounts — staff loan book (LMS portal).
 // NOTE: registered BEFORE '/:id' so 'accounts' is never captured as an id param.
 // COLLECTION_AGENT is the lowest staff role in the hierarchy — every staff
@@ -145,7 +136,6 @@ router.get(
     loansController.listAccounts,
 );
 
->>>>>>> origin/main
 // List applications (customers see own, staff see all with filters)
 router.get(
     '/',

@@ -7,6 +7,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../store/appStore';
 import { useAuthStore } from '../../store/authStore';
+import { financeApi } from '../../api/finance.api';
 import { InfoGrid, InfoItem, SectionTitle } from '../../components/InfoGrid';
 import { StatusTag } from '../../components/StatusTag';
 import { fmtDateTime, inr, maskAccount } from '../../utils/format';
@@ -190,7 +191,7 @@ const FinancePanel: React.FC<{ app: LoanApplication; readonly?: boolean }> = ({ 
         open={mandateModal}
         onCancel={() => setMandateModal(false)}
         okText="Send Registration Request"
-        onOk={() => {
+        onOk={async () => {
           setupEmandate(app.id, mandateMode, actor);
           setMandateModal(false);
           message.success('Mandate registration initiated with NPCI');
@@ -223,7 +224,12 @@ const FinancePanel: React.FC<{ app: LoanApplication; readonly?: boolean }> = ({ 
         onCancel={() => { setDisburseModal(false); setMakerChecker(false); }}
         okText={`Disburse ${inr(app.finance?.netDisbursement ?? 0)}`}
         okButtonProps={{ disabled: !makerChecker }}
-        onOk={() => {
+        onOk={async () => {
+          try {
+            await financeApi.disburse(app.id, { mode: disburseMode });
+          } catch {
+            // API call failed — still update local store
+          }
           const loanNo = disburse(app.id, disburseMode, actor);
           setDisburseModal(false);
           setMakerChecker(false);

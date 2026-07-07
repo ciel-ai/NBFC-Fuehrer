@@ -277,14 +277,10 @@ export const auditService = {
 // snapshots). Only compliance-designated roles may read them.
 
 function assertComplianceAccess(role: string): void {
-<<<<<<< HEAD
     const ALLOWED = new Set([
         'SUPER_ADMIN', 'FINANCE', 'ADMIN',
         'FINANCE_CDL', 'FINANCE_GOLD', 'FINANCE_HOUSING',
     ]);
-=======
-    const ALLOWED = new Set(['SUPER_ADMIN', 'FINANCE']);
->>>>>>> origin/main
     if (!ALLOWED.has(role)) {
         throw new ForbiddenError(
             'Audit logs are only accessible to Super Admin and Finance roles',
