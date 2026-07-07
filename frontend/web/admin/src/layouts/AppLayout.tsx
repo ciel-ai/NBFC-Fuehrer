@@ -100,7 +100,21 @@ const LayoutInner: React.FC<{ user: SessionUser }> = ({ user }) => {
         ],
       });
     }
-    
+    if (canAccess(user.role, 'lms')) {
+      items.push({
+        key: 'g-lms',
+        icon: <WalletOutlined />,
+        label: 'Loan Management',
+        children: [
+          { key: '/lms/accounts', label: 'Loan Accounts' },
+          { key: '/lms/emi-schedule', label: 'EMI Schedule' },
+          { key: '/lms/repayments', label: 'Repayments' },
+          { key: '/lms/charges', label: 'Charges' },
+          { key: '/lms/documents', label: 'Document Repository' },
+        ],
+      });
+    }
+
     if (canAccess(user.role, 'collections')) {
       items.push({
         key: 'g-collections',
@@ -154,7 +168,7 @@ const LayoutInner: React.FC<{ user: SessionUser }> = ({ user }) => {
     key.startsWith('/applications') ? 'g-applications'
     : key.startsWith('/credit') ? 'g-credit'
     : key.startsWith('/finance') ? 'g-finance'
-    
+    : key.startsWith('/lms') ? 'g-lms'
     : key.startsWith('/collections') ? 'g-collections'
     : key.startsWith('/reports') ? 'g-reports' : '';
 

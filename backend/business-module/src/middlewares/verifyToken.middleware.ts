@@ -8,6 +8,11 @@ import {
     AUTH_ERRORS,
 } from '@/errors';
 import type { AuthenticatedUser } from '@/types/express';
+import {
+    isStaffRole,
+    toBusinessRole,
+} from '@/constants/staffRoles.constants';
+import type { StaffRole } from '@/constants/staffRoles.constants';
 
 // ─── Token extraction ──────────────────────────────────────────────────────────
 // Accept: "Bearer <token>" in Authorization header only.
@@ -28,6 +33,27 @@ function verifyJwt(token: string): AuthenticatedUser {
             algorithms: ['HS256'],
         }) as Record<string, unknown>;
 
+        const rawRole = decoded.role as string;
+
+        // ── Staff tokens (web dashboard / mobile sales) ────────────────────
+        // Issued by staff-auth with the staff vocabulary (ADMIN, CREDIT_GOLD,
+        // …) and the staff id in `sub`. Map onto the business ROLE enum so
+        // allowRoles() works identically for staff and customers, and keep
+        // the original staff role for product-line scoping.
+        if (isStaffRole(rawRole)) {
+            return {
+                id:        decoded.sub as string,
+                phone:     (decoded.phone as string) ?? '',
+                role:      toBusinessRole(rawRole as StaffRole),
+                staffRole: rawRole,
+                branchId:  (decoded.branchId as string | null) ?? null,
+                jti:       decoded.jti as string,
+                iat:       decoded.iat as number,
+                exp:       decoded.exp as number,
+            };
+        }
+
+        // ── Customer/agent tokens (user-module) ────────────────────────────
         // User module issues tokens with userId field.
         // Business module AuthenticatedUser expects id.
         return {
@@ -51,10 +77,14 @@ function verifyJwt(token: string): AuthenticatedUser {
 // with TTL matching the token's remaining lifetime.
 // We check this on every request — O(1) Redis GET is fast enough.
 
-async function isTokenDenylisted(jti: string): Promise<boolean> {
+async function isTokenDenylisted(jti: string, isStaff: boolean): Promise<boolean> {
     try {
         const redis = getRedisClient();
-        const result = await redis.get(RedisKeys.tokenDenylist(jti));
+        // Staff logout denylists under a separate key namespace (staff-auth)
+        const key = isStaff
+            ? RedisKeys.staffTokenDenylist(jti)
+            : RedisKeys.tokenDenylist(jti);
+        const result = await redis.get(key);
         return result !== null;
     } catch {
         // Redis is unavailable — fail open (allow the request)
@@ -87,7 +117,7 @@ export function verifyToken() {
             const payload = verifyJwt(token);
 
             // Check denylist — handles logout before token expiry
-            if (await isTokenDenylisted(payload.jti)) {
+            if (await isTokenDenylisted(payload.jti, payload.staffRole !== undefined)) {
                 throw AUTH_ERRORS.tokenRevoked();
             }
 

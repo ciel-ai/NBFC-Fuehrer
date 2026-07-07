@@ -575,7 +575,18 @@ export const loansService = {
         return loansRepository.findAccountsByUserId(userId, pagination);
     },
 
-    // ── 14. EMI calculation helper (used by disbursement.service) ─────────────
+    // ── 14. Staff loan book — all accounts with servicing metrics (LMS) ───────
+
+    async listLoanAccounts(filters: {
+        status?: string;
+        search?: string;
+        page?: number;
+        limit?: number;
+    }) {
+        return loansRepository.listAccounts(filters);
+    },
+
+    // ── 15. EMI calculation helper (used by disbursement.service) ─────────────
 
     calculateEmi,
 };

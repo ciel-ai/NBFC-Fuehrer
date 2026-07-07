@@ -8,6 +8,9 @@
 // This mirrors the frontend contract in webdash/src/auth/rbac.ts exactly.
 // Keep the two in sync — they are the same RBAC model on both sides.
 
+import { ROLE } from '@/config/constants';
+import type { Role } from '@/config/constants';
+
 // ─── Staff roles ────────────────────────────────────────────────────────────
 
 export const STAFF_ROLE = {
@@ -96,4 +99,32 @@ export function canAccess(role: StaffRole, module: ModuleKey): boolean {
 /** True if the role is allowed to sign in on the web dashboard. */
 export function canWebLogin(role: StaffRole): boolean {
     return STAFF_ROLE_META[role].webLogin;
+}
+
+// ─── Staff → business role bridge ─────────────────────────────────────────────
+// Staff tokens carry the staff vocabulary (ADMIN, CREDIT_GOLD, …) but every
+// business route is gated with allowRoles() against the ROLE enum
+// (SUPER_ADMIN, CREDIT_MANAGER, …). This map is the single place the two
+// vocabularies meet — verifyToken() applies it when it sees a staff token.
+//
+// Product-line scoping (CDL/GOLD/HOUSING) is intentionally NOT flattened away:
+// the original staff role is preserved on req.user.staffRole so route/service
+// layers can enforce loan-type scope via scopedLoanType().
+
+export const STAFF_TO_BUSINESS_ROLE: Record<StaffRole, Role> = {
+    ADMIN:           ROLE.SUPER_ADMIN,
+    CREDIT_CDL:      ROLE.CREDIT_MANAGER,
+    CREDIT_GOLD:     ROLE.CREDIT_MANAGER,
+    CREDIT_HOUSING:  ROLE.CREDIT_MANAGER,
+    FINANCE_CDL:     ROLE.FINANCE,
+    FINANCE_GOLD:    ROLE.FINANCE,
+    FINANCE_HOUSING: ROLE.FINANCE,
+    SALES_CDL:       ROLE.AGENT,
+    SALES_GOLD:      ROLE.AGENT,
+    SALES_HOUSING:   ROLE.AGENT,
+};
+
+/** Business-role equivalent for a staff role (used by verifyToken). */
+export function toBusinessRole(role: StaffRole): Role {
+    return STAFF_TO_BUSINESS_ROLE[role];
 }

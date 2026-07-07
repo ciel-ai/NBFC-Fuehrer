@@ -7,7 +7,7 @@ import {
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
-import { useAppStore } from '../../store/appStore';
+import { useLoanBook } from '../../hooks/useLms';
 import { useAuthStore } from '../../store/authStore';
 import { scopedLoanType } from '../../auth/rbac';
 import PageHeader from '../../components/PageHeader';
@@ -20,7 +20,7 @@ import type { LoanAccount, LoanStatus, LoanType } from '../../types';
 const LoanAccounts: React.FC = () => {
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user)!;
-  const loans = useAppStore((s) => s.loans);
+  const { loans, live, loading } = useLoanBook();
   const scope = scopedLoanType(user.role);
 
   const [search, setSearch] = useState('');
@@ -124,7 +124,7 @@ const LoanAccounts: React.FC = () => {
     <div>
       <PageHeader
         title="Loan Accounts"
-        subtitle={`Loan management system · ${scoped.length} accounts ${scope ? `· ${scope} portfolio` : ''}`}
+        subtitle={`Loan management system · ${scoped.length} accounts ${scope ? `· ${scope} portfolio` : ''}${live ? '' : ' · sample data (live API unreachable)'}`}
         extra={
           <Button
             icon={<DownloadOutlined />}
@@ -185,6 +185,7 @@ const LoanAccounts: React.FC = () => {
           dataSource={rows}
           columns={columns}
           rowKey="loanNumber"
+          loading={loading}
           size="middle"
           className="row-link"
           scroll={{ x: 1100 }}

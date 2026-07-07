@@ -66,10 +66,13 @@ declare global {
 // Coordinate with them on any changes here.
 
 export interface AuthenticatedUser {
-    id: string;   // UUID — maps to users.id in DB
-    phone: string;   // +91XXXXXXXXXX format
-    role: Role;     // One of the ROLE constants
+    id: string;   // UUID — users.id (customers/agents) or admin_users.id (staff)
+    phone: string;   // +91XXXXXXXXXX format ('' for staff tokens — they carry no phone)
+    role: Role;     // One of the ROLE constants (staff roles are mapped via toBusinessRole)
     agentId?: string;   // Set when role === ROLE.AGENT
+    staffRole?: string; // Original staff role (ADMIN, CREDIT_GOLD, …) when caller is staff —
+                        // preserved for product-line (CDL/GOLD/HOUSING) scoping
+    branchId?: string | null; // Staff tokens only — branch the staff member belongs to
     jti: string;   // JWT ID — used for token revocation via Redis denylist
     iat: number;   // Issued at (Unix timestamp)
     exp: number;   // Expiry (Unix timestamp)

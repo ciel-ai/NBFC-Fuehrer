@@ -52,7 +52,7 @@ export const ROLE_META: Record<Role, RoleMeta> = {
   CREDIT_MANAGER: { label: 'Credit Manager', short: 'Credit Mgr', family: 'CREDIT', color: '#b26a00', modules: CREDIT_MODULES },
   OPS_EXECUTIVE: { label: 'Ops Executive', short: 'Ops', family: 'CREDIT', color: '#0e7490', modules: ['dashboard', 'applications', 'customers', 'appraisals', 'reports'] },
   FINANCE: { label: 'Finance', short: 'Finance', family: 'FINANCE', color: '#1d7a46', modules: FINANCE_MODULES },
-  COLLECTION_AGENT: { label: 'Collections Agent', short: 'Collections', family: 'FINANCE', color: '#c0392b', modules: ['dashboard', 'collections', 'reports'] },
+  COLLECTION_AGENT: { label: 'Collections Agent', short: 'Collections', family: 'FINANCE', color: '#c0392b', modules: ['dashboard', 'collections', 'lms', 'reports'] },
   AGENT: { label: 'Field Agent', short: 'Agent', family: 'SALES', color: '#0e7490', modules: [] },
 };
 
