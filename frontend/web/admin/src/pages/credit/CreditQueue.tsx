@@ -64,7 +64,7 @@ const CreditQueue: React.FC = () => {
       dataIndex: 'appNumber',
       render: (v: string, r) => (
         <div>
-          <div style={{ fontWeight: 600, color: '#4f46e5', fontSize: 12.5 }}>{v}</div>
+          <div style={{ fontWeight: 600, color: '#0284c7', fontSize: 12.5 }}>{v}</div>
           <div style={{ fontWeight: 600, color: '#1e293b', marginTop: 2 }}>{r.customer.name}</div>
           <div style={{ fontSize: 11.5, color: '#94a3b8' }}>+91 {r.customer.mobile}</div>
         </div>

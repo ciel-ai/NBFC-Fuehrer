@@ -15,7 +15,7 @@ const { RangePicker } = DatePicker;
 const MODULES = ['Applications', 'Credit', 'Finance', 'Collections', 'User Management', 'Settings', 'Auth'];
 
 const MODULE_COLOR: Record<string, string> = {
-  Applications: '#4f46e5',
+  Applications: '#0284c7',
   Credit: '#b45309',
   Finance: '#047857',
   Collections: '#ea580c',
@@ -85,7 +85,7 @@ const AuditLogs: React.FC = () => {
       ),
     },
     { title: 'Action', dataIndex: 'action', render: (v: string) => <span style={{ fontWeight: 500, fontSize: 12.5 }}>{v}</span> },
-    { title: 'Entity', dataIndex: 'entity', width: 200, render: (v: string) => <span style={{ fontSize: 12.5, color: '#4f46e5', fontWeight: 600 }}>{v}</span> },
+    { title: 'Entity', dataIndex: 'entity', width: 200, render: (v: string) => <span style={{ fontSize: 12.5, color: '#0284c7', fontWeight: 600 }}>{v}</span> },
     {
       title: 'Old Value',
       dataIndex: 'oldValue',

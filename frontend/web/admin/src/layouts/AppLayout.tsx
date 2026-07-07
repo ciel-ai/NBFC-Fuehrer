@@ -22,7 +22,7 @@ import { fmtTimeAgo, initials } from '../utils/format';
 const { Sider, Header, Content } = Layout;
 
 const NOTIF_ICON: Record<string, React.ReactNode> = {
-  application: <FileTextOutlined style={{ color: '#4f46e5' }} />,
+  application: <FileTextOutlined style={{ color: '#0284c7' }} />,
   credit: <SafetyCertificateOutlined style={{ color: '#b26a00' }} />,
   finance: <BankOutlined style={{ color: '#1d7a46' }} />,
   collection: <ExclamationCircleOutlined style={{ color: '#c0392b' }} />,
@@ -202,7 +202,7 @@ const LayoutInner: React.FC<{ user: SessionUser }> = ({ user }) => {
         value: `app:${a.id}`,
         label: (
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-            <span><FileTextOutlined style={{ color: '#4f46e5', marginRight: 8 }} />{a.appNumber} · {a.customer.name}</span>
+            <span><FileTextOutlined style={{ color: '#0284c7', marginRight: 8 }} />{a.appNumber} · {a.customer.name}</span>
             <span style={{ color: '#94a3b8', fontSize: 12 }}>{a.status.replace(/_/g, ' ')}</span>
           </div>
         ),

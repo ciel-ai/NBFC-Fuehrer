@@ -81,7 +81,7 @@ const Collections: React.FC = () => {
   }, [recoveryTxns, search]);
 
   const loanCols: TableProps<LoanAccount>['columns'] = [
-    { title: 'Loan Number', dataIndex: 'loanNumber', width: 180, render: (v: string) => <span style={{ fontWeight: 600, color: '#4f46e5', fontSize: 12.5 }}>{v}</span> },
+    { title: 'Loan Number', dataIndex: 'loanNumber', width: 180, render: (v: string) => <span style={{ fontWeight: 600, color: '#0284c7', fontSize: 12.5 }}>{v}</span> },
     {
       title: 'Customer', dataIndex: 'customerName',
       render: (v: string, r) => (
@@ -133,7 +133,7 @@ const Collections: React.FC = () => {
 
   const recoveryCols: TableProps<Repayment>['columns'] = [
     { title: 'Date', dataIndex: 'date', width: 150, render: (v: string) => <span style={{ fontSize: 12.5, color: '#475569' }}>{fmtDate(v)}</span>, sorter: (a, b) => dayjs(a.date).valueOf() - dayjs(b.date).valueOf(), defaultSortOrder: 'descend' },
-    { title: 'Loan Number', dataIndex: 'loanNumber', width: 185, render: (v: string) => <span style={{ fontWeight: 600, color: '#4f46e5', fontSize: 12.5 }}>{v}</span> },
+    { title: 'Loan Number', dataIndex: 'loanNumber', width: 185, render: (v: string) => <span style={{ fontWeight: 600, color: '#0284c7', fontSize: 12.5 }}>{v}</span> },
     { title: 'Customer', dataIndex: 'customerName', render: (v: string) => <span style={{ fontWeight: 600 }}>{v}</span> },
     { title: 'Type', dataIndex: 'loanType', width: 90, render: (t) => <LoanTypeTag type={t} /> },
     { title: 'Recovered', dataIndex: 'amount', align: 'right', width: 130, render: (v: number) => <span className="tnum" style={{ fontWeight: 700, color: '#047857' }}>{inr(v)}</span> },

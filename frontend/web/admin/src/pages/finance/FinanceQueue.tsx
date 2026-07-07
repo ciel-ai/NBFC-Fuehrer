@@ -51,7 +51,7 @@ const FinanceQueue: React.FC = () => {
       dataIndex: 'appNumber',
       render: (v: string, r) => (
         <div>
-          <div style={{ fontWeight: 600, color: '#4f46e5', fontSize: 12.5 }}>{v}</div>
+          <div style={{ fontWeight: 600, color: '#0284c7', fontSize: 12.5 }}>{v}</div>
           <div style={{ fontWeight: 600, color: '#1e293b', marginTop: 2 }}>{r.customer.name}</div>
         </div>
       ),
@@ -185,7 +185,7 @@ const FinanceQueue: React.FC = () => {
       />
 
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-        <Col xs={24} sm={12} xl={6}><KpiCard label="Pending Disbursement" value={buckets.pending.length} sub={inrCompact(buckets.pending.reduce((s, a) => s + (a.creditDecision?.approvedAmount ?? a.loan.amount), 0)) + ' sanctioned'} icon={<BankOutlined />} tint="#4338ca" onClick={() => navigate('/finance/pending')} /></Col>
+        <Col xs={24} sm={12} xl={6}><KpiCard label="Pending Disbursement" value={buckets.pending.length} sub={inrCompact(buckets.pending.reduce((s, a) => s + (a.creditDecision?.approvedAmount ?? a.loan.amount), 0)) + ' sanctioned'} icon={<BankOutlined />} tint="#0369a1" onClick={() => navigate('/finance/pending')} /></Col>
         <Col xs={24} sm={12} xl={6}><KpiCard label="E-Mandate Pending" value={buckets.emandates.length} sub={`${buckets.emandates.filter((a) => a.finance?.emandate.status === 'ACTIVE').length} ready to disburse`} icon={<ThunderboltOutlined />} tint="#0e7490" onClick={() => navigate('/finance/emandates')} /></Col>
         <Col xs={24} sm={12} xl={6}><KpiCard label="Disbursed Today" value={disbursedToday.length} sub={inrCompact(disbursedToday.reduce((s, a) => s + a.finance!.disbursement!.amount, 0)) + ' credited'} icon={<FundOutlined />} tint="#0f766e" onClick={() => navigate('/finance/disbursed')} /></Col>
         <Col xs={24} sm={12} xl={6}><KpiCard label="Total Disbursed" value={buckets.disbursed.length} sub="lifetime conversions" icon={<FundOutlined />} tint="#7c3aed" /></Col>

@@ -68,7 +68,7 @@ const ApplicationsList: React.FC<{ preset: ListPreset }> = ({ preset }) => {
       title: 'Application No.',
       dataIndex: 'appNumber',
       width: 175,
-      render: (v: string) => <span style={{ fontWeight: 600, color: '#4f46e5', fontSize: 12.5 }}>{v}</span>,
+      render: (v: string) => <span style={{ fontWeight: 600, color: '#0284c7', fontSize: 12.5 }}>{v}</span>,
       sorter: (a, b) => a.appNumber.localeCompare(b.appNumber),
     },
     {

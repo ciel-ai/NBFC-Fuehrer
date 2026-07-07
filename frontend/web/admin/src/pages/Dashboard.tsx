@@ -181,7 +181,7 @@ const Dashboard: React.FC = () => {
 
     const list: ActionItem[] = [];
     if (meta.family !== 'FINANCE') {
-      if (counts.submitted) list.push({ icon: <FileTextOutlined />, title: `${counts.submitted} new application${counts.submitted > 1 ? 's' : ''} awaiting credit pickup`, sub: 'Sourced via the mobile sales app', to: '/applications/submitted', tone: '#4f46e5' });
+      if (counts.submitted) list.push({ icon: <FileTextOutlined />, title: `${counts.submitted} new application${counts.submitted > 1 ? 's' : ''} awaiting credit pickup`, sub: 'Sourced via the mobile sales app', to: '/applications/submitted', tone: '#0284c7' });
       if (counts.creditPending) list.push({ icon: <SafetyCertificateOutlined />, title: `${counts.creditPending} application${counts.creditPending > 1 ? 's' : ''} in the credit review queue`, sub: 'KYC, bureau & document checks pending', to: meta.family === 'CREDIT' ? '/credit/pending' : '/applications/credit-pending', tone: '#b26a00' });
     }
     if (meta.family !== 'CREDIT') {
@@ -232,7 +232,7 @@ const Dashboard: React.FC = () => {
       dataIndex: 'appNumber',
       render: (v: string, r) => (
         <div>
-          <div style={{ fontWeight: 600, fontSize: 12.5, color: '#4f46e5' }}>{v}</div>
+          <div style={{ fontWeight: 600, fontSize: 12.5, color: '#0284c7' }}>{v}</div>
           <div style={{ fontSize: 12, color: '#5a6675' }}>{r.customer.name}</div>
         </div>
       ),
@@ -379,7 +379,7 @@ const Dashboard: React.FC = () => {
             <div style={{ padding: '4px 0' }}>
               {activities.map((item) => (
                 <div key={item.id} style={{ display: 'flex', gap: 11, alignItems: 'center', padding: '9px 18px' }}>
-                  <Avatar size={30} style={{ background: '#eef2ff', color: '#4f46e5', fontWeight: 700, fontSize: 11, minWidth: 30 }}>
+                  <Avatar size={30} style={{ background: '#e0f2fe', color: '#0284c7', fontWeight: 700, fontSize: 11, minWidth: 30 }}>
                     {initials(item.user)}
                   </Avatar>
                   <div style={{ minWidth: 0 }}>

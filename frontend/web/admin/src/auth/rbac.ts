@@ -65,7 +65,7 @@ export const scopedLoanType = (role: Role): LoanType | undefined => ROLE_META[ro
 export const roleFamily = (role: Role): RoleFamily => ROLE_META[role].family;
 
 export const LOAN_TYPE_META: Record<LoanType, { label: string; short: string; color: string; bg: string }> = {
-  CDL: { label: 'Consumer Durable Loan', short: 'CDL', color: '#4f46e5', bg: '#eef3f9' },
+  CDL: { label: 'Consumer Durable Loan', short: 'CDL', color: '#0284c7', bg: '#eef3f9' },
   GOLD: { label: 'Gold Loan', short: 'Gold', color: '#b26a00', bg: '#fdf6ea' },
   HOUSING: { label: 'Affordable Housing', short: 'Housing', color: '#6d4ea8', bg: '#f3effa' },
 };

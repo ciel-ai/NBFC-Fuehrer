@@ -7,7 +7,7 @@ interface Meta { label: string; color: string; bg: string }
 
 const META: Record<string, Meta> = {
   // application statuses
-  SUBMITTED: { label: 'Submitted', color: '#4f46e5', bg: '#eef3f9' },
+  SUBMITTED: { label: 'Submitted', color: '#0284c7', bg: '#eef3f9' },
   CREDIT_PENDING: { label: 'Credit Pending', color: '#b26a00', bg: '#fdf6ea' },
   CREDIT_APPROVED: { label: 'Credit Approved', color: '#1d7a46', bg: '#eef7f1' },
   CREDIT_REJECTED: { label: 'Credit Rejected', color: '#c0392b', bg: '#fbeeec' },
@@ -32,7 +32,7 @@ const META: Record<string, Meta> = {
   FAILED: { label: 'Failed', color: '#c0392b', bg: '#fbeeec' },
   // emi
   PAID: { label: 'Paid', color: '#1d7a46', bg: '#eef7f1' },
-  DUE: { label: 'Due', color: '#4f46e5', bg: '#eef3f9' },
+  DUE: { label: 'Due', color: '#0284c7', bg: '#eef3f9' },
   UPCOMING: { label: 'Upcoming', color: '#5a6675', bg: '#f4f6f9' },
   // charges
   UNPAID: { label: 'Unpaid', color: '#c2410c', bg: '#fbf0e9' },
@@ -42,7 +42,7 @@ const META: Record<string, Meta> = {
   // collections
   NORMAL: { label: 'Normal', color: '#5a6675', bg: '#eef1f5' },
   FOLLOW_UP: { label: 'Follow-up', color: '#b26a00', bg: '#fdf6ea' },
-  PTP: { label: 'PTP', color: '#4f46e5', bg: '#eef3f9' },
+  PTP: { label: 'PTP', color: '#0284c7', bg: '#eef3f9' },
   FIELD_VISIT: { label: 'Field Visit', color: '#0e7490', bg: '#e9f5f7' },
   LEGAL: { label: 'Legal', color: '#a32219', bg: '#fbeeec' },
   // decisions

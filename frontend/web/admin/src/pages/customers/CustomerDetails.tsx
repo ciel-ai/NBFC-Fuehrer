@@ -51,7 +51,7 @@ const CustomerDetails: React.FC = () => {
   const liveBook = custLoans.filter((l) => l.status !== 'CLOSED').reduce((s, l) => s + l.outstandingPrincipal, 0);
 
   const appCols: TableProps<LoanApplication>['columns'] = [
-    { title: 'Application', dataIndex: 'appNumber', render: (v: string) => <span style={{ fontWeight: 600, color: '#4f46e5', fontSize: 12.5 }}>{v}</span> },
+    { title: 'Application', dataIndex: 'appNumber', render: (v: string) => <span style={{ fontWeight: 600, color: '#0284c7', fontSize: 12.5 }}>{v}</span> },
     { title: 'Product', dataIndex: 'loanType', width: 120, render: (t) => <LoanTypeTag type={t} /> },
     { title: 'Amount', dataIndex: ['loan', 'amount'], align: 'right', width: 130, render: (v: number) => <span className="tnum" style={{ fontWeight: 600 }}>{inr(v)}</span> },
     { title: 'Stage', dataIndex: 'status', width: 155, render: (s: string) => <StatusTag status={s} /> },
@@ -75,7 +75,7 @@ const CustomerDetails: React.FC = () => {
       />
 
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-        <Col xs={24} sm={12} xl={6}><KpiCard label="Applications" value={apps.length} sub="lifetime" icon={<UserOutlined />} tint="#4f46e5" /></Col>
+        <Col xs={24} sm={12} xl={6}><KpiCard label="Applications" value={apps.length} sub="lifetime" icon={<UserOutlined />} tint="#0284c7" /></Col>
         <Col xs={24} sm={12} xl={6}><KpiCard label="Live Loans" value={custLoans.filter((l) => l.status !== 'CLOSED').length} sub={`${custLoans.length} total`} icon={<WalletOutlined />} tint="#0f766e" /></Col>
         <Col xs={24} sm={12} xl={6}><KpiCard label="Total Requested" value={inr(totalRequested)} sub="across applications" icon={<CreditCardOutlined />} tint="#b45309" /></Col>
         <Col xs={24} sm={12} xl={6}><KpiCard label="Live Book" value={inr(liveBook)} sub="outstanding principal" icon={<ShopOutlined />} tint="#6d4ea8" /></Col>
@@ -86,7 +86,7 @@ const CustomerDetails: React.FC = () => {
           <Card variant="borderless" style={panel} styles={panelBody}>
             <SectionTitle><UserOutlined /> Profile</SectionTitle>
             <div style={{ display: 'flex', gap: 14, alignItems: 'center', marginBottom: 16 }}>
-              <Avatar size={52} style={{ background: '#eef2ff', color: '#4f46e5', fontWeight: 700, fontSize: 18 }}>{initials(customer.name)}</Avatar>
+              <Avatar size={52} style={{ background: '#e0f2fe', color: '#0284c7', fontWeight: 700, fontSize: 18 }}>{initials(customer.name)}</Avatar>
               <div>
                 <div style={{ fontWeight: 700, fontSize: 16, color: '#0f172a' }}>{customer.name}</div>
                 <div style={{ fontSize: 12.5, color: '#7c8aa3' }}>{customer.gender} · {customer.age} yrs · {customer.maritalStatus}</div>

@@ -84,7 +84,7 @@ const CustomersList: React.FC = () => {
       dataIndex: ['customer', 'name'],
       render: (_: string, r) => (
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-          <Avatar size={38} style={{ background: '#eef2ff', color: '#4f46e5', fontWeight: 700, fontSize: 13 }}>{initials(r.customer.name)}</Avatar>
+          <Avatar size={38} style={{ background: '#e0f2fe', color: '#0284c7', fontWeight: 700, fontSize: 13 }}>{initials(r.customer.name)}</Avatar>
           <div>
             <div style={{ fontWeight: 600, color: '#1e293b' }}>{r.customer.name}</div>
             <div style={{ fontSize: 11.5, color: '#94a3b8' }}>+91 {r.mobile}</div>
