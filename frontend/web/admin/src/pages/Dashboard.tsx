@@ -82,14 +82,14 @@ const Dashboard: React.FC = () => {
 
   const disbTrend = useMemo(() => (
     live && liveSummary
-      ? liveSummary.disbursementTrend.map((m) => ({ month: m.month, amount: m.amount }))
+      ? liveSummary.disbursementTrend.map((m) => ({ month: m.month, amount: m.amount / 100 }))
       : monthlyDisbursement(lns)
   ), [live, liveSummary, lns]);
 
   const collPerf = useMemo(() => (
     live && liveSummary
       // Backend trend has collected amounts only — demand series omitted
-      ? liveSummary.collectionPerformance.map((m) => ({ month: m.month, collected: m.amount }))
+      ? liveSummary.collectionPerformance.map((m) => ({ month: m.month, collected: m.amount / 100 }))
       : collectionPerformance(lns)
   ), [live, liveSummary, lns]);
 
@@ -101,7 +101,7 @@ const Dashboard: React.FC = () => {
           loanType: 'CDL',
           status: r.status,
           customer: { name: r.user?.full_name ?? '—' },
-          loan: { amount: Number(r.approved_amount ?? r.amount_requested) },
+          loan: { amount: Number(r.approved_amount ?? r.amount_requested) / 100 }, // paise -> rupees
           createdAt: r.applied_at,
         } as unknown as LoanApplication))
       : apps.slice(0, 7)

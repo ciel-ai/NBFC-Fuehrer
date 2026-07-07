@@ -48,6 +48,12 @@ interface BackendEmiRow {
 /** Frontend LoanAccount enriched with the backend account UUID. */
 export type LiveLoanAccount = LoanAccount & { id: string };
 
+// The backend's moneyConverter middleware serialises money fields in PAISE
+// (mobile-app convention). The web UI works in rupees — convert on ingest.
+// NOTE: outstandingAfter is NOT in the middleware's field list, so it
+// arrives in rupees already.
+const rupees = (paise: number): number => Math.round(paise) / 100;
+
 // ─── Mappers ──────────────────────────────────────────────────────────────────
 
 function mapAccountStatus(status: string, dpd: number): LoanStatus {
@@ -78,13 +84,13 @@ function mapEmi(e: BackendEmiRow): EmiRow {
   return {
     seq: e.emiNumber,
     dueDate: day(e.dueDate),
-    principal: e.principalComponent,
-    interest: e.interestComponent,
-    emi: e.emiAmount,
-    balance: e.outstandingAfter,
+    principal: rupees(e.principalComponent),
+    interest: rupees(e.interestComponent),
+    emi: rupees(e.emiAmount),
+    balance: e.outstandingAfter, // already rupees — not converted by the middleware
     status: mapEmiStatus(e.status, e.dueDate),
     paidOn: e.paidAt ? day(e.paidAt) : undefined,
-    paidAmount: e.paidAt ? e.emiAmount : undefined,
+    paidAmount: e.paidAt ? rupees(e.emiAmount) : undefined,
   };
 }
 
@@ -102,16 +108,16 @@ export function mapAccount(row: BackendAccountRow): LiveLoanAccount {
     customerName: row.customerName,
     mobile: row.customerPhone.replace(/^\+?91/, ''),
     loanType: 'CDL', // current product line — revisit when GOLD/HOUSING go live
-    principal: row.principalAmount,
+    principal: rupees(row.principalAmount),
     interestRate: row.interestRate,
     tenureMonths: row.tenureMonths,
-    emi: row.monthlyEmi,
+    emi: rupees(row.monthlyEmi),
     disbursedOn: row.disbursedAt ?? '',
     firstEmiDate: day(row.firstEmiDate),
     nextDueDate: row.nextDueDate ? day(row.nextDueDate) : undefined,
     paidCount: row.paidCount,
-    outstandingPrincipal: row.outstandingBalance,
-    overdueAmount: row.overdueAmount,
+    outstandingPrincipal: rupees(row.outstandingBalance),
+    overdueAmount: rupees(row.overdueAmount),
     dpd: row.dpd,
     status: mapAccountStatus(row.status, row.dpd),
     collectionStatus: row.dpd > 0 ? 'FOLLOW_UP' : 'NORMAL',
