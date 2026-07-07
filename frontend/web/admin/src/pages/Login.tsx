@@ -261,7 +261,7 @@ const Login: React.FC = () => {
               <SafetyCertificateOutlined />
               Secure &amp; compliant platform
             </div>
-            <div style={{ marginTop: 8, fontSize: 12.5, color: 'rgba(255,255,255,0.78)' }}>
+            <div style={{ marginTop: 8, fontSize: 12.5, color: '#6b7280' }}>
               256-bit encryption &nbsp;·&nbsp; RBI Compliant &nbsp;·&nbsp; Trusted by NBFCs
             </div>
           </div>
