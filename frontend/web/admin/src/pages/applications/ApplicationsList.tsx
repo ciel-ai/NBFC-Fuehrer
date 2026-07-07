@@ -4,7 +4,7 @@ import type { TableProps } from 'antd';
 import { DownloadOutlined, EyeOutlined, SearchOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import dayjs, { Dayjs } from 'dayjs';
-import { useAppStore } from '../../store/appStore';
+import { useApplications } from '../../hooks/useApplications';
 import { useAuthStore } from '../../store/authStore';
 import { scopedLoanType } from '../../auth/rbac';
 import PageHeader from '../../components/PageHeader';
@@ -33,7 +33,7 @@ const ALL_STATUSES: AppStatus[] = [
 const ApplicationsList: React.FC<{ preset: ListPreset }> = ({ preset }) => {
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user)!;
-  const applications = useAppStore((s) => s.applications);
+  const { applications, live, loading } = useApplications();
   const scope = scopedLoanType(user.role);
   const meta = PRESET_META[preset];
 
@@ -147,7 +147,7 @@ const ApplicationsList: React.FC<{ preset: ListPreset }> = ({ preset }) => {
     <div>
       <PageHeader
         title={meta.title}
-        subtitle={`${meta.subtitle} · ${rows.length} records · ${inr(totalAmount)} requested`}
+        subtitle={`${meta.subtitle} · ${rows.length} records · ${inr(totalAmount)} requested${live ? '' : ' · sample data (live API unreachable)'}`}
         extra={
           <Button icon={<DownloadOutlined />} onClick={handleExport}>
             Export CSV
@@ -200,6 +200,7 @@ const ApplicationsList: React.FC<{ preset: ListPreset }> = ({ preset }) => {
           <RangePicker value={range as any} onChange={(v) => setRange(v as any)} style={{ width: 250 }} />
         </div>
         <Table<LoanApplication>
+          loading={loading}
           dataSource={rows}
           columns={columns}
           rowKey="id"
