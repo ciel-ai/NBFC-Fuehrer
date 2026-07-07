@@ -8,7 +8,6 @@ import PageHeader from '../../components/PageHeader';
 import { exportCsv } from '../../utils/csv';
 import { fmtDateTime } from '../../utils/format';
 import type { AuditLog } from '../../types';
-import { settingsApi } from '../../api/settings.api';
 
 const { RangePicker } = DatePicker;
 
@@ -26,25 +25,16 @@ const MODULE_COLOR: Record<string, string> = {
 
 const AuditLogs: React.FC = () => {
   const auditLogs = useAppStore((s) => s.auditLogs);
-  const [realLogs, setRealLogs] = React.useState<any[]>([]);
-
-  React.useEffect(() => {
-    settingsApi.getAuditLogs({ limit: 100 })
-      .then((res) => { if (res.data?.length) setRealLogs(res.data); })
-      .catch(() => {});
-  }, []);
-
-  const logList = realLogs.length > 0 ? realLogs : auditLogs;
   const [search, setSearch] = useState('');
   const [moduleFilter, setModuleFilter] = useState<string | undefined>();
   const [roleFilter, setRoleFilter] = useState<string | undefined>();
   const [range, setRange] = useState<[Dayjs | null, Dayjs | null] | null>(null);
 
-  const roles = useMemo(() => [...new Set(logList.map((l) => l.role))].sort(), [logList]);
+  const roles = useMemo(() => [...new Set(auditLogs.map((l) => l.role))].sort(), [auditLogs]);
 
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return logList.filter((l) => {
+    return auditLogs.filter((l) => {
       if (moduleFilter && l.module !== moduleFilter) return false;
       if (roleFilter && l.role !== roleFilter) return false;
       if (range?.[0] && dayjs(l.at).isBefore(range[0].startOf('day'))) return false;
@@ -52,7 +42,7 @@ const AuditLogs: React.FC = () => {
       if (q && !`${l.user} ${l.action} ${l.entity} ${l.ip}`.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [logList, search, moduleFilter, roleFilter, range]);
+  }, [auditLogs, search, moduleFilter, roleFilter, range]);
 
   const columns: TableProps<AuditLog>['columns'] = [
     {

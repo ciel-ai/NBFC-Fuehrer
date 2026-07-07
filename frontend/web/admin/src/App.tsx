@@ -19,6 +19,9 @@ import AgentManagement from './pages/agents/AgentManagement';
 import BranchManagement from './pages/branches/BranchManagement';
 import CreditQueue from './pages/credit/CreditQueue';
 import FinanceQueue from './pages/finance/FinanceQueue';
+import LoanAccounts from './pages/lms/LoanAccounts';
+import LoanDetails from './pages/lms/LoanDetails';
+import { EmiSchedulePage, RepaymentsPage, ChargesPage, DocumentsPage } from './pages/lms/LmsLists';
 
 import Collections from './pages/collections/Collections';
 import Reports from './pages/reports/Reports';
@@ -72,7 +75,15 @@ const App: React.FC = () => (
             <Route path="finance" element={<Navigate to="/finance/pending" replace />} />
             <Route path="finance/:tab" element={<RequireModule module="finance"><FinanceQueue /></RequireModule>} />
 
-           
+            {/* Loan Management (LMS / servicing) — post-disbursement loan book */}
+            <Route path="lms" element={<Navigate to="/lms/accounts" replace />} />
+            <Route path="lms/accounts" element={<RequireModule module="lms"><LoanAccounts /></RequireModule>} />
+            <Route path="lms/accounts/:loanNumber" element={<RequireModule module="lms"><LoanDetails /></RequireModule>} />
+            <Route path="lms/emi-schedule" element={<RequireModule module="lms"><EmiSchedulePage /></RequireModule>} />
+            <Route path="lms/repayments" element={<RequireModule module="lms"><RepaymentsPage /></RequireModule>} />
+            <Route path="lms/charges" element={<RequireModule module="lms"><ChargesPage /></RequireModule>} />
+            <Route path="lms/documents" element={<RequireModule module="lms"><DocumentsPage /></RequireModule>} />
+
             <Route path="collections" element={<Navigate to="/collections/due-today" replace />} />
             <Route path="collections/:tab" element={<RequireModule module="collections"><Collections /></RequireModule>} />
 

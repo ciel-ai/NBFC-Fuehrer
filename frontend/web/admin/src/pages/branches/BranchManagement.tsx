@@ -9,7 +9,6 @@ import {
 } from '@ant-design/icons';
 import { useAppStore } from '../../store/appStore';
 import { useAuthStore } from '../../store/authStore';
-import { branchesApi } from '../../api/branches.api';
 import PageHeader from '../../components/PageHeader';
 import KpiCard from '../../components/KpiCard';
 import { LoanTypeTag, StatusTag } from '../../components/StatusTag';
@@ -32,16 +31,6 @@ const BranchManagement: React.FC = () => {
   const updateBranch = useAppStore((s) => s.updateBranch);
   const toggleBranchStatus = useAppStore((s) => s.toggleBranchStatus);
 
-  const [realBranches, setRealBranches] = React.useState<any[]>([]);
-
-  React.useEffect(() => {
-    branchesApi.list({ limit: 100 })
-      .then((res) => { if (res.data?.length) setRealBranches(res.data); })
-      .catch(() => {});
-  }, []);
-
-  const branchList = realBranches.length > 0 ? realBranches : branches;
-
   const [search, setSearch] = useState('');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<Branch | null>(null);
@@ -58,8 +47,8 @@ const BranchManagement: React.FC = () => {
 
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return branchList.filter((b) => !q || `${b.name} ${b.code} ${b.city} ${b.state} ${b.manager}`.toLowerCase().includes(q));
-  }, [branchList, search]);
+    return branches.filter((b) => !q || `${b.name} ${b.code} ${b.city} ${b.state} ${b.manager}`.toLowerCase().includes(q));
+  }, [branches, search]);
 
   const openCreate = (): void => {
     setEditing(null);
@@ -111,7 +100,7 @@ const BranchManagement: React.FC = () => {
     },
     { title: 'Manager', dataIndex: 'manager', width: 165, render: (v: string) => <span style={{ fontSize: 12.5, color: '#475569' }}>{v}</span> },
     { title: 'Phone', dataIndex: 'phone', width: 140, render: (v: string) => <span className="tnum" style={{ fontSize: 12.5, color: '#64748b' }}>{v}</span> },
-    { title: 'Products', dataIndex: 'products', width: 155, render: (p: LoanType[]) => <span style={{ display: 'inline-flex', gap: 5, flexWrap: 'wrap' }}>{(p ?? []).map((t) => <LoanTypeTag key={t} type={t} />)}</span> },
+    { title: 'Products', dataIndex: 'products', width: 155, render: (p: LoanType[]) => <span style={{ display: 'inline-flex', gap: 5, flexWrap: 'wrap' }}>{p.map((t) => <LoanTypeTag key={t} type={t} />)}</span> },
     { title: 'Staff', key: 'staff', width: 90, align: 'center', render: (_, r) => <span className="tnum" style={{ fontWeight: 600 }}><TeamOutlined style={{ marginRight: 5, color: '#94a3b8' }} />{staffByBranch.get(r.name) ?? 0}</span> },
     { title: 'Opened', dataIndex: 'openedOn', width: 120, render: (v: string) => <span style={{ fontSize: 12.5, color: '#94a3b8' }}>{fmtDate(v)}</span> },
     { title: 'Status', dataIndex: 'status', width: 95, render: (s: string) => <StatusTag status={s} /> },
@@ -133,14 +122,14 @@ const BranchManagement: React.FC = () => {
     },
   ];
 
-  const activeCount = branchList.filter((b) => b.status === 'ACTIVE').length;
-  const states = new Set(branchList.map((b: any) => b.state)).size;
+  const activeCount = branches.filter((b) => b.status === 'ACTIVE').length;
+  const states = new Set(branches.map((b) => b.state)).size;
 
   const handleExport = (): void => {
     exportCsv(
       `branches-${new Date().toISOString().slice(0, 10)}`,
       ['Code', 'Name', 'City', 'State', 'Manager', 'Phone', 'Products', 'Staff', 'Opened', 'Status'],
-      rows.map((b: any) => [b.code, b.name, b.city, b.state, b.manager, b.phone, (b.products ?? []).join(' / '), staffByBranch.get(b.name) ?? 0, fmtDate(b.openedOn), b.status]),
+      rows.map((b) => [b.code, b.name, b.city, b.state, b.manager, b.phone, b.products.join(' / '), staffByBranch.get(b.name) ?? 0, fmtDate(b.openedOn), b.status]),
     );
   };
 
@@ -158,10 +147,10 @@ const BranchManagement: React.FC = () => {
       />
 
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-        <Col xs={24} sm={12} xl={6}><KpiCard label="Total Branches" value={branchList.length} sub={`${activeCount} active`} icon={<BankOutlined />} tint="#2563eb" /></Col>
+        <Col xs={24} sm={12} xl={6}><KpiCard label="Total Branches" value={branches.length} sub={`${activeCount} active`} icon={<BankOutlined />} tint="#2563eb" /></Col>
         <Col xs={24} sm={12} xl={6}><KpiCard label="States Covered" value={states} sub="geographic spread" icon={<EnvironmentOutlined />} tint="#6d4ea8" /></Col>
         <Col xs={24} sm={12} xl={6}><KpiCard label="Total Staff" value={users.length} sub="across branches" icon={<TeamOutlined />} tint="#0e7490" /></Col>
-        <Col xs={24} sm={12} xl={6}><KpiCard label="Inactive" value={branchList.length - activeCount} sub="non-operational" icon={<BankOutlined />} tint="#c0392b" /></Col>
+        <Col xs={24} sm={12} xl={6}><KpiCard label="Inactive" value={branches.length - activeCount} sub="non-operational" icon={<BankOutlined />} tint="#c0392b" /></Col>
       </Row>
 
       <Card variant="borderless" style={{ border: '1px solid #e7ebf3' }} styles={{ body: { padding: 0 } }}>

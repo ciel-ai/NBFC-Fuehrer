@@ -1,14 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { App, Button, Checkbox, ConfigProvider, Form, Input, Typography } from 'antd';
+import { App, Button, Checkbox, ConfigProvider, Form, Input } from 'antd';
 import {
   ArrowLeftOutlined, ArrowRightOutlined, BankOutlined, LockOutlined, MobileOutlined,
   SafetyCertificateOutlined, UserOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
-import { useAppStore } from '../store/appStore';
-import { DEMO_ADMIN, OTP_CODE } from '../data/mock';
-import { ROLE_META } from '../auth/rbac';
+import { staffAuthApi, staffAuthError } from '../api/staffAuth.api';
+import type { StaffAuthResult, StaffPortal } from '../api/staffAuth.api';
 
 type Portal = 'Admin' | 'Credit Team' | 'Finance Team';
 
@@ -38,10 +37,6 @@ const Login: React.FC = () => {
   const navigate = useNavigate();
   const login = useAuthStore((s) => s.login);
   const user = useAuthStore((s) => s.user);
-  const portalUsers = useAppStore((s) => s.users);
-
-  const findOtpUser = (phone: string, family: 'CREDIT' | 'FINANCE') =>
-    portalUsers.find((u) => u.phone === phone && u.role.startsWith(family) && u.status === 'ACTIVE');
 
   const [portal, setPortal] = useState<Portal>('Admin');
   const [otpStage, setOtpStage] = useState<'phone' | 'otp'>('phone');
@@ -62,59 +57,69 @@ const Login: React.FC = () => {
     return () => clearInterval(t);
   }, [resendIn]);
 
-  const finishLogin = (u: { id: string; name: string; role: any; email: string; phone: string; branch: string }): void => {
-    login({ ...u, loginAt: new Date().toISOString() });
+  const portalFamily: StaffPortal = portal === 'Credit Team' ? 'CREDIT' : 'FINANCE';
+
+  /** Persist the authenticated session (user + real JWT pair) and enter the portal. */
+  const finishLogin = (result: StaffAuthResult): void => {
+    const u = result.user;
+    login(
+      {
+        id: u.id,
+        name: u.name,
+        role: u.role,
+        email: u.email,
+        phone: u.phone,
+        branch: u.branch ?? 'Head Office',
+        loginAt: new Date().toISOString(),
+      },
+      { accessToken: result.accessToken, refreshToken: result.refreshToken },
+    );
     message.success(`Welcome back, ${u.name.split(' ')[0]}`);
     navigate('/dashboard', { replace: true });
   };
 
-  const handleAdmin = (values: { username: string; password: string }): void => {
+  const handleAdmin = async (values: { username: string; password: string }): Promise<void> => {
     setLoading(true);
-    setTimeout(() => {
+    try {
+      const result = await staffAuthApi.login(values.username.trim(), values.password);
+      finishLogin(result);
+    } catch (err) {
+      message.error(staffAuthError(err));
+    } finally {
       setLoading(false);
-      if (values.username === DEMO_ADMIN.username && values.password === DEMO_ADMIN.password) {
-        const u = DEMO_ADMIN.user;
-        finishLogin({ id: u.id, name: u.name, role: u.role, email: u.email, phone: u.phone, branch: u.branch });
-      } else {
-        message.error('Invalid username or password');
-      }
-    }, 500);
-  };
-
-  const sendOtp = (values: { phone: string }): void => {
-    const family = portal === 'Credit Team' ? 'CREDIT' : 'FINANCE';
-    const found = findOtpUser(values.phone, family);
-    if (!found) {
-      const other = portalUsers.find((u) => u.phone === values.phone);
-      if (other && ROLE_META[other.role].family === 'SALES') {
-        message.warning(`${other.name} is a Sales user — the Sales team signs in on the FUEHRER mobile app, not the web dashboard.`);
-      } else if (other && other.status === 'INACTIVE') {
-        message.error('This account has been deactivated. Contact the administrator.');
-      } else if (other) {
-        message.error(`This number is registered as ${ROLE_META[other.role].label} — switch to the correct portal tab.`);
-      } else {
-        message.error(`No active ${portal} user is registered with this mobile number`);
-      }
-      return;
     }
-    setPhone(values.phone);
-    setOtpStage('otp');
-    setResendIn(30);
-    message.success(`OTP sent to +91 ${values.phone} (use ${OTP_CODE})`);
   };
 
-  const verifyOtp = (values: { otp: string }): void => {
+  const requestOtp = async (toPhone: string): Promise<void> => {
     setLoading(true);
-    setTimeout(() => {
+    try {
+      const r = await staffAuthApi.otpRequest(toPhone, portalFamily);
+      setPhone(toPhone);
+      setOtpStage('otp');
+      setResendIn(30);
+      // devOtp is only returned by non-production builds of the API
+      message.success(r.devOtp
+        ? `OTP sent to +91 ${toPhone} (dev OTP: ${r.devOtp})`
+        : `OTP sent to +91 ${toPhone}`);
+    } catch (err) {
+      message.error(staffAuthError(err));
+    } finally {
       setLoading(false);
-      if (values.otp !== OTP_CODE) {
-        message.error('Incorrect OTP — please retry');
-        return;
-      }
-      const family = portal === 'Credit Team' ? 'CREDIT' : 'FINANCE';
-      const u = findOtpUser(phone, family);
-      if (u) finishLogin({ id: u.id, name: u.name, role: u.role, email: u.email, phone: u.phone, branch: u.branch });
-    }, 500);
+    }
+  };
+
+  const sendOtp = (values: { phone: string }): void => { void requestOtp(values.phone); };
+
+  const verifyOtp = async (values: { otp: string }): Promise<void> => {
+    setLoading(true);
+    try {
+      const result = await staffAuthApi.otpVerify(phone, values.otp, portalFamily);
+      finishLogin(result);
+    } catch (err) {
+      message.error(staffAuthError(err));
+    } finally {
+      setLoading(false);
+    }
   };
 
   const switchPortal = (p: Portal): void => {
@@ -125,16 +130,6 @@ const Login: React.FC = () => {
   const resetOtpFlow = (): void => {
     setOtpStage('phone');
     otpForm.resetFields();
-  };
-
-  const demoFill = (p: Portal, value: string): void => {
-    setPortal(p);
-    setOtpStage('phone');
-    if (p === 'Admin') {
-      adminForm.setFieldsValue({ username: DEMO_ADMIN.username, password: DEMO_ADMIN.password });
-    } else {
-      phoneForm.setFieldsValue({ phone: value });
-    }
   };
 
   return (
@@ -225,8 +220,8 @@ const Login: React.FC = () => {
                     <Input size="large" addonBefore="+91" prefix={<MobileOutlined style={{ color: '#94a3b8' }} />}
                       placeholder="Enter your phone number" maxLength={10} autoFocus />
                   </Form.Item>
-                  <Button type="primary" size="large" htmlType="submit" block
-                    icon={<ArrowRightOutlined />} iconPosition="end">
+                  <Button type="primary" size="large" htmlType="submit" block loading={loading}
+                    icon={!loading ? <ArrowRightOutlined /> : undefined} iconPosition="end">
                     Send OTP
                   </Button>
                 </Form>
@@ -250,7 +245,7 @@ const Login: React.FC = () => {
                     {resendIn > 0 ? (
                       <>Resend OTP in 00:{String(resendIn).padStart(2, '0')}</>
                     ) : (
-                      <Button type="link" size="small" onClick={() => { setResendIn(30); message.success(`OTP re-sent (use ${OTP_CODE})`); }}>
+                      <Button type="link" size="small" onClick={() => { void requestOtp(phone); }}>
                         Resend OTP
                       </Button>
                     )}
@@ -271,22 +266,6 @@ const Login: React.FC = () => {
             </div>
           </div>
 
-          {/* demo access (demo build helper) */}
-          <div className="login-demo">
-            <div className="login-demo-title">Demo access — click to fill</div>
-            <div className="login-demo-chips">
-              <button className="demo-chip" onClick={() => demoFill('Admin', '')}>Admin · admin / admin@123</button>
-              <button className="demo-chip" onClick={() => demoFill('Credit Team', '9810012001')}>{ROLE_META.CREDIT_CDL.short} · 9810012001</button>
-              <button className="demo-chip" onClick={() => demoFill('Credit Team', '9810012002')}>{ROLE_META.CREDIT_GOLD.short} · 9810012002</button>
-              <button className="demo-chip" onClick={() => demoFill('Credit Team', '9810012003')}>{ROLE_META.CREDIT_HOUSING.short} · 9810012003</button>
-              <button className="demo-chip" onClick={() => demoFill('Finance Team', '9820013001')}>{ROLE_META.FINANCE_CDL.short} · 9820013001</button>
-              <button className="demo-chip" onClick={() => demoFill('Finance Team', '9820013002')}>{ROLE_META.FINANCE_GOLD.short} · 9820013002</button>
-              <button className="demo-chip" onClick={() => demoFill('Finance Team', '9820013003')}>{ROLE_META.FINANCE_HOUSING.short} · 9820013003</button>
-            </div>
-            <Typography.Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.72)', display: 'block', marginTop: 10 }}>
-              OTP for all demo logins: <strong style={{ color: '#fff' }}>{OTP_CODE}</strong>
-            </Typography.Text>
-          </div>
         </div>
       </ConfigProvider>
     </div>

@@ -7,7 +7,6 @@ import {
 } from '@ant-design/icons';
 import { useAppStore } from '../../store/appStore';
 import { useAuthStore } from '../../store/authStore';
-import { creditApi } from '../../api/credit.api';
 import { RiskGradeTag } from '../../components/StatusTag';
 import { inr } from '../../utils/format';
 import type { LoanApplication, RiskGrade } from '../../types';
@@ -59,21 +58,7 @@ const CreditDecisionDrawer: React.FC<Props> = ({ app, open, onClose }) => {
     }
   }, [open, app.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const submit = async (values: any): Promise<void> => {
-    try {
-      if (values.decision === 'APPROVED') {
-        await creditApi.approve(app.id, {
-          approvedAmount: values.approvedAmount,
-          interestRate: values.approvedRate,
-          processingFee: Math.round(values.approvedAmount * 0.025),
-        });
-      } else if (values.decision === 'REJECTED') {
-        await creditApi.reject(app.id, { reason: values.reason ?? values.remarks });
-      }
-    } catch {
-      // API call failed — still update local store for now
-    }
-
+  const submit = (values: any): void => {
     creditDecision(
       app.id,
       {

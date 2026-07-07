@@ -55,7 +55,7 @@ const Reports: React.FC = () => {
   const family = ROLE_META[user.role].family;
 
   const allowedTabs: ReportTab[] =
-    (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') ? ['los', 'credit', 'finance', 'collections']
+    user.role === 'ADMIN' ? ['los', 'credit', 'finance', 'collections']
     : family === 'CREDIT' ? ['credit'] : ['finance'];
   const activeTab = (allowedTabs.includes(tab as ReportTab) ? tab : allowedTabs[0]) as ReportTab;
 
