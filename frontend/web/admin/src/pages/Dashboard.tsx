@@ -13,6 +13,7 @@ import {
 } from 'recharts';
 import { useAppStore } from '../store/appStore';
 import { useAuthStore } from '../store/authStore';
+import { useDashboardSummary } from '../hooks/useDashboard';
 import { ROLE_META, scopedLoanType, LOAN_TYPE_META } from '../auth/rbac';
 import ChartCard, { tooltipStyle, tooltipItemStyle, tooltipLabelStyle } from '../components/ChartCard';
 import PageHeader from '../components/PageHeader';
@@ -20,7 +21,7 @@ import { LoanTypeTag, StatusTag } from '../components/StatusTag';
 import { CHART_COLORS } from '../theme';
 import { fmtTimeAgo, inr, inrCompact, initials } from '../utils/format';
 import { approvalStats, collectionPerformance, monthlyDisbursement, recoveryThisMonth } from '../utils/analytics';
-import type { LoanApplication } from '../types';
+import type { AuditLog, LoanApplication } from '../types';
 
 const isToday = (iso?: string): boolean => !!iso && dayjs(iso).isSame(dayjs(), 'day');
 
@@ -70,11 +71,56 @@ const Dashboard: React.FC = () => {
     };
   }, [apps, lns, repayments, scope]);
 
-  const approval = useMemo(() => approvalStats(apps), [apps]);
-  const disbTrend = useMemo(() => monthlyDisbursement(lns), [lns]);
-  const collPerf = useMemo(() => collectionPerformance(lns), [lns]);
-  const recentApps = useMemo(() => apps.slice(0, 7), [apps]);
-  const activities = useMemo(() => auditLogs.slice(0, 7), [auditLogs]);
+  // ── live summary (real API) with labelled sample-data fallback ──
+  const { summary: liveSummary, live } = useDashboardSummary();
+
+  const approval = useMemo(() => (
+    live && liveSummary
+      ? { ratio: liveSummary.approvalRatio.approvalRate, approved: liveSummary.approvalRatio.approved, rejected: liveSummary.approvalRatio.rejected }
+      : approvalStats(apps)
+  ), [live, liveSummary, apps]);
+
+  const disbTrend = useMemo(() => (
+    live && liveSummary
+      ? liveSummary.disbursementTrend.map((m) => ({ month: m.month, amount: m.amount }))
+      : monthlyDisbursement(lns)
+  ), [live, liveSummary, lns]);
+
+  const collPerf = useMemo(() => (
+    live && liveSummary
+      // Backend trend has collected amounts only — demand series omitted
+      ? liveSummary.collectionPerformance.map((m) => ({ month: m.month, collected: m.amount }))
+      : collectionPerformance(lns)
+  ), [live, liveSummary, lns]);
+
+  const recentApps = useMemo<LoanApplication[]>(() => (
+    live && liveSummary
+      ? liveSummary.recentApplications.map((r) => ({
+          id: r.id,
+          appNumber: `FHR-${new Date(r.applied_at).getFullYear()}-${r.id.replace(/-/g, '').slice(-5).toUpperCase()}`,
+          loanType: 'CDL',
+          status: r.status,
+          customer: { name: r.user?.full_name ?? '—' },
+          loan: { amount: Number(r.approved_amount ?? r.amount_requested) },
+          createdAt: r.applied_at,
+        } as unknown as LoanApplication))
+      : apps.slice(0, 7)
+  ), [live, liveSummary, apps]);
+
+  const activities = useMemo<AuditLog[]>(() => (
+    live && liveSummary
+      ? liveSummary.recentActivities.map((a) => ({
+          id: a.id,
+          user: a.role ?? 'System',
+          role: a.role ?? 'SYSTEM',
+          module: a.entity_type ?? '—',
+          action: a.action.replace(/_/g, ' '),
+          entity: a.entity_type ?? '—',
+          at: a.created_at,
+          ip: '',
+        } as AuditLog))
+      : auditLogs.slice(0, 7)
+  ), [live, liveSummary, auditLogs]);
 
   // ── role-aware metric band ──
   const metrics = useMemo<Metric[]>(() => {
@@ -107,6 +153,32 @@ const Dashboard: React.FC = () => {
 
   // ── needs-action worklist ──
   const actions = useMemo<ActionItem[]>(() => {
+    // Live queue counts from the summary endpoint — mapped onto frontend routes
+    if (live && liveSummary) {
+      const metaByType: Record<string, Omit<ActionItem, 'title'> & { title: (n: number) => string }> = {
+        CREDIT_REVIEW: {
+          icon: <SafetyCertificateOutlined />,
+          title: (n) => `${n} application${n > 1 ? 's' : ''} awaiting credit review`,
+          sub: 'Underwriting complete — pending decision',
+          to: meta.family === 'CREDIT' ? '/credit/pending' : '/applications/credit-pending',
+          tone: '#b26a00',
+        },
+        FINANCE_DISBURSEMENT: {
+          icon: <BankOutlined />,
+          title: (n) => `${n} approval${n > 1 ? 's' : ''} awaiting disbursement`,
+          sub: 'Approved by credit — pending fund release',
+          to: meta.family === 'FINANCE' ? '/finance/pending' : '/applications/finance-pending',
+          tone: '#3949ab',
+        },
+      };
+      return liveSummary.pendingActions
+        .filter((a) => metaByType[a.type])
+        .map((a) => {
+          const m = metaByType[a.type]!;
+          return { icon: m.icon, title: m.title(a.count), sub: m.sub, to: m.to, tone: m.tone };
+        });
+    }
+
     const list: ActionItem[] = [];
     if (meta.family !== 'FINANCE') {
       if (counts.submitted) list.push({ icon: <FileTextOutlined />, title: `${counts.submitted} new application${counts.submitted > 1 ? 's' : ''} awaiting credit pickup`, sub: 'Sourced via the mobile sales app', to: '/applications/submitted', tone: '#2563eb' });
@@ -122,7 +194,7 @@ const Dashboard: React.FC = () => {
       if (counts.npa) list.push({ icon: <WarningOutlined />, title: `${counts.npa} NPA account${counts.npa > 1 ? 's' : ''} under recovery`, sub: `${inrCompact(counts.npaOutstanding)} outstanding`, to: '/collections/npa', tone: '#c0392b' });
     }
     return list;
-  }, [counts, meta.family, user.role]);
+  }, [live, liveSummary, counts, meta.family, user.role]);
 
   // ── portfolio / summary panel ──
   const summary = useMemo<{ label: string; value: React.ReactNode }[]>(() => {
@@ -173,10 +245,11 @@ const Dashboard: React.FC = () => {
 
   const pageTitle = user.role === 'ADMIN' ? 'Operations Dashboard' : meta.family === 'CREDIT' ? 'Credit Workbench' : 'Finance Operations';
   const needAction = actions.length;
-  const subtitle =
+  const subtitle = `${
     needAction > 0
       ? `${needAction} item${needAction > 1 ? 's' : ''} need your attention${user.role === 'ADMIN' ? ` · ${inrCompact(counts.collectionDue)} collectible today` : ''}`
-      : 'You are all caught up — nothing needs action right now';
+      : 'You are all caught up — nothing needs action right now'
+  }${live ? '' : ' · sample data (live API unreachable)'}`;
 
   const showCharts = user.role === 'ADMIN' || meta.family === 'FINANCE';
 
