@@ -2,6 +2,7 @@
   "info": {
     "name": "Fuehrer NBFC - User Module",
     "_postman_id": "c3626512-f160-451d-82e7-f4c619f13f1a",
+<<<<<<< HEAD
     "description": "User module auth, profile, KYC, and eNACH endpoints.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
@@ -30,11 +31,115 @@
   "item": [
     {
       "name": "Auth Flow",
+=======
+    "description": "User module auth, profile, KYC, and eNACH endpoints. The mobile app talks to the /auth/* routes; /api/users/* and /api/kyc/* are internal/legacy.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "phone", "value": "9876543210" },
+    { "key": "agentPhone", "value": "9000000001" },
+    { "key": "otp", "value": "" },
+    { "key": "accessToken", "value": "" },
+    { "key": "refreshToken", "value": "" },
+    { "key": "token", "value": "" },
+    { "key": "userId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Auth (Mobile App)",
+      "item": [
+        {
+          "name": "Send OTP",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"phone\": \"{{phone}}\"\n}" },
+            "url": "{{baseUrl}}/auth/send-otp"
+          }
+        },
+        {
+          "name": "Verify OTP",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.data) {",
+                  "  pm.collectionVariables.set('accessToken', json.data.accessToken);",
+                  "  pm.collectionVariables.set('refreshToken', json.data.refreshToken);",
+                  "  pm.collectionVariables.set('token', json.data.accessToken);",
+                  "  if (json.data.user) pm.collectionVariables.set('userId', json.data.user.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"phone\": \"{{phone}}\",\n  \"otp\": \"{{otp}}\"\n}" },
+            "url": "{{baseUrl}}/auth/verify-otp"
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.data) {",
+                  "  pm.collectionVariables.set('accessToken', json.data.accessToken);",
+                  "  pm.collectionVariables.set('refreshToken', json.data.refreshToken);",
+                  "  pm.collectionVariables.set('token', json.data.accessToken);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}" },
+            "url": "{{baseUrl}}/auth/refresh"
+          }
+        },
+        {
+          "name": "Get Me",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/auth/me"
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}" },
+            "url": "{{baseUrl}}/auth/logout"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth Flow (Legacy /api/users)",
+>>>>>>> origin/main
       "item": [
         {
           "name": "Register",
           "request": {
             "method": "POST",
+<<<<<<< HEAD
             "header": [
               {
                 "key": "Content-Type",
@@ -45,6 +150,10 @@
               "mode": "raw",
               "raw": "{\n  \"phone\": \"{{phone}}\"\n}"
             },
+=======
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"phone\": \"{{phone}}\"\n}" },
+>>>>>>> origin/main
             "url": "{{baseUrl}}/api/users/register"
           }
         },
@@ -52,6 +161,7 @@
           "name": "Send OTP",
           "request": {
             "method": "POST",
+<<<<<<< HEAD
             "header": [
               {
                 "key": "Content-Type",
@@ -62,6 +172,10 @@
               "mode": "raw",
               "raw": "{\n  \"phone\": \"{{phone}}\"\n}"
             },
+=======
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"phone\": \"{{phone}}\"\n}" },
+>>>>>>> origin/main
             "url": "{{baseUrl}}/api/users/send-otp"
           }
         },
@@ -71,17 +185,31 @@
             {
               "listen": "test",
               "script": {
+<<<<<<< HEAD
                 "exec": [
                   "const json = pm.response.json();",
                   "pm.collectionVariables.set('token', json.data.token);",
                   "pm.collectionVariables.set('userId', json.data.user.id);"
                 ],
                 "type": "text/javascript"
+=======
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.data) {",
+                  "  pm.collectionVariables.set('accessToken', json.data.accessToken);",
+                  "  pm.collectionVariables.set('refreshToken', json.data.refreshToken);",
+                  "  pm.collectionVariables.set('token', json.data.accessToken);",
+                  "  if (json.data.user) pm.collectionVariables.set('userId', json.data.user.id);",
+                  "}"
+                ]
+>>>>>>> origin/main
               }
             }
           ],
           "request": {
             "method": "POST",
+<<<<<<< HEAD
             "header": [
               {
                 "key": "Content-Type",
@@ -92,6 +220,10 @@
               "mode": "raw",
               "raw": "{\n  \"phone\": \"{{phone}}\",\n  \"otp\": \"{{otp}}\"\n}"
             },
+=======
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"phone\": \"{{phone}}\",\n  \"otp\": \"{{otp}}\"\n}" },
+>>>>>>> origin/main
             "url": "{{baseUrl}}/api/users/verify-otp"
           }
         },
@@ -99,6 +231,7 @@
           "name": "Login",
           "request": {
             "method": "POST",
+<<<<<<< HEAD
             "header": [
               {
                 "key": "Content-Type",
@@ -109,6 +242,10 @@
               "mode": "raw",
               "raw": "{\n  \"phone\": \"{{phone}}\"\n}"
             },
+=======
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"phone\": \"{{phone}}\"\n}" },
+>>>>>>> origin/main
             "url": "{{baseUrl}}/api/users/login"
           }
         },
@@ -116,12 +253,16 @@
           "name": "Logout",
           "request": {
             "method": "POST",
+<<<<<<< HEAD
             "header": [
               {
                 "key": "Authorization",
                 "value": "Bearer {{token}}"
               }
             ],
+=======
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+>>>>>>> origin/main
             "url": "{{baseUrl}}/api/users/logout"
           }
         }
@@ -134,12 +275,16 @@
           "name": "Get Profile",
           "request": {
             "method": "GET",
+<<<<<<< HEAD
             "header": [
               {
                 "key": "Authorization",
                 "value": "Bearer {{token}}"
               }
             ],
+=======
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+>>>>>>> origin/main
             "url": "{{baseUrl}}/api/users/profile"
           }
         },
@@ -148,6 +293,7 @@
           "request": {
             "method": "PUT",
             "header": [
+<<<<<<< HEAD
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -161,6 +307,12 @@
               "mode": "raw",
               "raw": "{\n  \"name\": \"Hari Krishnan\",\n  \"email\": \"hari@example.com\"\n}"
             },
+=======
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Hari Krishnan\",\n  \"email\": \"hari@example.com\"\n}" },
+>>>>>>> origin/main
             "url": "{{baseUrl}}/api/users/profile"
           }
         },
@@ -168,12 +320,16 @@
           "name": "Get User By ID",
           "request": {
             "method": "GET",
+<<<<<<< HEAD
             "header": [
               {
                 "key": "Authorization",
                 "value": "Bearer {{token}}"
               }
             ],
+=======
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+>>>>>>> origin/main
             "url": "{{baseUrl}}/api/users/{{userId}}"
           }
         }
@@ -187,6 +343,7 @@
           "request": {
             "method": "POST",
             "header": [
+<<<<<<< HEAD
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -200,6 +357,12 @@
               "mode": "raw",
               "raw": "{\n  \"panNumber\": \"ABCDE1234F\"\n}"
             },
+=======
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"panNumber\": \"ABCDE1234F\"\n}" },
+>>>>>>> origin/main
             "url": "{{baseUrl}}/api/kyc/verify-pan"
           }
         },
@@ -208,6 +371,7 @@
           "request": {
             "method": "POST",
             "header": [
+<<<<<<< HEAD
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -221,6 +385,12 @@
               "mode": "raw",
               "raw": "{\n  \"aadhaarNumber\": \"123456789012\"\n}"
             },
+=======
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"aadhaarNumber\": \"123456789012\"\n}" },
+>>>>>>> origin/main
             "url": "{{baseUrl}}/api/kyc/verify-aadhaar"
           }
         },
@@ -229,6 +399,7 @@
           "request": {
             "method": "POST",
             "header": [
+<<<<<<< HEAD
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -242,6 +413,12 @@
               "mode": "raw",
               "raw": "{\n  \"selfieData\": \"base64-image-placeholder\"\n}"
             },
+=======
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"selfieData\": \"base64-image-placeholder\"\n}" },
+>>>>>>> origin/main
             "url": "{{baseUrl}}/api/kyc/verify-selfie"
           }
         },
@@ -249,12 +426,16 @@
           "name": "KYC Status",
           "request": {
             "method": "GET",
+<<<<<<< HEAD
             "header": [
               {
                 "key": "Authorization",
                 "value": "Bearer {{token}}"
               }
             ],
+=======
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+>>>>>>> origin/main
             "url": "{{baseUrl}}/api/kyc/status"
           }
         },
@@ -263,6 +444,7 @@
           "request": {
             "method": "POST",
             "header": [
+<<<<<<< HEAD
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -276,6 +458,12 @@
               "mode": "raw",
               "raw": "{\n  \"documentId\": \"loan-agreement-001\"\n}"
             },
+=======
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"documentId\": \"loan-agreement-001\"\n}" },
+>>>>>>> origin/main
             "url": "{{baseUrl}}/api/kyc/esign"
           }
         }
@@ -289,6 +477,7 @@
           "request": {
             "method": "POST",
             "header": [
+<<<<<<< HEAD
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -302,6 +491,12 @@
               "mode": "raw",
               "raw": "{\n  \"accountNumber\": \"123456789012\",\n  \"ifscCode\": \"HDFC0001234\",\n  \"accountHolderName\": \"Hari Krishnan\",\n  \"bankName\": \"HDFC Bank\"\n}"
             },
+=======
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"accountNumber\": \"123456789012\",\n  \"ifscCode\": \"HDFC0001234\",\n  \"accountHolderName\": \"Hari Krishnan\",\n  \"bankName\": \"HDFC Bank\"\n}" },
+>>>>>>> origin/main
             "url": "{{baseUrl}}/api/kyc/enach"
           }
         },
@@ -309,12 +504,16 @@
           "name": "eNACH Status",
           "request": {
             "method": "GET",
+<<<<<<< HEAD
             "header": [
               {
                 "key": "Authorization",
                 "value": "Bearer {{token}}"
               }
             ],
+=======
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+>>>>>>> origin/main
             "url": "{{baseUrl}}/api/kyc/enach/status"
           }
         }

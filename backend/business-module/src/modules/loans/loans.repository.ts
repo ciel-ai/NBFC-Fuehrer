@@ -2,9 +2,15 @@
 import { prisma } from '@/config/database';
 import { withTransaction } from '@/config/database';
 import { createModuleLogger } from '@/config/logger';
+<<<<<<< HEAD
 import { generateLoanAccountNumber, generateLoanApplicationNumber } from '@/utils/referenceNumber.util';
 import {
     LOAN_STATUS,
+=======
+import {
+    LOAN_STATUS,
+    EMI_STATUS,
+>>>>>>> origin/main
     PAGINATION,
 } from '@/config/constants';
 import type { LoanStatus, ProductType } from '@/config/constants';
@@ -21,13 +27,17 @@ import type {
     LoanApplication,
     LoanAccount,
     ListLoansInput,
+<<<<<<< HEAD
     CustomerProfile,
     UpsertCustomerInput,
+=======
+>>>>>>> origin/main
 } from './loans.types';
 import { NotFoundError } from '@/errors';
 
 const log = createModuleLogger('loans.repository');
 
+<<<<<<< HEAD
 // ─── Mappers ───────────────────────────────────────────────────────────────────
 
 function mapCustomer(row: Record<string, unknown>): CustomerProfile {
@@ -66,6 +76,40 @@ function mapApplication(row: Record<string, unknown>): LoanApplication {
             createdAt: (row.customer as any).created_at,
             updatedAt: (row.customer as any).updated_at,
         } : null,
+=======
+// ─── Staff loan-book list item ─────────────────────────────────────────────────
+// Shape returned by listAccounts() for the LMS portal — account terms joined
+// with customer identity and servicing metrics derived from the EMI schedule.
+
+export interface StaffLoanAccountListItem {
+    id: string;
+    accountNumber: string;
+    applicationId: string;
+    customerName: string;
+    customerPhone: string;
+    principalAmount: number;
+    interestRate: number;
+    tenureMonths: number;
+    monthlyEmi: number;
+    outstandingBalance: number;
+    status: string;
+    disbursedAt: Date | null;
+    firstEmiDate: Date | null;
+    nextDueDate: Date | null;
+    paidCount: number;
+    totalEmis: number;
+    overdueAmount: number;
+    dpd: number;
+}
+
+// ─── Mappers ───────────────────────────────────────────────────────────────────
+
+function mapApplication(row: Record<string, unknown>): LoanApplication {
+    return {
+        id: row.id as string,
+        userId: row.user_id as string,
+        agentId: row.agent_id as string | null,
+>>>>>>> origin/main
         status: row.status as LoanStatus,
         amountRequested: toNumber(row.amount_requested as number),
         tenureMonths: row.tenure_months as number,
@@ -86,8 +130,25 @@ function mapApplication(row: Record<string, unknown>): LoanApplication {
         reviewedAt: row.reviewed_at as Date | null,
         appliedAt: row.applied_at as Date,
         updatedAt: row.updated_at as Date,
+<<<<<<< HEAD
         monthlyIncome: row.monthly_income
             ? toNumber(row.monthly_income as number) : null,
+=======
+
+        // Address fields
+        flatHouseNo: row.flat_house_no as string | null,
+        streetArea: row.street_area as string | null,
+        city: row.city as string | null,
+        pincode: row.pincode as string | null,
+        state: row.state as string | null,
+
+        // Employment fields
+        employmentType: row.employment_type as string | null,
+        employerName: row.employer_name as string | null,
+        monthlyIncome: row.monthly_income
+            ? toNumber(row.monthly_income as number) : null,
+
+>>>>>>> origin/main
         repaymentType: (row.repayment_type as string) ?? 'MONTHLY_EMI',
     };
 }
@@ -114,10 +175,28 @@ function mapAccount(row: Record<string, unknown>): LoanAccount {
     } as LoanAccount;
 }
 
+<<<<<<< HEAD
+=======
+// ─── Account number generator ──────────────────────────────────────────────────
+// FHR-2026-000001 — human-readable, sequential, year-scoped
+
+async function generateAccountNumber(): Promise<string> {
+    const year = new Date().getFullYear();
+    const result = await prisma.$queryRaw<[{ count: bigint }]>`
+    SELECT COUNT(*)::bigint as count
+    FROM loan_accounts
+    WHERE EXTRACT(YEAR FROM created_at) = ${year}
+  `;
+    const seq = Number(result[0]!.count) + 1;
+    return `FHR-${year}-${String(seq).padStart(6, '0')}`;
+}
+
+>>>>>>> origin/main
 // ─── Repository ────────────────────────────────────────────────────────────────
 
 export const loansRepository = {
 
+<<<<<<< HEAD
     // ── Customer upsert ───────────────────────────────────────────────────────
 
     async upsertCustomer(data: UpsertCustomerInput): Promise<CustomerProfile> {
@@ -156,6 +235,8 @@ export const loansRepository = {
         return row ? mapCustomer(row as unknown as Record<string, unknown>) : null;
     },
 
+=======
+>>>>>>> origin/main
     // ── Application CRUD ──────────────────────────────────────────────────────
 
     async findApplicationById(id: string): Promise<LoanApplication | null> {
@@ -172,6 +253,7 @@ export const loansRepository = {
     },
 
     async createApplication(
+<<<<<<< HEAD
         data: Omit<LoanApplication, 'id' | 'referenceNumber' | 'status' | 'approvedAmount' |
             'interestRate' | 'processingFee' | 'processingFeeGst' |
             'rejectionReason' | 'reviewedBy' | 'reviewedAt' | 'updatedAt'>,
@@ -196,6 +278,40 @@ export const loansRepository = {
                 updated_at:      new Date(),
             },
         });
+=======
+        data: Omit<LoanApplication, 'id' | 'status' | 'approvedAmount' |
+            'interestRate' | 'processingFee' | 'processingFeeGst' |
+            'rejectionReason' | 'reviewedBy' | 'reviewedAt' | 'updatedAt'>,
+    ): Promise<LoanApplication> {
+       const row = await prisma.loan_applications.create({
+    data: {
+        user_id: data.userId,
+        agent_id: data.agentId,
+        status: LOAN_STATUS.DRAFT,
+        amount_requested: data.amountRequested,
+        tenure_months: data.tenureMonths,
+        product_type: data.productType,
+        purpose: data.purpose,
+        store_name: data.storeName,
+        store_city: data.storeCity,
+        applied_at: data.appliedAt,
+        updated_at: new Date(),
+
+        // Address fields
+        flat_house_no:  data.flatHouseNo   ?? null,
+        street_area:    data.streetArea    ?? null,
+        city:           data.city          ?? null,
+        pincode:        data.pincode       ?? null,
+        state:          data.state         ?? null,
+
+        // Employment fields
+        employment_type: data.employmentType ?? null,
+        employer_name:   data.employerName   ?? null,
+        monthly_income:  data.monthlyIncome  ?? null,
+        repayment_type:  data.repaymentType  ?? 'MONTHLY_EMI',
+    },
+});
+>>>>>>> origin/main
         return mapApplication(row as unknown as Record<string, unknown>);
     },
 
@@ -268,7 +384,10 @@ export const loansRepository = {
                 where,
                 orderBy,
                 ...toPrismaPage({ page: filters.page, limit: filters.limit }),
+<<<<<<< HEAD
                 include: { customer: true },
+=======
+>>>>>>> origin/main
             }),
             prisma.loan_applications.count({ where }),
         ]);
@@ -303,6 +422,105 @@ export const loansRepository = {
         return acc;
     },
 
+<<<<<<< HEAD
+=======
+    // ── Staff loan book — all accounts with servicing metrics (LMS portal) ────
+    // Joins customer identity + EMI schedule and derives per-account servicing
+    // figures (paid count, next due, overdue amount, DPD) in one query.
+
+    async listAccounts(filters: {
+        status?: string;
+        search?: string;
+        page?: number;
+        limit?: number;
+    }): Promise<PaginatedResult<StaffLoanAccountListItem>> {
+        const page = filters.page ?? PAGINATION.DEFAULT_PAGE;
+        const limit = filters.limit ?? PAGINATION.DEFAULT_LIMIT;
+
+        const where: Record<string, unknown> = {};
+        if (filters.status) where.status = filters.status;
+        if (filters.search) {
+            const q = filters.search.trim();
+            where.OR = [
+                { account_number: { contains: q, mode: 'insensitive' } },
+                { user: { full_name: { contains: q, mode: 'insensitive' } } },
+                { user: { phone: { contains: q } } },
+            ];
+        }
+
+        const [rows, total] = await prisma.$transaction([
+            prisma.loan_accounts.findMany({
+                where,
+                include: {
+                    user: { select: { full_name: true, phone: true } },
+                    emi_schedule: {
+                        select: {
+                            due_date: true,
+                            emi_amount: true,
+                            penalty_amount: true,
+                            status: true,
+                        },
+                        orderBy: { emi_number: 'asc' },
+                    },
+                },
+                orderBy: { created_at: 'desc' },
+                ...toPrismaPage({ page, limit }),
+            }),
+            prisma.loan_accounts.count({ where }),
+        ]);
+
+        const data: StaffLoanAccountListItem[] = rows.map((row) => {
+            const emis = row.emi_schedule;
+            const settled = new Set<string>([EMI_STATUS.PAID, EMI_STATUS.WAIVED]);
+            const overdueStates = new Set<string>([EMI_STATUS.OVERDUE, EMI_STATUS.BOUNCED]);
+
+            const paidCount = emis.filter((e) => settled.has(e.status)).length;
+            const overdueEmis = emis.filter((e) => overdueStates.has(e.status));
+            const firstUnpaid = emis.find((e) => !settled.has(e.status));
+
+            const overdueAmount = overdueEmis.reduce(
+                (sum, e) => sum + toNumber(e.emi_amount) + toNumber(e.penalty_amount),
+                0,
+            );
+
+            // DPD = days since the earliest overdue EMI's due date
+            const earliestOverdue = overdueEmis[0];
+            const dpd = earliestOverdue
+                ? Math.max(0, Math.floor(
+                    (Date.now() - new Date(earliestOverdue.due_date).getTime())
+                    / 86_400_000,
+                ))
+                : 0;
+
+            return {
+                id: row.id,
+                accountNumber: row.account_number,
+                applicationId: row.application_id,
+                customerName: row.user.full_name,
+                customerPhone: row.user.phone,
+                principalAmount: toNumber(row.principal_amount),
+                interestRate: toNumber(row.interest_rate),
+                tenureMonths: row.tenure_months,
+                monthlyEmi: toNumber(row.monthly_emi),
+                outstandingBalance: toNumber(row.outstanding_balance),
+                status: row.status,
+                disbursedAt: row.disbursed_at,
+                firstEmiDate: emis[0]?.due_date ?? null,
+                nextDueDate: firstUnpaid?.due_date ?? null,
+                paidCount,
+                totalEmis: emis.length,
+                overdueAmount: Math.round(overdueAmount * 100) / 100,
+                dpd,
+            };
+        });
+
+        return {
+            data,
+            pagination: buildPaginationMeta(page, limit, total),
+        };
+    },
+
+>>>>>>> origin/main
     async findAccountsByUserId(
         userId: string,
         pagination: PaginationParams,
@@ -337,6 +555,7 @@ export const loansRepository = {
         totalInterest: number;
     }): Promise<LoanAccount> {
         return withTransaction(async (tx) => {
+<<<<<<< HEAD
             const accountNumber = await generateLoanAccountNumber();
 
             const row = await tx.loan_accounts.create({
@@ -360,6 +579,32 @@ export const loansRepository = {
                 where: { id: data.applicationId },
                 data: {
                     status:     LOAN_STATUS.DISBURSED,
+=======
+            const accountNumber = await generateAccountNumber();
+
+            const row = await tx.loan_accounts.create({
+                data: {
+                    application_id: data.applicationId,
+                    user_id: data.userId,
+                    account_number: accountNumber,
+                    principal_amount: data.principalAmount,
+                    interest_rate: data.interestRate,
+                    tenure_months: data.tenureMonths,
+                    monthly_emi: data.monthlyEmi,
+                    outstanding_balance: data.principalAmount + data.totalInterest,
+                    total_interest: data.totalInterest,
+                    status: LOAN_STATUS.DISBURSED,
+                    created_at: new Date(),
+                    updated_at: new Date(),
+                },
+            });
+
+            // Update application status to DISBURSED atomically
+            await tx.loan_applications.update({
+                where: { id: data.applicationId },
+                data: {
+                    status: LOAN_STATUS.DISBURSED,
+>>>>>>> origin/main
                     updated_at: new Date(),
                 },
             });
@@ -408,7 +653,13 @@ export const loansRepository = {
             Date.now() - overdueDaysThreshold * 24 * 60 * 60 * 1000,
         );
 
+<<<<<<< HEAD
         const rows = await prisma.$queryRaw`
+=======
+        const rows = await prisma.$queryRaw<
+            Array<{ loan_account_id: string; user_id: string; overdue_days: number }>
+        > `
+>>>>>>> origin/main
       SELECT
         la.id           AS loan_account_id,
         la.user_id,
@@ -422,7 +673,11 @@ export const loansRepository = {
       GROUP BY la.id, la.user_id
       HAVING EXTRACT(DAY FROM NOW() - MIN(es.due_date)) >= ${overdueDaysThreshold}
       ORDER BY overdue_days DESC
+<<<<<<< HEAD
     ` as Array<{ loan_account_id: string; user_id: string; overdue_days: number }>;
+=======
+    `;
+>>>>>>> origin/main
 
         return rows.map((r) => ({
             loanAccountId: r.loan_account_id,
@@ -430,4 +685,8 @@ export const loansRepository = {
             overdueDays: r.overdue_days,
         }));
     },
+<<<<<<< HEAD
 };
+=======
+};
+>>>>>>> origin/main

@@ -17,12 +17,15 @@ import {
     requestESignSchema,
     manualOverrideSchema,
     userIdParamSchema,
+<<<<<<< HEAD
     panVerifySchema,
     bankVerifySchema,
      bankVerifyAdvancedSchema,
      nameSimilaritySchema,
      silentBankVerifySchema,
      gstVerifySchema
+=======
+>>>>>>> origin/main
 } from './kyc.dto';
 import { ROLE, BUSINESS_RULES } from '@/config/constants';
 
@@ -135,6 +138,7 @@ router.post(
     requireAuth(),
     allowRoles(ROLE.CUSTOMER),
     kycLimiter,
+<<<<<<< HEAD
     validateBody(panVerifySchema),
     kycController.verifyPan,
 );
@@ -183,6 +187,10 @@ router.post(
     kycLimiter,
     validateBody(nameSimilaritySchema),
     kycController.checkNameSimilarity,
+=======
+    validateBody(initiateKycSchema),
+    kycController.initiate, // TODO: replace with kycController.verifyPan
+>>>>>>> origin/main
 );
 
 // POST /kyc/pan/verify → canonical path (matches API docs)
@@ -230,5 +238,8 @@ router.post(
 );
 
 export { router as kycRouter };
+<<<<<<< HEAD
 
 
+=======
+>>>>>>> origin/main

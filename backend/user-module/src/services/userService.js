@@ -1,14 +1,52 @@
 const prisma = require('../config/prismaClient');
 const otpService = require('./otpService');
 const AppError = require('../utils/appError');
+<<<<<<< HEAD
 const { generateToken } = require('../utils/jwtUtils');
+=======
+const {
+  generateAccessToken,
+  generateRefreshToken,
+  verifyRefreshToken,
+} = require('../utils/jwtUtils');
+>>>>>>> origin/main
 const logger = require('../utils/logger');
 const { normalizePhone } = require('../utils/phoneUtils');
 const { buildUserResponse } = require('../utils/userPresenter');
 const { hashToken } = require('../utils/tokenUtils');
+<<<<<<< HEAD
 
 const registerUser = async (phone, role = 'CUSTOMER') => {
     const normalizedPhone = normalizePhone(phone);  const existingUser = await prisma.user.findUnique({
+=======
+const { toClientRole, isSalesRole, roleToProduct } = require('../utils/roleUtils');
+
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+
+// The mobile app's OTP-resend countdown expects this many seconds.
+const OTP_EXPIRES_IN_SECONDS = 300;
+
+// The KYC module historically wrote upper-case "PENDING"/"VERIFIED"; the mobile
+// app expects lower-case states (none | started | in_progress | verified).
+// Legacy "PENDING" maps to "none" (i.e. "not started" from the app's view).
+const toClientKycStatus = (status) => {
+  const normalized = String(status || 'none').toLowerCase();
+  return normalized === 'pending' ? 'none' : normalized;
+};
+
+const persistRefreshToken = (userId, refreshToken) =>
+  prisma.refreshToken.create({
+    data: {
+      tokenHash: hashToken(refreshToken),
+      userId,
+      expiresAt: new Date(Date.now() + SEVEN_DAYS_MS),
+    },
+  });
+
+const registerUser = async (phone, role = 'CUSTOMER') => {
+  const normalizedPhone = normalizePhone(phone);
+  const existingUser = await prisma.user.findUnique({
+>>>>>>> origin/main
     where: {
       phone: normalizedPhone,
     },
@@ -20,10 +58,17 @@ const registerUser = async (phone, role = 'CUSTOMER') => {
 
   const user = await prisma.user.create({
     data: {
+<<<<<<< HEAD
         phone: normalizedPhone,
         role,
     },
 });
+=======
+      phone: normalizedPhone,
+      role,
+    },
+  });
+>>>>>>> origin/main
   logger.info({
     message: 'User registered successfully.',
     userId: user.id,
@@ -37,6 +82,7 @@ const registerUser = async (phone, role = 'CUSTOMER') => {
 
 const sendOtp = async (phone) => {
   const normalizedPhone = normalizePhone(phone);
+<<<<<<< HEAD
   const user = await prisma.user.findUnique({
     where: {
       phone: normalizedPhone,
@@ -53,11 +99,36 @@ const sendOtp = async (phone) => {
     phone: normalizedPhone,
     expiresAt: otpPayload.expiresAt,
     otp: otpPayload.otp,
+=======
+
+  // Auto-create a customer if this phone is unknown — customers self-register
+  // through this flow. Sales agents are pre-seeded and simply match here.
+  // Never throw 404 for an unknown phone.
+  let user = await prisma.user.findUnique({
+    where: { phone: normalizedPhone },
+  });
+
+  if (!user) {
+    user = await prisma.user.create({
+      data: { phone: normalizedPhone, role: 'CUSTOMER' },
+    });
+    logger.info({ message: 'Auto-registered new customer', userId: user.id });
+  }
+
+  // otpService logs the OTP to the console in dev and sends via MSG91 in prod.
+  await otpService.issueOtp(normalizedPhone);
+
+  // Never return the OTP itself in the response.
+  return {
+    phone: normalizedPhone,
+    expiresIn: OTP_EXPIRES_IN_SECONDS,
+>>>>>>> origin/main
   };
 };
 
 const verifyOtp = async (phone, otp) => {
   const normalizedPhone = normalizePhone(phone);
+<<<<<<< HEAD
   const user = await prisma.user.findUnique({
     where: {
       phone: normalizedPhone,
@@ -71,6 +142,29 @@ const verifyOtp = async (phone, otp) => {
   await otpService.consumeOtp(normalizedPhone, otp);
 
   const token = generateToken(user.id, user.phone, user.role);
+=======
+
+  const user = await prisma.user.findUnique({
+    where: { phone: normalizedPhone },
+    include: { agent: true },
+  });
+
+  if (!user) {
+    throw new AppError('User not found.', 404);
+  }
+
+  // Existing otpService handles expiry + bcrypt comparison and throws on failure.
+  await otpService.consumeOtp(normalizedPhone, otp);
+
+  const accessToken = generateAccessToken(user);
+  const refreshToken = generateRefreshToken(user.id);
+
+  await persistRefreshToken(user.id, refreshToken);
+
+  const clientRole = toClientRole(user.role);
+  const isSales = isSalesRole(user.role);
+  const kycStatus = toClientKycStatus(user.kycStatus);
+>>>>>>> origin/main
 
   logger.info({
     message: 'OTP verified successfully.',
@@ -78,9 +172,93 @@ const verifyOtp = async (phone, otp) => {
     phone: user.phone,
   });
 
+<<<<<<< HEAD
   return {
     user: buildUserResponse(user),
     token,
+=======
+  const responseData = {
+    accessToken,
+    refreshToken,
+    user: {
+      id: user.id,
+      phone: user.phone,
+      name: user.name ?? '',
+      role: clientRole,
+      kycStatus,
+    },
+    kycComplete: isSales ? true : kycStatus === 'verified',
+  };
+
+  // Attach the agent profile only for sales roles.
+  if (isSales && user.agent) {
+    responseData.agent = {
+      id: user.agent.id,
+      name: user.agent.name,
+      product: roleToProduct(user.role),
+      branch: user.agent.branch,
+      fdoCode: user.agent.fdoCode,
+    };
+  }
+
+  return responseData;
+};
+
+// Rotate refresh tokens: validate the presented token, revoke it, and issue a
+// brand-new access + refresh pair. Any failure surfaces as 401 to the caller.
+const refreshTokens = async (refreshToken) => {
+  if (!refreshToken) {
+    throw new AppError('Refresh token is required.', 401);
+  }
+
+  let decoded;
+  try {
+    decoded = verifyRefreshToken(refreshToken);
+  } catch (err) {
+    throw new AppError('Invalid or expired refresh token.', 401);
+  }
+
+  const tokenHash = hashToken(refreshToken);
+
+  const stored = await prisma.refreshToken.findUnique({ where: { tokenHash } });
+  if (!stored || stored.revokedAt || stored.expiresAt < new Date()) {
+    throw new AppError('Refresh token is invalid, expired, or revoked.', 401);
+  }
+
+  // Honour the shared blacklist too (logout writes refresh hashes there).
+  const blacklisted = await prisma.tokenBlacklist.findUnique({ where: { tokenHash } });
+  if (blacklisted && blacklisted.expiresAt > new Date()) {
+    throw new AppError('Refresh token has been revoked.', 401);
+  }
+
+  const user = await prisma.user.findUnique({ where: { id: decoded.sub } });
+  if (!user) {
+    throw new AppError('User not found.', 401);
+  }
+
+  const accessToken = generateAccessToken(user);
+  const newRefreshToken = generateRefreshToken(user.id);
+
+  await prisma.$transaction([
+    prisma.refreshToken.update({
+      where: { tokenHash },
+      data: { revokedAt: new Date() },
+    }),
+    prisma.refreshToken.create({
+      data: {
+        tokenHash: hashToken(newRefreshToken),
+        userId: user.id,
+        expiresAt: new Date(Date.now() + SEVEN_DAYS_MS),
+      },
+    }),
+  ]);
+
+  logger.info({ message: 'Tokens refreshed.', userId: user.id });
+
+  return {
+    accessToken,
+    refreshToken: newRefreshToken,
+>>>>>>> origin/main
   };
 };
 
@@ -88,7 +266,11 @@ const loginUser = async (phone) => {
   return sendOtp(phone);
 };
 
+<<<<<<< HEAD
 const logoutUser = async (userId, token, tokenExp) => {
+=======
+const logoutUser = async (userId, token, tokenExp, refreshToken) => {
+>>>>>>> origin/main
   const user = await prisma.user.findUnique({
     where: {
       id: userId,
@@ -99,6 +281,7 @@ const logoutUser = async (userId, token, tokenExp) => {
     throw new AppError('User not found.', 404);
   }
 
+<<<<<<< HEAD
   const tokenHash = hashToken(token);
   const expiresAt = tokenExp ? new Date(tokenExp * 1000) : new Date(Date.now() + (7 * 24 * 60 * 60 * 1000));
 
@@ -116,6 +299,45 @@ const logoutUser = async (userId, token, tokenExp) => {
     },
   });
 
+=======
+  // Blacklist the access token.
+  const tokenHash = hashToken(token);
+  const expiresAt = tokenExp
+    ? new Date(tokenExp * 1000)
+    : new Date(Date.now() + SEVEN_DAYS_MS);
+
+  await prisma.tokenBlacklist.upsert({
+    where: { tokenHash },
+    update: { expiresAt },
+    create: { tokenHash, userId, expiresAt },
+  });
+
+  // Blacklist + revoke the refresh token if the client supplied one.
+  if (refreshToken) {
+    const refreshHash = hashToken(refreshToken);
+    let refreshExpiresAt = new Date(Date.now() + SEVEN_DAYS_MS);
+    try {
+      const decoded = verifyRefreshToken(refreshToken);
+      if (decoded.exp) {
+        refreshExpiresAt = new Date(decoded.exp * 1000);
+      }
+    } catch (err) {
+      // Still blacklist by hash even if the token can't be verified.
+    }
+
+    await prisma.refreshToken.updateMany({
+      where: { tokenHash: refreshHash, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+
+    await prisma.tokenBlacklist.upsert({
+      where: { tokenHash: refreshHash },
+      update: { expiresAt: refreshExpiresAt },
+      create: { tokenHash: refreshHash, userId, expiresAt: refreshExpiresAt },
+    });
+  }
+
+>>>>>>> origin/main
   logger.info({
     message: 'User logged out successfully.',
     userId,
@@ -126,6 +348,10 @@ const logoutUser = async (userId, token, tokenExp) => {
   };
 };
 
+<<<<<<< HEAD
+=======
+// Flat shape consumed by GET /auth/me (role + kycStatus are always lowercase).
+>>>>>>> origin/main
 const getProfile = async (userId) => {
   const user = await prisma.user.findUnique({
     where: {
@@ -138,7 +364,15 @@ const getProfile = async (userId) => {
   }
 
   return {
+<<<<<<< HEAD
     user: buildUserResponse(user),
+=======
+    id: user.id,
+    phone: user.phone,
+    name: user.name ?? '',
+    role: toClientRole(user.role),
+    kycStatus: toClientKycStatus(user.kycStatus),
+>>>>>>> origin/main
   };
 };
 
@@ -193,6 +427,10 @@ module.exports = {
   registerUser,
   sendOtp,
   verifyOtp,
+<<<<<<< HEAD
+=======
+  refreshTokens,
+>>>>>>> origin/main
   loginUser,
   logoutUser,
   getProfile,

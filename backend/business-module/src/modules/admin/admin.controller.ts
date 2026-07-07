@@ -134,6 +134,7 @@ export const adminController = {
             );
         } catch (err) { next(err); }
     },
+<<<<<<< HEAD
 
     // GET /admin/branches
 async listBranches(_req: AuthRequest, res: Response, next: NextFunction) {
@@ -282,3 +283,6 @@ async getLoanDetail(req: AuthRequest, res: Response, next: NextFunction) {
 };
 
 
+=======
+};
+>>>>>>> origin/main

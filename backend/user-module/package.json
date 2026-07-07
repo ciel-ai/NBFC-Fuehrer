@@ -9,19 +9,31 @@
     "prisma:generate": "prisma generate",
     "prisma:validate": "prisma validate",
     "prisma:push": "prisma db push --skip-generate",
+<<<<<<< HEAD
     "prisma:migrate": "prisma migrate dev --name user_module_tables"
+=======
+    "prisma:migrate": "prisma migrate dev --name add_auth_tables",
+    "seed": "node scripts/seed.js"
+>>>>>>> origin/main
   },
   "dependencies": {
     "@prisma/client": "^6.6.0",
     "bcrypt": "^5.1.1",
+<<<<<<< HEAD
     "bcryptjs": "^3.0.3",
+=======
+>>>>>>> origin/main
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "express-rate-limit": "^7.5.0",
     "express-validator": "^7.2.1",
     "jsonwebtoken": "^9.0.2",
+<<<<<<< HEAD
     "pg": "^8.21.0",
+=======
+    "twilio": "^6.0.2",
+>>>>>>> origin/main
     "winston": "^3.17.0"
   },
   "devDependencies": {

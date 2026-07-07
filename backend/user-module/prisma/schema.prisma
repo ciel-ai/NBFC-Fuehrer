@@ -15,11 +15,22 @@ model User {
   panNumber         String?
   aadhaarNumber     String?
   isKycDone         Boolean             @default(false)
+<<<<<<< HEAD
   kycStatus         String              @default("PENDING")
   isActive          Boolean             @default(true)
 
   // Role field — required by business module JWT and RBAC
   // Valid values: CUSTOMER | AGENT
+=======
+  // App-facing KYC states: none | started | in_progress | verified
+  // (the KYC module historically wrote PENDING/VERIFIED; the auth layer
+  //  normalizes to lowercase for the mobile app — see userService)
+  kycStatus         String              @default("none")
+  isActive          Boolean             @default(true)
+
+  // Role field — required by business module JWT and RBAC
+  // Valid values: CUSTOMER | SALES_CDL | SALES_GOLD | SALES_HOUSING
+>>>>>>> origin/main
   role              String              @default("CUSTOMER")
 
   createdAt         DateTime            @default(now())
@@ -28,10 +39,45 @@ model User {
   eNachMandate      ENachMandate?
   blacklistedTokens TokenBlacklist[]
   loan_applications loan_applications[]
+<<<<<<< HEAD
+=======
+  agent             SalesAgent?
+>>>>>>> origin/main
 
   @@map("users")
 }
 
+<<<<<<< HEAD
+=======
+// Sales agents are pre-seeded by admin; one row per agent user.
+// product is the lowercase app product code: cdl | gold | housing
+model SalesAgent {
+  id      String @id @default(uuid())
+  userId  String @unique
+  user    User   @relation(fields: [userId], references: [id])
+  product String
+  branch  String
+  fdoCode String
+  name    String
+
+  @@map("sales_agents")
+}
+
+// Refresh tokens are rotated on every /auth/refresh. We store only the
+// SHA-256 hash; revokedAt is set when a token is rotated or on logout.
+model RefreshToken {
+  id        String    @id @default(uuid())
+  tokenHash String    @unique
+  userId    String
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+>>>>>>> origin/main
 model agents {
   id        String   @id
   name      String

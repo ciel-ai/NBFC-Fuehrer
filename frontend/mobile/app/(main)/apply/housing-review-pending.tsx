@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 import React, { useCallback, useState } from 'react';
+=======
+import React, { useCallback } from 'react';
+>>>>>>> origin/main
 import {
   View,
   Text,
@@ -6,7 +10,10 @@ import {
   ScrollView,
   TouchableOpacity,
   BackHandler,
+<<<<<<< HEAD
   Alert,
+=======
+>>>>>>> origin/main
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -16,9 +23,13 @@ import { FontFamily, FontSize, Typography } from '@/src/core/theme/typography';
 import { Spacing, BorderRadius, Shadow } from '@/src/core/theme/spacing';
 import { Button } from '@/src/shared/components/common/Button';
 import { scale } from '@/src/core/utils/responsive';
+<<<<<<< HEAD
 import { formatCurrency, calculateEMI } from '@/src/core/utils/formatters';
 import { useServices } from '@/src/core/services/ServiceProvider';
 import { HOUSING_INTEREST_RATE } from '@/src/entities/housingLoan';
+=======
+import { formatCurrency } from '@/src/core/utils/formatters';
+>>>>>>> origin/main
 
 function generateRef() {
   const n = Math.floor(10000 + Math.random() * 90000);
@@ -44,6 +55,7 @@ export default function HousingReviewPendingScreen() {
     }, [])
   );
 
+<<<<<<< HEAD
   const { housingLoanService } = useServices();
   const [deciding, setDeciding] = useState(false);
 
@@ -74,6 +86,11 @@ export default function HousingReviewPendingScreen() {
       setDeciding(false);
     }
   };
+=======
+  const loanAmount = Number(params.amount) || 3600000;
+  const propertyValue = Number(params.agreementValue) || 4500000;
+  const ltv = Math.round((loanAmount / propertyValue) * 100);
+>>>>>>> origin/main
 
   return (
     <SafeAreaView style={styles.container}>
@@ -166,8 +183,13 @@ export default function HousingReviewPendingScreen() {
             'Site visit by technical valuer (Day 1)',
             'Legal title verification by panel counsel (Day 1–2)',
             'Credit committee sanction decision (Day 2)',
+<<<<<<< HEAD
             'Sanction letter eSigned via eMudhra (Day 2)',
             'You complete eSign + eNACH → Disbursal to builder',
+=======
+            'Sanction letter issued — you eSign the agreement',
+            'Finance team disburses to the builder',
+>>>>>>> origin/main
           ].map((step, i) => (
             <View key={i} style={styles.timelineRow}>
               <View style={styles.timelineDot} />
@@ -179,6 +201,7 @@ export default function HousingReviewPendingScreen() {
 
       <View style={styles.footer}>
         <Button
+<<<<<<< HEAD
           title={deciding ? 'Getting committee decision…' : 'Get Committee Decision'}
           loading={deciding}
           disabled={deciding}
@@ -190,6 +213,17 @@ export default function HousingReviewPendingScreen() {
         >
           <Ionicons name="time-outline" size={16} color={Colors.primary} />
           <Text style={styles.homeLinkText}>Track later from My Loans</Text>
+=======
+          title="Track from My Loans"
+          onPress={() => router.replace('/(main)/(tabs)/loans')}
+        />
+        <TouchableOpacity
+          style={styles.homeLink}
+          onPress={() => router.replace('/(main)/(tabs)/home')}
+        >
+          <Ionicons name="home-outline" size={16} color={Colors.primary} />
+          <Text style={styles.homeLinkText}>Back to Home</Text>
+>>>>>>> origin/main
         </TouchableOpacity>
       </View>
     </SafeAreaView>

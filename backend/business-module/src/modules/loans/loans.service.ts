@@ -39,7 +39,10 @@ import type {
     EmiPreviewInput,
     EmiPreviewResult,
     StatusTransitionResult,
+<<<<<<< HEAD
     CustomerProfile,
+=======
+>>>>>>> origin/main
 } from './loans.types';
 
 const log = createModuleLogger('loans.service');
@@ -63,7 +66,11 @@ function calculateEmi(
         emi = (principal * r * power) / (power - 1);
     }
 
+<<<<<<< HEAD
     emi = ceilRupees(emi);
+=======
+    emi = ceilRupees(emi);   // Always round UP — customer never underpays
+>>>>>>> origin/main
 
     const totalAmount = roundRupees(emi * tenureMonths);
     const totalInterest = roundRupees(totalAmount - principal);
@@ -72,6 +79,10 @@ function calculateEmi(
 }
 
 // ─── APR calculation ───────────────────────────────────────────────────────────
+<<<<<<< HEAD
+=======
+// Effective annual rate including processing fee using Newton-Raphson approximation
+>>>>>>> origin/main
 
 function calculateApr(
     principal: number,
@@ -80,6 +91,10 @@ function calculateApr(
     processingFee: number,
 ): number {
     const netDisbursed = principal - processingFee;
+<<<<<<< HEAD
+=======
+    // Newton-Raphson to find monthly rate that prices EMIs on net disbursed amount
+>>>>>>> origin/main
     let r = 0.01;
     for (let i = 0; i < 100; i++) {
         const power = Math.pow(1 + r, tenureMonths);
@@ -98,13 +113,23 @@ function calculateApr(
 
 function toApplicationResponse(
     app: LoanApplication,
+<<<<<<< HEAD
     customer: CustomerProfile | null,
+=======
+>>>>>>> origin/main
 ): LoanApplicationResponse {
     const terms = app.approvedAmount && app.interestRate && app.tenureMonths
         ? calculateEmi(app.approvedAmount, app.interestRate, app.tenureMonths)
         : null;
 
+<<<<<<< HEAD
     const referenceNumber = app.referenceNumber ?? null;
+=======
+    // Generate FHR-YYYY-NNNNN reference from UUID last 5 chars
+    const year = new Date(app.appliedAt).getFullYear();
+    const shortRef = app.id.replace(/-/g, '').slice(-5).toUpperCase();
+    const referenceNumber = `FHR-${year}-${shortRef}`;
+>>>>>>> origin/main
 
     return {
         id: app.id,
@@ -120,13 +145,34 @@ function toApplicationResponse(
         purpose: app.purpose,
         storeName: app.storeName,
         storeCity: app.storeCity,
+<<<<<<< HEAD
         monthlyIncome: app.monthlyIncome ?? null,
         repaymentType: app.repaymentType ?? 'MONTHLY_EMI',
+=======
+>>>>>>> origin/main
         rejectionReason: app.rejectionReason,
         appliedAt: app.appliedAt,
         updatedAt: app.updatedAt,
         reviewedAt: app.reviewedAt,
+<<<<<<< HEAD
         customer,
+=======
+
+        // Address fields
+        flatHouseNo:    app.flatHouseNo    ?? null,
+        streetArea:     app.streetArea     ?? null,
+        city:           app.city           ?? null,
+        pincode:        app.pincode        ?? null,
+        state:          app.state          ?? null,
+
+        // Employment fields
+        employmentType: app.employmentType ?? null,
+        employerName:   app.employerName   ?? null,
+        monthlyIncome:  app.monthlyIncome  ?? null,
+
+        // Repayment type
+        repaymentType:  app.repaymentType  ?? 'MONTHLY_EMI',
+>>>>>>> origin/main
     };
 }
 
@@ -182,6 +228,10 @@ export const loansService = {
     ): Promise<LoanApplicationResponse> {
         const { userId, amount, tenureMonths } = input;
 
+<<<<<<< HEAD
+=======
+        // ── Business rule validations ────────────────────────────────────────────
+>>>>>>> origin/main
         if (
             amount < env.business.minLoanAmount ||
             amount > env.business.maxLoanAmount
@@ -204,6 +254,7 @@ export const loansService = {
             );
         }
 
+<<<<<<< HEAD
         const hasActive = await loansRepository.hasActiveApplication(userId);
         if (hasActive) throw CONFLICT_ERRORS.duplicateApplication(userId);
 
@@ -234,6 +285,18 @@ export const loansService = {
             appliedAt:       new Date(),
         });
 
+=======
+        // One active application per user — prevent duplicate pipeline entries
+        const hasActive = await loansRepository.hasActiveApplication(userId);
+        if (hasActive) throw CONFLICT_ERRORS.duplicateApplication(userId);
+
+        const application = await loansRepository.createApplication({
+            ...input,
+            amountRequested: input.amount,
+            appliedAt: new Date(),
+        });
+        
+>>>>>>> origin/main
         setAuditContext(req, {
             action: AUDIT_ACTION.LOAN_CREATED,
             entityType: 'loan_application',
@@ -257,10 +320,16 @@ export const loansService = {
             loanId: application.id,
             userId,
             amount,
+<<<<<<< HEAD
             customerId: customer.id,
         });
 
         return toApplicationResponse(application, customer);
+=======
+        });
+
+        return toApplicationResponse(application);
+>>>>>>> origin/main
     },
 
     // ── 3. Submit for KYC (DRAFT → KYC_PENDING) ──────────────────────────────
@@ -272,12 +341,24 @@ export const loansService = {
     ): Promise<LoanApplicationResponse> {
         const application = await loansRepository.findApplicationByIdOrThrow(loanId);
 
+<<<<<<< HEAD
+=======
+        // Ownership — customer can only submit their own application
+>>>>>>> origin/main
         if (application.userId !== userId) {
             throw new ForbiddenError('You can only submit your own loan application');
         }
 
+<<<<<<< HEAD
         LoanStateError.assert(loanId, application.status, LOAN_STATUS.KYC_PENDING);
 
+=======
+        // State machine check
+        LoanStateError.assert(loanId, application.status, LOAN_STATUS.KYC_PENDING);
+
+        // KYC must have been initiated — not necessarily complete at this stage
+        // (KYC completes async; the loan moves to UNDERWRITING once KYC is done)
+>>>>>>> origin/main
         const kycDoc = await kycRepository.findByUserId(userId);
         if (!kycDoc) {
             throw new KycIncompleteError(userId, ['KYC not initiated']);
@@ -301,12 +382,21 @@ export const loansService = {
         );
 
         log.info('Loan submitted for KYC', { loanId, userId });
+<<<<<<< HEAD
 
         const customer = await loansRepository.findCustomerByUserId(userId);
         return toApplicationResponse(updated, customer);
     },
 
     // ── 4. Progress to UNDERWRITING (KYC_PENDING → UNDERWRITING) ────────────
+=======
+        return toApplicationResponse(updated);
+    },
+
+    // ── 4. Progress to UNDERWRITING (KYC_PENDING → UNDERWRITING) ────────────
+    // Called by the KYC module's 'kyc.completed' event handler
+    // (not a direct controller action — internal use only)
+>>>>>>> origin/main
 
     async progressToUnderwriting(
         loanId: string,
@@ -334,6 +424,10 @@ export const loansService = {
     },
 
     // ── 5. Submit for approval (UNDERWRITING → PENDING_APPROVAL) ─────────────
+<<<<<<< HEAD
+=======
+    // Called by underwriting.service after completing risk assessment
+>>>>>>> origin/main
 
     async submitForApproval(
         loanId: string,
@@ -373,22 +467,39 @@ export const loansService = {
 
         LoanStateError.assert(loanId, application.status, LOAN_STATUS.APPROVED);
 
+<<<<<<< HEAD
+=======
+        // Processing fee GST
+>>>>>>> origin/main
         const processingFeeGst = roundRupees(
             processingFee * BUSINESS_RULES.GST_ON_PROCESSING_FEE,
         );
 
+<<<<<<< HEAD
+=======
+        // Calculate EMI at approval stage
+>>>>>>> origin/main
         const { emi } = calculateEmi(approvedAmount, interestRate, application.tenureMonths);
 
         const updated = await loansRepository.updateApplicationStatus(
             loanId,
             LOAN_STATUS.APPROVED,
             {
+<<<<<<< HEAD
                 approved_amount:     approvedAmount,
                 interest_rate:       interestRate,
                 processing_fee:      processingFee,
                 processing_fee_gst:  processingFeeGst,
                 reviewed_by:         approvedBy,
                 reviewed_at:         new Date(),
+=======
+                approved_amount: approvedAmount,
+                interest_rate: interestRate,
+                processing_fee: processingFee,
+                processing_fee_gst: processingFeeGst,
+                reviewed_by: approvedBy,
+                reviewed_at: new Date(),
+>>>>>>> origin/main
             },
         );
 
@@ -409,18 +520,33 @@ export const loansService = {
             application,
             {
                 approvedAmount, interestRate,
+<<<<<<< HEAD
                 tenureMonths: application.tenureMonths, monthlyEmi: emi,
+=======
+                tenureMonths: application.tenureMonths, monthlyEmi: emi
+>>>>>>> origin/main
             },
             approvedBy,
             req,
         );
 
+<<<<<<< HEAD
         log.info('Loan approved', { loanId, approvedBy, approvedAmount, interestRate });
 
         const customer = application.customerId
             ? await loansRepository.findCustomerByUserId(application.userId)
             : null;
         return toApplicationResponse(updated, customer);
+=======
+        log.info('Loan approved', {
+            loanId,
+            approvedBy,
+            approvedAmount,
+            interestRate,
+        });
+
+        return toApplicationResponse(updated);
+>>>>>>> origin/main
     },
 
     // ── 7. Reject loan ────────────────────────────────────────────────────────
@@ -432,6 +558,10 @@ export const loansService = {
         const { loanId, rejectedBy, reason } = input;
         const application = await loansRepository.findApplicationByIdOrThrow(loanId);
 
+<<<<<<< HEAD
+=======
+        // Rejection is allowed from multiple states
+>>>>>>> origin/main
         const rejectableStates: LoanStatus[] = [
             LOAN_STATUS.KYC_PENDING,
             LOAN_STATUS.UNDERWRITING,
@@ -448,8 +578,13 @@ export const loansService = {
             LOAN_STATUS.REJECTED,
             {
                 rejection_reason: reason,
+<<<<<<< HEAD
                 reviewed_by:      rejectedBy,
                 reviewed_at:      new Date(),
+=======
+                reviewed_by: rejectedBy,
+                reviewed_at: new Date(),
+>>>>>>> origin/main
             },
         );
 
@@ -464,6 +599,7 @@ export const loansService = {
         loanEvents.rejected(application, reason, rejectedBy, req);
 
         log.info('Loan rejected', { loanId, rejectedBy, reason });
+<<<<<<< HEAD
 
         const customer = application.customerId
             ? await loansRepository.findCustomerByUserId(application.userId)
@@ -472,6 +608,13 @@ export const loansService = {
     },
 
     // ── 8. Mark as ACTIVE (DISBURSED → ACTIVE) ───────────────────────────────
+=======
+        return toApplicationResponse(updated);
+    },
+
+    // ── 8. Mark as ACTIVE (DISBURSED → ACTIVE) ───────────────────────────────
+    // Called after eNACH mandate is registered — loan is now in repayment mode
+>>>>>>> origin/main
 
     async activateLoan(
         accountId: string,
@@ -482,7 +625,14 @@ export const loansService = {
 
         LoanStateError.assert(accountId, account.status, LOAN_STATUS.ACTIVE);
 
+<<<<<<< HEAD
         await loansRepository.updateAccountStatus(accountId, LOAN_STATUS.ACTIVE);
+=======
+        await loansRepository.updateAccountStatus(
+            accountId,
+            LOAN_STATUS.ACTIVE,
+        );
+>>>>>>> origin/main
         await loansRepository.updateMandateId(accountId, mandateId);
 
         log.info('Loan activated', { accountId, mandateId });
@@ -498,7 +648,11 @@ export const loansService = {
     ): Promise<void> {
         const account = await loansRepository.findAccountByIdOrThrow(accountId);
 
+<<<<<<< HEAD
         if (account.status === LOAN_STATUS.NPA) return;
+=======
+        if (account.status === LOAN_STATUS.NPA) return; // Already NPA
+>>>>>>> origin/main
 
         LoanStateError.assert(accountId, account.status, LOAN_STATUS.NPA);
 
@@ -526,15 +680,23 @@ export const loansService = {
     ): Promise<LoanApplicationResponse> {
         const application = await loansRepository.findApplicationByIdOrThrow(loanId);
 
+<<<<<<< HEAD
+=======
+        // Customers can only view their own applications
+>>>>>>> origin/main
         const staffRoles = ['OPS_EXECUTIVE', 'CREDIT_MANAGER', 'FINANCE', 'SUPER_ADMIN', 'COLLECTION_AGENT'];
         if (!staffRoles.includes(role) && application.userId !== userId) {
             throw new ForbiddenError('You can only view your own loan applications');
         }
 
+<<<<<<< HEAD
         const customer = application.customerId
             ? await loansRepository.findCustomerByUserId(application.userId)
             : null;
         return toApplicationResponse(application, customer);
+=======
+        return toApplicationResponse(application);
+>>>>>>> origin/main
     },
 
     // ── 11. List applications ─────────────────────────────────────────────────
@@ -572,7 +734,25 @@ export const loansService = {
         return loansRepository.findAccountsByUserId(userId, pagination);
     },
 
+<<<<<<< HEAD
     // ── 14. EMI calculation helper (used by disbursement.service) ─────────────
 
     calculateEmi,
 };
+=======
+    // ── 14. Staff loan book — all accounts with servicing metrics (LMS) ───────
+
+    async listLoanAccounts(filters: {
+        status?: string;
+        search?: string;
+        page?: number;
+        limit?: number;
+    }) {
+        return loansRepository.listAccounts(filters);
+    },
+
+    // ── 15. EMI calculation helper (used by disbursement.service) ─────────────
+
+    calculateEmi,
+};
+>>>>>>> origin/main

@@ -197,7 +197,11 @@ export const kycService = {
     input: AadhaarOtpVerifyInput,
     req: Request,
 ): Promise<KycStatusResponse> {
+<<<<<<< HEAD
     const { userId } = input;
+=======
+    const { userId, otp, shareCode } = input;
+>>>>>>> origin/main
     const doc = await kycRepository.findByUserIdOrThrow(userId);
 
     if (!doc.aadhaarEncrypted) {
@@ -216,7 +220,11 @@ export const kycService = {
     const aadhaarPlain = await enc.decrypt(doc.aadhaarEncrypted);
     const kycProvider = getKycVerifyProvider();
 
+<<<<<<< HEAD
     const result = await kycProvider.verifyAadhaar(aadhaarPlain, accessKey, '');
+=======
+    const result = await kycProvider.verifyAadhaar(aadhaarPlain, accessKey, shareCode);
+>>>>>>> origin/main
 
     // Clean up accessKey after use
     await redis.del(`kyc:aadhaar:accessKey:${userId}`);
@@ -491,6 +499,7 @@ export const kycService = {
         };
     },
 
+<<<<<<< HEAD
     async runBankVerificationAdvanced(
     userId: string,
     accountNumber: string,
@@ -573,6 +582,8 @@ async runGSTVerification(
     };
 },
 
+=======
+>>>>>>> origin/main
     // ── 9. Analyse bank statement ─────────────────────────────────────────────────
 
     async runBankStatementAnalysis(

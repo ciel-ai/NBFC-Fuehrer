@@ -1,13 +1,21 @@
+<<<<<<< HEAD
 ﻿// tsconfig.json
 {
     "compilerOptions": {
         // â”€â”€ Output â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+=======
+// tsconfig.json
+{
+    "compilerOptions": {
+        // ── Output ───────────────────────────────────────────────────────────────
+>>>>>>> origin/main
         "target": "ES2022",
         "module": "CommonJS",
         "lib": [
             "ES2022"
         ],
         "outDir": "./dist",
+<<<<<<< HEAD
         // rootDir intentionally omitted â€” TypeScript infers it from "include".
         // Setting rootDir: "./src" breaks compilation because config/ and scripts/
         // sit outside src/ but are still part of the program.
@@ -20,6 +28,20 @@
         "ignoreDeprecations": "5.0",
         "baseUrl": ".",
         // The @/ alias â€” maps to src/ so imports never use ../../../
+=======
+        // rootDir intentionally omitted — TypeScript infers it from "include".
+        // Setting rootDir: "./src" breaks compilation because config/ and scripts/
+        // sit outside src/ but are still part of the program.
+        // ── Module resolution ─────────────────────────────────────────────────────
+        "moduleResolution": "node",
+        // "node" (alias node10) and baseUrl are reported as deprecated by TS 7.0
+        // previews. Resolution is intentional (node + tsconfig-paths at runtime),
+        // and baseUrl is required for the @/* path aliases below — so silence the
+        // forward-compat warnings rather than change resolution semantics.
+        "ignoreDeprecations": "5.0",
+        "baseUrl": ".",
+        // The @/ alias — maps to src/ so imports never use ../../../
+>>>>>>> origin/main
         // Works with tsconfig-paths at runtime and jest moduleNameMapper in tests
         "paths": {
             "@/*": [
@@ -33,7 +55,11 @@
         "resolveJsonModule": true, // Allow import of .json files
         "esModuleInterop": true, // Fixes default imports from CommonJS modules
         "allowSyntheticDefaultImports": true,
+<<<<<<< HEAD
         // â”€â”€ Strict mode â€” core safety flags on â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+=======
+        // ── Strict mode — core safety flags on ────────────────────────────────────
+>>>>>>> origin/main
         // These are non-negotiable for a financial application
         "strict": true,
         "noImplicitAny": true,
@@ -43,11 +69,16 @@
         "strictPropertyInitialization": true,
         "noImplicitThis": true,
         "alwaysStrict": true,
+<<<<<<< HEAD
         // â”€â”€ Additional strictness â€” relaxed for Express + Prisma compatibility â”€â”€â”€
+=======
+        // ── Additional strictness — relaxed for Express + Prisma compatibility ───
+>>>>>>> origin/main
         // These four flags were too strict for the Express RequestHandler pattern
         // and Prisma's optional field types. Can be re-enabled in a future cleanup
         // pass once AuthRequest and DTOs are refactored. Real bug-catching flags
         // (noFallthroughCasesInSwitch, noUncheckedIndexedAccess) stay on.
+<<<<<<< HEAD
         "noUnusedLocals": false, // Was true â€” created 50+ false-positive errors
         "noUnusedParameters": false, // Was true â€” Express middlewares take unused args
         "noImplicitReturns": false, // Was true â€” async controllers fall through naturally
@@ -59,6 +90,19 @@
         "declarationMap": true, // Source maps for .d.ts
         "sourceMap": true, // Source maps for debugging in production
         // â”€â”€ Type roots â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+=======
+        "noUnusedLocals": false, // Was true — created 50+ false-positive errors
+        "noUnusedParameters": false, // Was true — Express middlewares take unused args
+        "noImplicitReturns": false, // Was true — async controllers fall through naturally
+        "noFallthroughCasesInSwitch": true, // Keep — real bug prevention
+        "exactOptionalPropertyTypes": false, // Was true — Express req.user is optional
+        "noUncheckedIndexedAccess": true, // Keep — real bug prevention
+        // ── Declaration files ─────────────────────────────────────────────────────
+        "declaration": true, // Generate .d.ts files alongside .js
+        "declarationMap": true, // Source maps for .d.ts
+        "sourceMap": true, // Source maps for debugging in production
+        // ── Type roots ────────────────────────────────────────────────────────────
+>>>>>>> origin/main
         // Tell TypeScript to look for global type augmentations in src/types/
         "typeRoots": [
             "./node_modules/@types",
@@ -68,21 +112,36 @@
             "node",
             "jest"
         ],
+<<<<<<< HEAD
         // â”€â”€ Decorators (if needed for Prisma / future DI) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         "experimentalDecorators": true,
         "emitDecoratorMetadata": true,
         // â”€â”€ Misc â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+=======
+        // ── Decorators (if needed for Prisma / future DI) ─────────────────────────
+        "experimentalDecorators": true,
+        "emitDecoratorMetadata": true,
+        // ── Misc ──────────────────────────────────────────────────────────────────
+>>>>>>> origin/main
         "skipLibCheck": true, // Don't type-check node_modules
         "forceConsistentCasingInFileNames": true,
         "removeComments": false // Keep comments in output for audit readability
     },
+<<<<<<< HEAD
     // â”€â”€ Included files â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+=======
+    // ── Included files ──────────────────────────────────────────────────────────
+>>>>>>> origin/main
    "include": [
     "src/**/*.ts",
     "config/**/*.ts",
     "scripts/**/*.ts"
 ],
+<<<<<<< HEAD
     // â”€â”€ Excluded files â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+=======
+    // ── Excluded files ──────────────────────────────────────────────────────────
+>>>>>>> origin/main
     "exclude": [
         "node_modules",
         "dist",
@@ -90,5 +149,9 @@
         "**/*.spec.ts",
         "**/*.test.ts"
     ]
+<<<<<<< HEAD
 }
 
+=======
+}
+>>>>>>> origin/main

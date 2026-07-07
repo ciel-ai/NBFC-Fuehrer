@@ -44,12 +44,17 @@ export const createLoanSchema = Joi.object({
         .max(100)
         .required(),
 
+<<<<<<< HEAD
     storeCity: Joi.string()
+=======
+   storeCity: Joi.string()
+>>>>>>> origin/main
         .trim()
         .min(2)
         .max(100)
         .required(),
 
+<<<<<<< HEAD
     // Income snapshot — stays on loan application
     monthlyIncome: Joi.number().positive().optional(),
 
@@ -66,10 +71,31 @@ export const createLoanSchema = Joi.object({
     pincode:        Joi.string().length(6).pattern(/^\d{6}$/).optional()
                         .messages({ 'string.pattern.base': 'Pincode must be 6 digits' }),
     state:          Joi.string().trim().max(100).optional(),
+=======
+    // Address fields — Step 2 of loan application screen
+    flatHouseNo: Joi.string().trim().max(100).optional(),
+    streetArea:  Joi.string().trim().max(200).optional(),
+    city:        Joi.string().trim().max(100).optional(),
+    pincode:     Joi.string().length(6).pattern(/^\d{6}$/).optional()
+                    .messages({ 'string.pattern.base': 'Pincode must be 6 digits' }),
+    state:       Joi.string().trim().max(100).optional(),
+
+    // Employment fields — Step 2 of loan application screen
+>>>>>>> origin/main
     employmentType: Joi.string()
                         .valid('SALARIED', 'SELF_EMPLOYED', 'BUSINESS_OWNER')
                         .optional(),
     employerName:   Joi.string().trim().max(200).optional(),
+<<<<<<< HEAD
+=======
+    monthlyIncome:  Joi.number().positive().optional(),
+
+    // Repayment type — from Loan Amount & Tenure screen
+    repaymentType: Joi.string()
+                       .valid('MONTHLY_EMI', 'INTEREST_ONLY', 'BULLET')
+                       .default('MONTHLY_EMI')
+                       .optional(),
+>>>>>>> origin/main
 });
 
 // ─── EMI preview (no auth needed) ─────────────────────────────────────────────
@@ -81,7 +107,11 @@ export const emiPreviewSchema = Joi.object({
 
     interestRate: Joi.number()
         .positive()
+<<<<<<< HEAD
         .max(60)
+=======
+        .max(60)     // 60% p.a. absolute ceiling
+>>>>>>> origin/main
         .precision(2)
         .required(),
 });
@@ -138,4 +168,8 @@ export const listLoansQuerySchema = Joi.object({
 
 export const loanIdParamSchema = Joi.object({
     id: Joi.string().uuid({ version: 'uuidv4' }).required(),
+<<<<<<< HEAD
 });
+=======
+});
+>>>>>>> origin/main

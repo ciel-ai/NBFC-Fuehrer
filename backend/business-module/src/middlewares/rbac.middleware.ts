@@ -9,6 +9,7 @@ import type { AuthRequest } from '@/types/express';
 // Roles higher in the hierarchy can do everything lower roles can do.
 // SUPER_ADMIN can call any endpoint regardless of the roles listed.
 
+<<<<<<< HEAD
 export const ROLE_HIERARCHY: Record<Role, number> = {
     [ROLE.CUSTOMER]: 1,
     [ROLE.AGENT]: 2,
@@ -28,6 +29,17 @@ export const ROLE_HIERARCHY: Record<Role, number> = {
     [ROLE.SUPER_ADMIN]: 99,
     [ROLE.ADMIN]: 99,
 } as const;
+=======
+const ROLE_HIERARCHY: Record<Role, number> = {
+    [ROLE.CUSTOMER]: 1,
+    [ROLE.AGENT]: 2,
+    [ROLE.COLLECTION_AGENT]: 3,
+    [ROLE.OPS_EXECUTIVE]: 4,
+    [ROLE.FINANCE]: 5,
+    [ROLE.CREDIT_MANAGER]: 6,
+    [ROLE.SUPER_ADMIN]: 99,
+};
+>>>>>>> origin/main
 
 export function hasRole(userRole: Role, requiredRole: Role): boolean {
     // Super admin bypasses all role checks

@@ -1,7 +1,10 @@
 import { createApp } from './app';
 import { env } from '@/config/env';
 import { createModuleLogger } from '@/config/logger';
+<<<<<<< HEAD
 import { scheduleNpaWatchJob } from '@/jobs/npaWatch.job';
+=======
+>>>>>>> origin/main
 
 const log = createModuleLogger('server');
 
@@ -12,10 +15,13 @@ app.listen(env.port, () => {
         env: env.nodeEnv,
         port: env.port,
     });
+<<<<<<< HEAD
 
     // Daily DPD/NPA rollover — penalties, NPA marking, collection case
     // auto-open, broken PTP detection, overdue reminders. Runs at
     // CRON_SCHEDULE.NPA_WATCH (01:00 IST) per config/constants.ts.
     scheduleNpaWatchJob();
     log.info('NPA watch job started and scheduled');
+=======
+>>>>>>> origin/main
 });

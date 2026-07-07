@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 ﻿// src/app.ts
+=======
+// src/app.ts
+>>>>>>> origin/main
 import { profileRouter } from '@/modules/profile';
 import { notificationsRouter } from '@/modules/notifications/notifications.routes';
 import express from 'express';
@@ -15,10 +19,18 @@ import {
     notFoundHandler,
 } from '@/middlewares';
 import { bootstrapEventHandlers } from '@/events';
+<<<<<<< HEAD
 import { moneyConverterMiddleware } from '@/middlewares/moneyConverter.middleware';
 
 // â”€â”€ Module routers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 import { authRouter } from '@/modules/auth';
+=======
+
+// ── Module routers ─────────────────────────────────────────────────────────────
+import { authRouter } from '@/modules/auth';
+import { staffAuthRouter } from '@/modules/staff-auth';
+import { staffUsersRouter, staffBranchesRouter } from '@/modules/staff-users';
+>>>>>>> origin/main
 import { healthRouter } from '@/modules/health';
 import { webhooksRouter } from '@/modules/webhooks';
 import { kycRouter } from '@/modules/kyc';
@@ -32,22 +44,30 @@ import { collectionsRouter } from '@/modules/collections';
 import { auditRouter } from '@/modules/audit';
 import { reportsRouter } from '@/modules/reports';
 import { adminRouter } from '@/modules/admin';
+<<<<<<< HEAD
 import { goldLoansRouter } from '@/modules/goldLoans';
 import { housingLoansRouter } from '@/modules/housingLoans';
 import { cdlLoansRouter } from '@/modules/cdlLoans';
 import { salesRouter } from '@/modules/sales';
 import { webRouter } from '@/modules/web/web.routes';
+=======
+>>>>>>> origin/main
 
 export function createApp(): express.Application {
     const app = express();
     const api = `/api/${env.apiVersion}`;
 
+<<<<<<< HEAD
     // â”€â”€ 1. Security headers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+=======
+    // ── 1. Security headers ────────────────────────────────────────────────────
+>>>>>>> origin/main
     app.use(helmet({
         contentSecurityPolicy: env.isProd,
         crossOriginEmbedderPolicy: false,
     }));
 
+<<<<<<< HEAD
     // â”€â”€ 2. CORS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     app.use(corsMiddleware);
 
@@ -64,10 +84,29 @@ export function createApp(): express.Application {
     app.use(`${api}/webhooks`, webhooksRouter);
 
     // â”€â”€ 7. Body parsing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+=======
+    // ── 2. CORS ────────────────────────────────────────────────────────────────
+    app.use(corsMiddleware);
+
+    // ── 3. Request logger ──────────────────────────────────────────────────────
+    app.use(requestLogger());
+
+    // ── 4. Rate limiter ────────────────────────────────────────────────────────
+    app.use(generalLimiter);
+
+    // ── 5. Health — no auth, no body parsing ──────────────────────────────────
+    app.use('/health', healthRouter);
+
+    // ── 6. Webhooks — MUST be before express.json() ───────────────────────────
+    app.use(`${api}/webhooks`, webhooksRouter);
+
+    // ── 7. Body parsing ────────────────────────────────────────────────────────
+>>>>>>> origin/main
     app.use(express.json({ limit: '1mb' }));
     app.use(express.urlencoded({ extended: true, limit: '1mb' }));
     app.use(compression());
 
+<<<<<<< HEAD
     // â”€â”€ 8. JWT verification â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     app.use(verifyToken());
 
@@ -83,6 +122,24 @@ app.use(moneyConverterMiddleware());
     app.use('/auth', authRouter);
     app.use('/user', profileRouter);
 app.use(`${api}/notifications`, notificationsRouter);
+=======
+    // ── 8. JWT verification ────────────────────────────────────────────────────
+    app.use(verifyToken());
+
+    // ── 9. Audit trail ─────────────────────────────────────────────────────────
+    app.use(auditTrail());
+
+    // ── 10. Bootstrap event + notification handlers ───────────────────────────
+    bootstrapEventHandlers();
+
+    // ── 11. Domain routes ──────────────────────────────────────────────────────
+    app.use('/auth', authRouter);
+    app.use('/staff/auth', staffAuthRouter);
+    app.use('/staff/users', staffUsersRouter);
+    app.use('/staff/branches', staffBranchesRouter);
+    app.use('/user', profileRouter);
+app.use('/notifications', notificationsRouter);
+>>>>>>> origin/main
     app.use(`${api}/kyc`, kycRouter);
     app.use(`${api}/loans`, loansRouter);
     app.use(`${api}/emi`, emiRouter);
@@ -94,6 +151,7 @@ app.use(`${api}/notifications`, notificationsRouter);
     app.use(`${api}/audit`, auditRouter);
     app.use(`${api}/reports`, reportsRouter);
     app.use(`${api}/admin`, adminRouter);
+<<<<<<< HEAD
     app.use(`${api}/gold-loans`, goldLoansRouter);
     app.use(`${api}/housing-loans`, housingLoansRouter);
     app.use(`${api}/consumer-durable-loans`, cdlLoansRouter);
@@ -108,3 +166,14 @@ app.use(`${api}/notifications`, notificationsRouter);
 
     return app;
 }
+=======
+
+    // ── 12. 404 handler ────────────────────────────────────────────────────────
+    app.use(notFoundHandler());
+
+    // ── 13. Global error handler ───────────────────────────────────────────────
+    app.use(errorHandler());
+
+    return app;
+}
+>>>>>>> origin/main

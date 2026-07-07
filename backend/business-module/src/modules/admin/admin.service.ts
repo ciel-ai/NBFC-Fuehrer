@@ -46,10 +46,20 @@ async function buildAlerts(): Promise<SystemAlert[]> {
     const { prisma } = await import('@/config/database');
     const alerts: SystemAlert[] = [];
 
+<<<<<<< HEAD
     const staleKyc = await prisma.kyc_documents.count({
         where: {
             overall_status: 'IN_PROGRESS',
             updated_at: { lt: new Date(Date.now() - 48 * 60 * 60 * 1000) },
+=======
+    // Pending KYC over 48 hours
+    const staleKyc = await prisma.kyc_documents.count({
+        where: {
+            overall_status: 'IN_PROGRESS',
+            updated_at: {
+                lt: new Date(Date.now() - 48 * 60 * 60 * 1000),
+            },
+>>>>>>> origin/main
         },
     });
     if (staleKyc > 0) {
@@ -62,6 +72,10 @@ async function buildAlerts(): Promise<SystemAlert[]> {
         });
     }
 
+<<<<<<< HEAD
+=======
+    // Failed disbursements
+>>>>>>> origin/main
     const failedDisbursements = await prisma.disbursements.count({
         where: { status: 'FAILED' },
     });
@@ -75,6 +89,10 @@ async function buildAlerts(): Promise<SystemAlert[]> {
         });
     }
 
+<<<<<<< HEAD
+=======
+    // High NPA rate
+>>>>>>> origin/main
     const portfolio = await adminRepository.getPlatformStats();
     if (portfolio.npaRate > 5) {
         alerts.push({
@@ -93,6 +111,10 @@ async function buildAlerts(): Promise<SystemAlert[]> {
         });
     }
 
+<<<<<<< HEAD
+=======
+    // Unassigned collection cases
+>>>>>>> origin/main
     const unassignedCases = await prisma.collection_cases.count({
         where: { status: 'OPEN', assigned_to: null },
     });
@@ -106,10 +128,20 @@ async function buildAlerts(): Promise<SystemAlert[]> {
         });
     }
 
+<<<<<<< HEAD
     const stalePendingApprovals = await prisma.loan_applications.count({
         where: {
             status: 'PENDING_APPROVAL',
             updated_at: { lt: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+=======
+    // Pending approvals over 24 hours
+    const stalePendingApprovals = await prisma.loan_applications.count({
+        where: {
+            status: 'PENDING_APPROVAL',
+            updated_at: {
+                lt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+            },
+>>>>>>> origin/main
         },
     });
     if (stalePendingApprovals > 0) {
@@ -129,10 +161,19 @@ async function buildAlerts(): Promise<SystemAlert[]> {
 
 export const adminService = {
 
+<<<<<<< HEAD
+=======
+    // ── 1. Admin user management ───────────────────────────────────────────────
+
+>>>>>>> origin/main
     async createAdminUser(
         input: CreateAdminUserInput,
         req: Request,
     ): Promise<AdminUserResponse> {
+<<<<<<< HEAD
+=======
+        // Prevent duplicate email
+>>>>>>> origin/main
         const existing = await adminRepository.findAdminUserByEmail(input.email);
         if (existing) {
             throw new ConflictError(
@@ -141,6 +182,7 @@ export const adminService = {
             );
         }
 
+<<<<<<< HEAD
         let passwordHash: string | undefined;
         if (input.password) {
             const bcrypt = await import('bcryptjs');
@@ -152,6 +194,9 @@ export const adminService = {
             passwordHash,
             createdBy: (req as any).user?.id,
         });
+=======
+        const user = await adminRepository.createAdminUser(input);
+>>>>>>> origin/main
 
         setAuditContext(req, {
             action: 'ADMIN_USER_CREATED',
@@ -177,7 +222,15 @@ export const adminService = {
     ): Promise<AdminUserResponse> {
         const user = await adminRepository.findAdminUserByIdOrThrow(userId);
 
+<<<<<<< HEAD
         if (user.role === 'SUPER_ADMIN' && input.status === 'SUSPENDED') {
+=======
+        // Super admins cannot suspend other super admins
+        if (
+            user.role === 'SUPER_ADMIN' &&
+            input.status === 'SUSPENDED'
+        ) {
+>>>>>>> origin/main
             throw new ForbiddenError('Super Admin accounts cannot be suspended');
         }
 
@@ -208,6 +261,11 @@ export const adminService = {
         return toResponse(user);
     },
 
+<<<<<<< HEAD
+=======
+    // ── 2. System configuration ────────────────────────────────────────────────
+
+>>>>>>> origin/main
     async getAllConfigs() {
         return adminRepository.getAllConfigs();
     },
@@ -218,7 +276,14 @@ export const adminService = {
         return config;
     },
 
+<<<<<<< HEAD
     async updateConfig(input: UpdateSystemConfigInput, req: Request) {
+=======
+    async updateConfig(
+        input: UpdateSystemConfigInput,
+        req: Request,
+    ) {
+>>>>>>> origin/main
         const descriptions: Record<ConfigKey, string> = {
             MAX_LOAN_AMOUNT: 'Maximum loan amount in INR',
             MIN_LOAN_AMOUNT: 'Minimum loan amount in INR',
@@ -270,15 +335,29 @@ export const adminService = {
         return config;
     },
 
+<<<<<<< HEAD
+=======
+    // ── 3. Dashboard ───────────────────────────────────────────────────────────
+
+>>>>>>> origin/main
     async getDashboard(): Promise<AdminDashboard> {
         const [platform, today, alerts] = await Promise.all([
             adminRepository.getPlatformStats(),
             adminRepository.getTodayStats(),
             buildAlerts(),
         ]);
+<<<<<<< HEAD
         return { platform, today, alerts };
     },
 
+=======
+
+        return { platform, today, alerts };
+    },
+
+    // ── 4. Maintenance mode ────────────────────────────────────────────────────
+
+>>>>>>> origin/main
     async setMaintenanceMode(
         enabled: boolean,
         message: string,
@@ -286,13 +365,29 @@ export const adminService = {
         req: Request,
     ): Promise<void> {
         await this.updateConfig(
+<<<<<<< HEAD
             { key: 'MAINTENANCE_MODE', value: String(enabled), updatedBy: setBy },
+=======
+            {
+                key: 'MAINTENANCE_MODE',
+                value: String(enabled),
+                updatedBy: setBy,
+            },
+>>>>>>> origin/main
             req,
         );
 
         if (message) {
             await this.updateConfig(
+<<<<<<< HEAD
                 { key: 'MAINTENANCE_MESSAGE', value: message, updatedBy: setBy },
+=======
+                {
+                    key: 'MAINTENANCE_MESSAGE',
+                    value: message,
+                    updatedBy: setBy,
+                },
+>>>>>>> origin/main
                 req,
             );
         }
@@ -300,17 +395,31 @@ export const adminService = {
         log.warn('Maintenance mode changed', { enabled, setBy });
     },
 
+<<<<<<< HEAD
     async isMaintenanceMode(): Promise<{ active: boolean; message: string }> {
+=======
+    // ── 5. Check maintenance mode (used by middleware) ─────────────────────────
+
+    async isMaintenanceMode(): Promise<{
+        active: boolean;
+        message: string;
+    }> {
+>>>>>>> origin/main
         const config = await adminRepository.getConfig('MAINTENANCE_MODE');
         if (!config || config.value !== 'true') {
             return { active: false, message: '' };
         }
+<<<<<<< HEAD
+=======
+
+>>>>>>> origin/main
         const msgConfig = await adminRepository.getConfig('MAINTENANCE_MESSAGE');
         return {
             active: true,
             message: msgConfig?.value ?? 'Platform under maintenance',
         };
     },
+<<<<<<< HEAD
 
     // ── Branch management ─────────────────────────────────────────────────────
 
@@ -401,3 +510,6 @@ return {
         return loan;
     },
 };
+=======
+};
+>>>>>>> origin/main

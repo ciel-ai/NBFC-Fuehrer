@@ -107,12 +107,15 @@ export interface CreateAdminUserInput {
     phone: string;
     role: Role;
     department: string;
+<<<<<<< HEAD
     username?: string;
     password?: string;
     passwordHash?: string;
     product?: string;
     branchId?: string;
     createdBy?: string;
+=======
+>>>>>>> origin/main
 }
 
 export interface UpdateAdminUserInput {

@@ -59,6 +59,7 @@ export const adminRepository = {
     // ── Admin users ───────────────────────────────────────────────────────────
 
     async createAdminUser(data: {
+<<<<<<< HEAD
     fullName: string;
     email: string;
     phone: string;
@@ -90,6 +91,27 @@ export const adminRepository = {
         },
     });
     return mapAdminUser(row as unknown as Record<string, unknown>);
+=======
+        fullName: string;
+        email: string;
+        phone: string;
+        role: Role;
+        department: string;
+    }): Promise<AdminUser> {
+        const row = await prisma.admin_users.create({
+            data: {
+                full_name: data.fullName,
+                email: data.email,
+                phone: data.phone,
+                role: data.role,
+                status: 'ACTIVE',
+                department: data.department,
+                created_at: new Date(),
+                updated_at: new Date(),
+            },
+        });
+        return mapAdminUser(row as unknown as Record<string, unknown>);
+>>>>>>> origin/main
     },
 
     async findAdminUserById(id: string): Promise<AdminUser | null> {
