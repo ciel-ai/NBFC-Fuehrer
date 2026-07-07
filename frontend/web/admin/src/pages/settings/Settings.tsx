@@ -11,7 +11,7 @@ import { useAuthStore } from '../../store/authStore';
 import type { ProductConfig } from '../../types';
 import { settingsApi } from '../../api/settings.api';
 
-const panel: React.CSSProperties = { border: '1px solid #e7ebf3' };
+const panel: React.CSSProperties = { boxShadow: 'var(--shadow-card)' };
 
 const Settings: React.FC = () => {
   const { message } = App.useApp();

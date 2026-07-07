@@ -34,12 +34,12 @@ export const BRAND = {
   // Text — cool near-black ink → muted slate
   textHead: '#10202f',
   textBody: '#4a5663',
-  textMuted: '#8a97a6',
+  textMuted: '#6b7280',
 
   // Lines & surfaces
   border: '#e4e8ee',
   borderSoft: '#eef1f5',
-  pageBg: '#f3f5f8',
+  pageBg: '#f8f9fb',
   surface: '#ffffff',
 } as const;
 
@@ -72,9 +72,9 @@ export const antdTheme: ThemeConfig = {
     colorBorderSecondary: BRAND.border,
 
     // Sharper, institutional geometry
-    borderRadius: 8,
-    borderRadiusSM: 6,
-    borderRadiusLG: 10,
+    borderRadius: 10,
+    borderRadiusSM: 8,
+    borderRadiusLG: 16,
 
     fontFamily:
       "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
@@ -107,8 +107,8 @@ export const antdTheme: ThemeConfig = {
       groupTitleColor: '#9aa6b4',
       itemMarginInline: 8,
       itemMarginBlock: 2,
-      itemBorderRadius: 7,
-      itemHeight: 38,
+      itemBorderRadius: 10,
+      itemHeight: 40,
       fontSize: 13.5,
       iconSize: 16,
       collapsedIconSize: 17,
@@ -117,15 +117,15 @@ export const antdTheme: ThemeConfig = {
       paddingLG: 20,
       boxShadowTertiary: ELEVATION.xs,
       colorBorderSecondary: BRAND.border,
-      borderRadiusLG: 14,
+      borderRadiusLG: 16,
     },
     Table: {
-      headerBg: '#f6f8fa',
+      headerBg: 'transparent',
       headerColor: '#6b7785',
       headerSplitColor: 'transparent',
       headerBorderRadius: 8,
       fontSize: 13,
-      cellPaddingBlock: 13,
+      cellPaddingBlock: 15,
       rowHoverBg: '#f3f7fb',
       borderColor: '#eef1f5',
     },
@@ -166,10 +166,10 @@ export const antdTheme: ThemeConfig = {
     Tag: { fontSizeSM: 11, borderRadiusSM: 5 },
     Descriptions: { titleMarginBottom: 12, itemPaddingBottom: 10 },
     Drawer: { footerPaddingBlock: 16 },
-    Statistic: { contentFontSize: 22 },
+    Statistic: { contentFontSize: 28 },
     Avatar: { borderRadius: 8 },
     Tooltip: { colorBgSpotlight: '#10202f', borderRadius: 7 },
-    Modal: { borderRadiusLG: 12 },
+    Modal: { borderRadiusLG: 16 },
     Popover: { borderRadiusLG: 10 },
     Badge: { dotSize: 8 },
   },

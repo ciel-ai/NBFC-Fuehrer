@@ -155,7 +155,7 @@ const ApplicationsList: React.FC<{ preset: ListPreset }> = ({ preset }) => {
         }
       />
 
-      <Card variant="borderless" style={{ border: '1px solid #e7ebf3' }} styles={{ body: { padding: 0 } }}>
+      <Card variant="borderless" style={{ boxShadow: 'var(--shadow-card)' }} styles={{ body: { padding: 0 } }}>
         <div style={{ display: 'flex', gap: 10, padding: '16px 18px', flexWrap: 'wrap', borderBottom: '1px solid #eef1f7' }}>
           <Input
             prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}

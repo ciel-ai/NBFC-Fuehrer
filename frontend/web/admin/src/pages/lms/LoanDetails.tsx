@@ -16,7 +16,7 @@ import { DocumentsTab } from '../applications/tabs';
 import { fmtDate, fmtDateTime, initials, inr } from '../../utils/format';
 import type { EmiRow, LoanCharge, Repayment } from '../../types';
 
-const panel: React.CSSProperties = { border: '1px solid #e7ebf3' };
+const panel: React.CSSProperties = { boxShadow: 'var(--shadow-card)' };
 
 const LoanDetails: React.FC = () => {
   const { loanNumber } = useParams<{ loanNumber: string }>();

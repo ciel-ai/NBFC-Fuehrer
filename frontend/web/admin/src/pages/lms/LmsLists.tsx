@@ -13,7 +13,7 @@ import { exportCsv } from '../../utils/csv';
 import { fmtDate, fmtDateTime, inr } from '../../utils/format';
 import type { LoanCharge, Repayment } from '../../types';
 
-const cardStyle: React.CSSProperties = { border: '1px solid #e7ebf3' };
+const cardStyle: React.CSSProperties = { boxShadow: 'var(--shadow-card)' };
 
 // ════ EMI SCHEDULE (cross-portfolio demand view) ════
 interface DemandRow {

@@ -164,7 +164,7 @@ const BranchManagement: React.FC = () => {
         <Col xs={24} sm={12} xl={6}><KpiCard label="Inactive" value={branchList.length - activeCount} sub="non-operational" icon={<BankOutlined />} tint="#c0392b" /></Col>
       </Row>
 
-      <Card variant="borderless" style={{ border: '1px solid #e7ebf3' }} styles={{ body: { padding: 0 } }}>
+      <Card variant="borderless" style={{ boxShadow: 'var(--shadow-card)' }} styles={{ body: { padding: 0 } }}>
         <div style={{ display: 'flex', gap: 10, padding: '16px 18px', flexWrap: 'wrap', borderBottom: '1px solid #eef1f7' }}>
           <Input
             prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}

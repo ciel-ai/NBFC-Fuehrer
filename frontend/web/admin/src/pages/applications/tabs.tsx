@@ -15,7 +15,7 @@ import { fmtDate, fmtDateTime, inr } from '../../utils/format';
 import { useAppStore } from '../../store/appStore';
 import type { AppDocument, AuditLog, BureauAccount, LoanApplication } from '../../types';
 
-const panel: React.CSSProperties = { border: '1px solid #e7ebf3' };
+const panel: React.CSSProperties = { boxShadow: 'var(--shadow-card)' };
 const panelBody = { body: { padding: '20px 22px' } };
 
 // ════ OVERVIEW ════

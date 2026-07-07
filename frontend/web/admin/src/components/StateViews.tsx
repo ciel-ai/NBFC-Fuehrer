@@ -7,15 +7,26 @@
 //                     as the Table empty view via ConfigProvider renderEmpty)
 
 import React from 'react';
-import { Button, Spin } from 'antd';
+import { Button, Skeleton } from 'antd';
 import { CloudOffline, InboxIcon } from './stateIcons';
 
 // ─── Route / full-page loader ─────────────────────────────────────────────────
+// Skeleton screen shaped like a typical page (header + KPI row + table) so
+// navigation feels instant instead of spinner-then-pop.
 
-export const PageLoader: React.FC<{ tip?: string }> = ({ tip }) => (
-  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, padding: '110px 0' }}>
-    <Spin size="large" />
-    {tip && <div style={{ fontSize: 13, color: '#7c8896' }}>{tip}</div>}
+export const PageLoader: React.FC<{ tip?: string }> = () => (
+  <div style={{ padding: '28px 4px' }} aria-busy="true" aria-label="Loading page">
+    <Skeleton.Input active style={{ width: 240, height: 30, borderRadius: 8 }} />
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 16, marginTop: 24 }}>
+      {[0, 1, 2, 3].map((i) => (
+        <div key={i} style={{ background: '#fff', borderRadius: 16, padding: 20, boxShadow: 'var(--shadow-card, 0 1px 2px rgba(16,24,40,0.05))' }}>
+          <Skeleton active title={{ width: '55%' }} paragraph={{ rows: 1, width: '35%' }} />
+        </div>
+      ))}
+    </div>
+    <div style={{ background: '#fff', borderRadius: 16, padding: 24, marginTop: 16, boxShadow: 'var(--shadow-card, 0 1px 2px rgba(16,24,40,0.05))' }}>
+      <Skeleton active title={false} paragraph={{ rows: 6, width: ['100%', '100%', '92%', '96%', '88%', '60%'] }} />
+    </div>
   </div>
 );
 

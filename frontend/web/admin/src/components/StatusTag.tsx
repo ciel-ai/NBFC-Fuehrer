@@ -63,14 +63,13 @@ export const StatusTag: React.FC<{ status: string; size?: 'sm' | 'md' }> = ({ st
         display: 'inline-flex',
         alignItems: 'center',
         gap: 6,
-        padding: size === 'sm' ? '2px 8px' : '3px 11px',
-        borderRadius: 6,
+        padding: size === 'sm' ? '3px 10px' : '4px 13px',
+        borderRadius: 999,
         fontSize: size === 'sm' ? 11 : 12.5,
         fontWeight: 600,
         letterSpacing: 0.1,
         color: m.color,
         background: m.bg,
-        border: `1px solid ${m.color}24`,
         whiteSpace: 'nowrap',
         lineHeight: 1.5,
       }}
@@ -87,13 +86,12 @@ export const LoanTypeTag: React.FC<{ type: LoanType; full?: boolean }> = ({ type
     <span
       style={{
         display: 'inline-block',
-        padding: '2px 9px',
-        borderRadius: 6,
+        padding: '3px 11px',
+        borderRadius: 999,
         fontSize: 11,
         fontWeight: 600,
         color: m.color,
         background: m.bg,
-        border: `1px solid ${m.color}26`,
         whiteSpace: 'nowrap',
       }}
     >

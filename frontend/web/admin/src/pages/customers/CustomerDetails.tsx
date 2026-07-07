@@ -17,7 +17,7 @@ import PageHeader from '../../components/PageHeader';
 import { fmtDate, initials, inr } from '../../utils/format';
 import type { LoanAccount, LoanApplication } from '../../types';
 
-const panel: React.CSSProperties = { border: '1px solid #e7ebf3' };
+const panel: React.CSSProperties = { boxShadow: 'var(--shadow-card)' };
 const panelBody = { body: { padding: '20px 22px' } };
 
 const CustomerDetails: React.FC = () => {

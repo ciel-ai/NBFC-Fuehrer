@@ -68,7 +68,7 @@ const ApplicationDetails: React.FC = () => {
       {/* ── sticky application header ── */}
       <Card
         variant="borderless"
-        style={{ border: '1px solid #e7ebf3', marginBottom: 16 }}
+        style={{ boxShadow: 'var(--shadow-card)', marginBottom: 16 }}
         styles={{ body: { padding: '18px 22px' } }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>

@@ -172,7 +172,7 @@ const Collections: React.FC = () => {
         <Col xs={24} sm={12} xl={6}><KpiCard label="Recovery (Month)" value={inrCompact(kpis.recovered)} sub={`${recoveryTxns.length} recovery receipts total`} icon={<FundOutlined />} tint="#047857" onClick={() => navigate('/collections/recovery')} /></Col>
       </Row>
 
-      <Card variant="borderless" style={{ border: '1px solid #e7ebf3' }} styles={{ body: { padding: 0 } }}>
+      <Card variant="borderless" style={{ boxShadow: 'var(--shadow-card)' }} styles={{ body: { padding: 0 } }}>
         <div style={{ display: 'flex', gap: 12, padding: '16px 18px', flexWrap: 'wrap', alignItems: 'center', borderBottom: '1px solid #eef1f7' }}>
           <Segmented
             value={activeTab}

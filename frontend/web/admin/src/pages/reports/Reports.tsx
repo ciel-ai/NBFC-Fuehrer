@@ -31,7 +31,7 @@ const TAB_LABEL: Record<ReportTab, string> = {
 };
 
 const StatStrip: React.FC<{ stats: { label: string; value: React.ReactNode }[] }> = ({ stats }) => (
-  <Card variant="borderless" style={{ border: '1px solid #e7ebf3', marginBottom: 16 }} styles={{ body: { padding: '16px 22px' } }}>
+  <Card variant="borderless" style={{ boxShadow: 'var(--shadow-card)', marginBottom: 16 }} styles={{ body: { padding: '16px 22px' } }}>
     <div style={{ display: 'flex', gap: 40, flexWrap: 'wrap' }}>
       {stats.map((s) => (
         <div key={s.label}>
@@ -167,7 +167,7 @@ const Reports: React.FC = () => {
         }
       />
 
-      <Card variant="borderless" className="no-print" style={{ border: '1px solid #e7ebf3', marginBottom: 16 }} styles={{ body: { padding: '14px 18px' } }}>
+      <Card variant="borderless" className="no-print" style={{ boxShadow: 'var(--shadow-card)', marginBottom: 16 }} styles={{ body: { padding: '14px 18px' } }}>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
           <Segmented
             value={activeTab}
@@ -235,7 +235,7 @@ const Reports: React.FC = () => {
               </ChartCard>
             </Col>
             <Col span={24}>
-              <Card variant="borderless" style={{ border: '1px solid #e7ebf3' }} styles={{ body: { padding: '8px 10px' } }} title={<span style={{ fontSize: 14, fontWeight: 600 }}>Branch-wise Performance</span>}>
+              <Card variant="borderless" style={{ boxShadow: 'var(--shadow-card)' }} styles={{ body: { padding: '8px 10px' } }} title={<span style={{ fontSize: 14, fontWeight: 600 }}>Branch-wise Performance</span>}>
                 <Table dataSource={branchSummary} columns={branchCols} rowKey="branch" size="small" pagination={false} />
               </Card>
             </Col>
@@ -345,7 +345,7 @@ const Reports: React.FC = () => {
               </ChartCard>
             </Col>
             <Col span={24}>
-              <Card variant="borderless" style={{ border: '1px solid #e7ebf3' }} styles={{ body: { padding: '8px 10px' } }} title={<span style={{ fontSize: 14, fontWeight: 600 }}>Recent Disbursements</span>}>
+              <Card variant="borderless" style={{ boxShadow: 'var(--shadow-card)' }} styles={{ body: { padding: '8px 10px' } }} title={<span style={{ fontSize: 14, fontWeight: 600 }}>Recent Disbursements</span>}>
                 <Table
                   dataSource={disbursedApps.slice(0, 8)}
                   rowKey="id"
@@ -407,7 +407,7 @@ const Reports: React.FC = () => {
               </ChartCard>
             </Col>
             <Col span={24}>
-              <Card variant="borderless" style={{ border: '1px solid #e7ebf3' }} styles={{ body: { padding: '8px 10px' } }} title={<span style={{ fontSize: 14, fontWeight: 600 }}>Bucket Summary</span>}>
+              <Card variant="borderless" style={{ boxShadow: 'var(--shadow-card)' }} styles={{ body: { padding: '8px 10px' } }} title={<span style={{ fontSize: 14, fontWeight: 600 }}>Bucket Summary</span>}>
                 <Table
                   dataSource={buckets}
                   rowKey="bucket"
