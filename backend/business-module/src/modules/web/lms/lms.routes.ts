@@ -5,6 +5,7 @@ import { lmsCollectionsRouter } from './lms.collections.routes';
 import { lmsPaymentsRouter }    from './lms.payments.routes';
 import { lmsReportsRouter }     from './lms.reports.routes';
 import { lmsLedgerRouter }      from './lms.ledger.routes';
+import { lmsReconciliationRouter } from './lms.reconciliation.routes';
 
 const router = Router();
 
@@ -13,5 +14,6 @@ router.use('/collections', lmsCollectionsRouter);
 router.use('/payments',    lmsPaymentsRouter);
 router.use('/reports',     lmsReportsRouter);
 router.use('/ledger',      lmsLedgerRouter);
+router.use('/reconciliation', lmsReconciliationRouter);
 
 export { router as lmsRouter };
