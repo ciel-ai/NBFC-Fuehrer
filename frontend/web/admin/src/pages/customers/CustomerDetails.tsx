@@ -7,7 +7,9 @@ import {
 } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import dayjs from 'dayjs';
-import { useAppStore } from '../../store/appStore';
+import { useApplications } from '../../hooks/useApplications';
+import { useLoanBook } from '../../hooks/useLms';
+import { PageLoader } from '../../components/StateViews';
 import { useAuthStore } from '../../store/authStore';
 import { scopedLoanType } from '../../auth/rbac';
 import { InfoGrid, InfoItem, SectionTitle } from '../../components/InfoGrid';
@@ -24,8 +26,8 @@ const CustomerDetails: React.FC = () => {
   const { mobile } = useParams<{ mobile: string }>();
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user)!;
-  const applications = useAppStore((s) => s.applications);
-  const loans = useAppStore((s) => s.loans);
+  const { applications, loading: appsLoading } = useApplications();
+  const { loans, loading: loansLoading } = useLoanBook();
   const scope = scopedLoanType(user.role);
 
   const apps = useMemo(
@@ -41,6 +43,10 @@ const CustomerDetails: React.FC = () => {
     const latest = [...apps].sort((a, b) => dayjs(b.updatedAt).valueOf() - dayjs(a.updatedAt).valueOf())[0];
     return latest?.customer;
   }, [apps]);
+
+  if ((appsLoading || loansLoading) && !customer) {
+    return <PageLoader />;
+  }
 
   if (!customer) {
     return <Result status="404" title="Customer not found" extra={<Button type="primary" onClick={() => navigate('/customers')}>Back to Customers</Button>} />;

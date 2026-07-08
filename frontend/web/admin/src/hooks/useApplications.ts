@@ -29,7 +29,7 @@ interface BackendAppRow {
   storeCity: string;
   appliedAt: string;
   updatedAt: string;
-  customer: { name?: string; phone?: string } | null;
+  customer: { name?: string; phone?: string; email?: string } | null;
 }
 
 // Backend → frontend pipeline stage
@@ -62,6 +62,7 @@ function mapApp(r: BackendAppRow): LoanApplication {
     customer: {
       name: r.customer?.name ?? '—',
       mobile: (r.customer?.phone ?? '').replace(/^\+?91/, ''),
+      email: r.customer?.email ?? '—',
     },
     loan: {
       amount: rupees(r.approvedAmount ?? r.amountRequested),
