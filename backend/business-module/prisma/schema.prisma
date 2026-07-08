@@ -708,6 +708,42 @@ model role_permissions {
   @@index([module])
 }
 
+model gl_accounts {
+  id            String          @id @default(uuid()) @db.Uuid
+  code          String          @unique @db.VarChar(20)
+  name          String          @db.VarChar(100)
+  type          String          @db.VarChar(20)
+  normal_balance String         @db.VarChar(10)
+  is_active     Boolean         @default(true)
+  created_at    DateTime        @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime        @updatedAt @db.Timestamptz(6)
+  debit_entries  journal_entries[] @relation("DebitAccount")
+  credit_entries journal_entries[] @relation("CreditAccount")
+
+  @@index([code])
+  @@index([type])
+}
+
+model journal_entries {
+  id              String      @id @default(uuid()) @db.Uuid
+  entry_date      DateTime    @db.Date
+  reference_type  String      @db.VarChar(50)
+  reference_id    String      @db.Uuid
+  debit_account   String      @db.VarChar(20)
+  credit_account  String      @db.VarChar(20)
+  amount          Decimal     @db.Decimal(15, 2)
+  narration       String      @db.VarChar(300)
+  posted_by       String      @db.VarChar(100)
+  created_at      DateTime    @default(now()) @db.Timestamptz(6)
+  debit_gl        gl_accounts @relation("DebitAccount",  fields: [debit_account],  references: [code])
+  credit_gl       gl_accounts @relation("CreditAccount", fields: [credit_account], references: [code])
+
+  @@index([reference_type, reference_id])
+  @@index([entry_date])
+  @@index([debit_account])
+  @@index([credit_account])
+}
+
 model number_sequences {
   sequence_key  String   @id @db.VarChar(50)
   current_value Int      @default(0)
