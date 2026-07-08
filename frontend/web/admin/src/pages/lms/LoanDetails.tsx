@@ -23,13 +23,14 @@ const LoanDetails: React.FC = () => {
   const navigate = useNavigate();
   const { message } = App.useApp();
   const user = useAuthStore((s) => s.user)!;
-  const { loan, live, loading } = useLoanAccount(loanNumber);
+  const { loan, live, loading, payments } = useLoanAccount(loanNumber);
   const applications = useAppStore((s) => s.applications);
   const repayments = useAppStore((s) => s.repayments);
   const charges = useAppStore((s) => s.charges);
   const recordPayment = useAppStore((s) => s.recordPayment);
   const app = useMemo(() => applications.find((a) => a.id === loan?.applicationId), [applications, loan]);
-  const loanRepayments = useMemo(() => repayments.filter((r) => r.loanNumber === loanNumber), [repayments, loanNumber]);
+  const storeRepayments = useMemo(() => repayments.filter((r) => r.loanNumber === loanNumber), [repayments, loanNumber]);
+  const loanRepayments = payments ?? storeRepayments;
   const loanCharges = useMemo(() => charges.filter((c) => c.loanNumber === loanNumber), [charges, loanNumber]);
 
   const [payModal, setPayModal] = useState(false);

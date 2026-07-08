@@ -7,7 +7,7 @@
 
 import dayjs from 'dayjs';
 import { apiClient } from './client';
-import type { EmiRow, EmiStatus, LoanAccount, LoanStatus } from '../types';
+import type { EmiRow, EmiStatus, LoanAccount, LoanStatus, Repayment } from '../types';
 
 // ─── Backend wire shapes ──────────────────────────────────────────────────────
 
@@ -136,11 +136,62 @@ export interface ListAccountsParams {
   limit?: number;
 }
 
+interface BackendPaymentRow {
+  id: string;
+  emiId: string | null;
+  paymentType: string;      // EMI | PARTIAL | FORECLOSURE | ...
+  amount: number;           // paise (converted by middleware)
+  penaltyAmount: number;    // paise
+  channel: string;          // ENACH | UPI | BANK_TRANSFER | PAYMENT_LINK | CASH
+  gatewayTxnId: string | null;
+  utrNumber: string | null;
+  status: string;           // INITIATED | SUCCESS | FAILED | REFUNDED | PENDING
+  completedAt?: string | null;
+  initiatedAt?: string | null;
+  createdAt?: string | null;
+}
+
+const CHANNEL_TO_MODE: Record<string, Repayment['mode']> = {
+  ENACH: 'E-MANDATE', UPI: 'UPI', BANK_TRANSFER: 'NEFT', PAYMENT_LINK: 'UPI', CASH: 'CASH',
+};
+
+function mapPayment(pmt: BackendPaymentRow, loan: { loanNumber: string; customerName: string; loanType: LoanAccount['loanType'] }): Repayment {
+  const status: Repayment['status'] =
+    pmt.status === 'SUCCESS' ? 'SUCCESS'
+    : pmt.status === 'FAILED' ? 'BOUNCED'
+    : 'PENDING';
+  return {
+    id: pmt.id,
+    loanNumber: loan.loanNumber,
+    customerName: loan.customerName,
+    loanType: loan.loanType,
+    date: pmt.completedAt ?? pmt.initiatedAt ?? pmt.createdAt ?? '',
+    // amount + penalty arrive in paise; recompute the total in rupees
+    amount: rupees(pmt.amount) + rupees(pmt.penaltyAmount),
+    mode: CHANNEL_TO_MODE[pmt.channel] ?? 'NEFT',
+    reference: pmt.utrNumber ?? pmt.gatewayTxnId ?? pmt.id.slice(0, 12).toUpperCase(),
+    emiSeq: undefined,
+    status,
+    type: pmt.paymentType === 'FORECLOSURE' ? 'FORECLOSURE'
+      : pmt.paymentType === 'PARTIAL' ? 'PART_PAYMENT' : 'EMI',
+  };
+}
+
 export const lmsApi = {
   /** Staff loan book — GET /loans/accounts */
   listAccounts: async (params: ListAccountsParams = {}): Promise<LiveLoanAccount[]> => {
     const res = await apiClient.get('/loans/accounts', { params });
     return (res.data.data as BackendAccountRow[]).map(mapAccount);
+  },
+
+  /** Per-loan payment ledger — GET /lms/loans/:id/payments (unwrapped {data,pagination}) */
+  getPayments: async (
+    loanAccountId: string,
+    loan: { loanNumber: string; customerName: string; loanType: LoanAccount['loanType'] },
+  ): Promise<Repayment[]> => {
+    const res = await apiClient.get(`/lms/loans/${loanAccountId}/payments`, { params: { limit: 50 } });
+    const rows = (res.data.data ?? res.data) as BackendPaymentRow[];
+    return rows.map((r) => mapPayment(r, loan));
   },
 
   /** Full amortization schedule — GET /emi/:loanAccountId/schedule */

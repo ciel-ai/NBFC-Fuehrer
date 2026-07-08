@@ -10,7 +10,7 @@ import { USE_MOCK } from '../config';
 import { lmsApi } from '../api/lms.api';
 import type { LiveLoanAccount } from '../api/lms.api';
 import { useAppStore } from '../store/appStore';
-import type { LoanAccount } from '../types';
+import type { LoanAccount, Repayment } from '../types';
 
 // ─── Loan book (list screen) ──────────────────────────────────────────────────
 
@@ -49,11 +49,13 @@ export function useLoanAccount(loanNumber: string | undefined): {
   loan: LoanAccount | undefined;
   live: boolean;
   loading: boolean;
+  payments: Repayment[] | null;
 } {
   const mockLoan = useAppStore(
     (s) => s.loans.find((l) => l.loanNumber === loanNumber),
   );
   const [liveLoan, setLiveLoan] = useState<LiveLoanAccount | null>(null);
+  const [payments, setPayments] = useState<Repayment[] | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -66,7 +68,14 @@ export function useLoanAccount(loanNumber: string | undefined): {
         // schedule is fetched from the EMI module.
         const rows = await lmsApi.listAccounts({ search: loanNumber, limit: 5 });
         const hit = rows.find((r) => r.loanNumber === loanNumber) ?? null;
-        if (hit) hit.schedule = await lmsApi.getSchedule(hit.id);
+        if (hit) {
+          hit.schedule = await lmsApi.getSchedule(hit.id);
+          // Payment ledger is non-fatal — the tab falls back to the store
+          try {
+            const pmts = await lmsApi.getPayments(hit.id, hit);
+            if (alive) setPayments(pmts);
+          } catch { if (alive) setPayments(null); }
+        }
         if (alive) { setLiveLoan(hit); setLoading(false); }
       } catch {
         if (alive) { setLiveLoan(null); setLoading(false); }
@@ -79,5 +88,6 @@ export function useLoanAccount(loanNumber: string | undefined): {
     loan: liveLoan ?? mockLoan,
     live: liveLoan !== null,
     loading,
-  }), [liveLoan, mockLoan, loading]);
+    payments,
+  }), [liveLoan, mockLoan, loading, payments]);
 }
