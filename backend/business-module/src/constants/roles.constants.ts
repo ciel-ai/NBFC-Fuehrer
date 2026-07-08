@@ -79,6 +79,15 @@ export const STAFF_ROLES: Role[] = [
     ROLE.FINANCE,
     ROLE.COLLECTION_AGENT,
     ROLE.SUPER_ADMIN,
+    // Web-portal staff vocabulary — first-class roles minted by /staff/auth.
+    // Without these, service-layer staff checks 403 every dashboard user.
+    ROLE.ADMIN,
+    ROLE.CREDIT_CDL,
+    ROLE.CREDIT_GOLD,
+    ROLE.CREDIT_HOUSING,
+    ROLE.FINANCE_CDL,
+    ROLE.FINANCE_GOLD,
+    ROLE.FINANCE_HOUSING,
 ];
 
 /** Staff who can generate and export MIS / RBI reports */

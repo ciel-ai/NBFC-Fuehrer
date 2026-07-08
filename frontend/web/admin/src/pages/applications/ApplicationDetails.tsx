@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { App, Avatar, Button, Card, Result, Tabs, Tag } from 'antd';
 import {
   ArrowLeftOutlined, AuditOutlined, BankOutlined, FileProtectOutlined, FileTextOutlined,
@@ -7,6 +7,8 @@ import {
 } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAppStore } from '../../store/appStore';
+import { useApplicationDetail } from '../../hooks/useApplications';
+import { PageLoader } from '../../components/StateViews';
 import { useAuthStore } from '../../store/authStore';
 import { ROLE_META, scopedLoanType } from '../../auth/rbac';
 import { LoanTypeTag, RiskGradeTag, StatusTag } from '../../components/StatusTag';
@@ -20,14 +22,17 @@ const ApplicationDetails: React.FC = () => {
   const navigate = useNavigate();
   const { message } = App.useApp();
   const user = useAuthStore((s) => s.user)!;
-  const applications = useAppStore((s) => s.applications);
   const pickForReview = useAppStore((s) => s.pickForReview);
 
-  const app = useMemo(() => applications.find((a) => a.id === id), [applications, id]);
+  const { app, live, loading } = useApplicationDetail(id);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const meta = ROLE_META[user.role];
   const scope = scopedLoanType(user.role);
+
+  if (loading && !app) {
+    return <PageLoader />;
+  }
 
   if (!app) {
     return <Result status="404" title="Application not found" extra={<Button type="primary" onClick={() => navigate('/applications')}>Back to Applications</Button>} />;
@@ -81,6 +86,7 @@ const ApplicationDetails: React.FC = () => {
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: 18, fontWeight: 700, color: '#0f172a' }}>{app.customer.name}</span>
                 <StatusTag status={app.status} size="md" />
+                {live && <Tag style={{ borderRadius: 999, fontSize: 10.5, color: '#047857', background: '#ecfdf5', borderColor: '#a7f3d0' }}>LIVE</Tag>}
                 <LoanTypeTag type={app.loanType} full />
                 {app.creditDecision && <RiskGradeTag grade={app.creditDecision.riskGrade} />}
               </div>

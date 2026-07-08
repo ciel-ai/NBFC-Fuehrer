@@ -20,6 +20,7 @@ export const applicationsApi = {
 
   get: async (id: string) => {
     const res = await apiClient.get(`/applications/${id}`);
-    return res.data.data;
+    // The web BFF detail route responds unwrapped (no {success,data} envelope)
+    return res.data.data ?? res.data;
   },
 };
