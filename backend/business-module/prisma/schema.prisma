@@ -685,6 +685,30 @@ model collateral_property {
   @@index([loan_id])
 }
 
+model roles {
+  name        String   @id @db.VarChar(50)
+  label       String   @db.VarChar(100)
+  description String?  @db.VarChar(300)
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime @updatedAt @db.Timestamptz(6)
+  permissions role_permissions[]
+}
+
+model role_permissions {
+  id          String   @id @default(uuid()) @db.Uuid
+  role_name   String   @db.VarChar(50)
+  module      String   @db.VarChar(50)
+  action      String   @default("READ") @db.VarChar(20)
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+  role        roles    @relation(fields: [role_name], references: [name])
+
+  @@unique([role_name, module, action])
+  @@index([role_name])
+  @@index([module])
+}
+
 model number_sequences {
   sequence_key  String   @id @db.VarChar(50)
   current_value Int      @default(0)
