@@ -728,3 +728,183 @@ body {
     background: #fff;
   }
 }
+
+/* ═══════════════════ LOGIN v2 — split-card (reference layout) ═══════════════ */
+
+.wl-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 28px 18px;
+  background: #e8eaee;
+}
+
+.wl-card {
+  display: flex;
+  width: 960px;
+  max-width: 100%;
+  min-height: 560px;
+  background: #ffffff;
+  border-radius: 22px;
+  box-shadow: 0 18px 44px rgba(16, 24, 40, 0.10), 0 4px 12px rgba(16, 24, 40, 0.05);
+  overflow: hidden;
+}
+
+/* — left brand panel — */
+.wl-left {
+  position: relative;
+  flex: 0 0 340px;
+  margin: 12px;
+  border-radius: 16px;
+  background: linear-gradient(170deg, #8ec9f2 0%, #6cb6ec 100%);
+  padding: 30px 28px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.wl-brand {
+  font-size: 24px;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: -0.4px;
+}
+.wl-tag {
+  margin-top: 12px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.92);
+  max-width: 240px;
+}
+.wl-illus {
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-52%);
+  width: 118%;
+  max-width: none;
+  pointer-events: none;
+}
+
+/* — right form panel — */
+.wl-right {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 56px 48px 40px;
+}
+.wl-lang {
+  position: absolute;
+  top: 22px;
+  right: 26px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  color: #9ca3af;
+  cursor: default;
+  user-select: none;
+}
+.wl-body {
+  width: 340px;
+  max-width: 100%;
+}
+.wl-title {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 700;
+  color: #111827;
+  letter-spacing: -0.3px;
+}
+.wl-sub {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+/* portal chips — the three roles, styled like the reference's outline buttons */
+.wl-portals {
+  display: flex;
+  gap: 8px;
+  margin: 22px 0 8px;
+}
+.wl-portal {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 34px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: #4b5563;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.wl-portal:hover { border-color: #93c5fd; color: #0284c7; }
+.wl-portal.active {
+  border-color: #0284c7;
+  color: #0284c7;
+  background: #f0f9ff;
+}
+
+/* underline inputs */
+.wl-item { margin-bottom: 8px; }
+.u-input {
+  border: none !important;
+  border-bottom: 1px solid #e5e7eb !important;
+  border-radius: 0 !important;
+  padding: 10px 0 8px !important;
+  font-size: 13.5px;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+.u-input:hover { border-bottom-color: #cbd5e1 !important; }
+.u-input:focus,
+.u-input:focus-within {
+  border-bottom-color: #0284c7 !important;
+}
+.u-input input::placeholder,
+.u-input::placeholder { color: #9ca3af; }
+.wl-prefix {
+  color: #6b7280;
+  font-weight: 600;
+  font-size: 13px;
+  margin-right: 6px;
+}
+
+.wl-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 14px 0 22px;
+}
+.wl-muted { font-size: 12.5px; color: #6b7280; }
+
+/* flat primary button (reference style — modest width feel, flat, 6px radius) */
+.wl-btn {
+  height: 40px !important;
+  border-radius: 6px !important;
+  font-weight: 600 !important;
+  box-shadow: none !important;
+}
+
+.wl-foot {
+  margin-top: 26px;
+  font-size: 12.5px;
+  color: #6b7280;
+  text-align: center;
+}
+.wl-foot a { font-weight: 600; }
+
+/* responsive — drop the brand panel on small screens */
+@media (max-width: 860px) {
+  .wl-left { display: none; }
+  .wl-right { padding: 44px 26px 32px; }
+  .wl-card { min-height: 0; }
+}

@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { App, Button, Checkbox, ConfigProvider, Form, Input } from 'antd';
+import { App, Button, Checkbox, Form, Input } from 'antd';
 import {
-  ArrowLeftOutlined, ArrowRightOutlined, BankOutlined, LockOutlined, MobileOutlined,
-  SafetyCertificateOutlined, UserOutlined,
+  ArrowLeftOutlined, BankOutlined, DownOutlined, SafetyCertificateOutlined, UserOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
@@ -17,20 +16,41 @@ const TABS: { label: string; value: Portal; icon: React.ReactNode }[] = [
   { label: 'Finance', value: 'Finance Team', icon: <BankOutlined /> },
 ];
 
-/** Vivid royal-blue used only on the login surface (app chrome stays institutional navy). */
-const LOGIN_BLUE = '#0284c7';
-
-const loginTheme = {
-  token: {
-    colorPrimary: LOGIN_BLUE,
-    colorLink: LOGIN_BLUE,
-    colorLinkHover: '#0369a1',
-    borderRadius: 9,
-    controlHeight: 38,
-    controlHeightLG: 40,
-    fontSize: 13,
-  },
-};
+/** Flat line-art figure for the brand panel (matches the reference style). */
+const HeroFigure: React.FC = () => (
+  <svg className="wl-illus" viewBox="0 0 300 340" fill="none" aria-hidden="true">
+    {/* rear leg */}
+    <path d="M148 210 C120 250 78 268 52 296 L44 288 C70 258 108 240 132 202 Z"
+      fill="#eef6ff" stroke="#0f172a" strokeWidth="3" strokeLinejoin="round" />
+    {/* front leg */}
+    <path d="M170 214 C178 252 172 286 178 316 L162 318 C154 286 156 250 150 218 Z"
+      fill="#eef6ff" stroke="#0f172a" strokeWidth="3" strokeLinejoin="round" />
+    {/* shoe accents */}
+    <path d="M40 286 L58 300 L36 308 Z" fill="#0f172a" />
+    <path d="M158 314 L182 314 L176 330 L154 328 Z" fill="#0f172a" />
+    {/* torso — sweater */}
+    <path d="M132 108 C110 122 104 158 116 190 C134 214 176 216 192 196 C204 168 200 132 182 112 C166 100 146 100 132 108 Z"
+      fill="#7cc3f0" stroke="#0f172a" strokeWidth="3" strokeLinejoin="round" />
+    {/* pointing arm */}
+    <path d="M182 124 C210 122 238 116 258 106 L262 118 C242 130 214 138 188 142 Z"
+      fill="#7cc3f0" stroke="#0f172a" strokeWidth="3" strokeLinejoin="round" />
+    {/* hand */}
+    <path d="M258 104 L276 96 L280 104 L266 114 Z" fill="#f8d9c4" stroke="#0f172a" strokeWidth="3" strokeLinejoin="round" />
+    {/* back arm */}
+    <path d="M128 124 C116 142 112 162 118 178 L130 174 C126 158 130 142 138 130 Z"
+      fill="#5eb2ea" stroke="#0f172a" strokeWidth="3" strokeLinejoin="round" />
+    {/* neck + head */}
+    <path d="M150 108 L154 92 L172 94 L170 110 Z" fill="#f8d9c4" stroke="#0f172a" strokeWidth="3" />
+    <ellipse cx="164" cy="70" rx="24" ry="26" fill="#f8d9c4" stroke="#0f172a" strokeWidth="3" />
+    {/* hair + beard */}
+    <path d="M142 62 C142 44 158 38 168 40 C184 42 192 54 190 66 C182 58 172 54 164 56 C152 58 146 60 142 68 Z"
+      fill="#0f172a" />
+    <path d="M146 76 C148 92 158 100 168 98 C178 96 186 88 188 76 C186 92 180 106 166 106 C152 106 146 90 146 76 Z"
+      fill="#0f172a" opacity="0.9" />
+    {/* ground shadow */}
+    <ellipse cx="140" cy="326" rx="90" ry="8" fill="#0f172a" opacity="0.08" />
+  </svg>
+);
 
 const Login: React.FC = () => {
   const { message } = App.useApp();
@@ -133,141 +153,112 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div className="login-bg">
-      {/* decorative field — fixed & clipped so it never blocks page scroll */}
-      <div className="lb-field">
-        <div className="lb-deco lb-circles" />
-        <div className="lb-deco lb-shape-tr" />
-        <div className="lb-deco lb-shape-br" />
-        <div className="lb-deco lb-dots lb-dots-tl" />
-        <div className="lb-deco lb-dots lb-dots-br" />
-        <div className="lb-deco lb-lines" />
-        <span className="lb-deco lb-dot lb-dot-1" />
-        <span className="lb-deco lb-ring lb-ring-1" />
-      </div>
+    <div className="wl-page">
+      <div className="wl-card auth-rise">
 
-      <ConfigProvider theme={loginTheme}>
-        <div className="login-stage">
-          <div className="login-card auth-rise">
-            {/* brand lockup */}
-            <div style={{ textAlign: 'center' }}>
-              <div className="login-logo">F</div>
-              <div style={{ marginTop: 11, fontSize: 16.5, fontWeight: 800, color: '#10202f', letterSpacing: 0.3 }}>
-                FUEHRER CAPITAL
-              </div>
-              <div style={{ marginTop: 3, fontSize: 12, color: '#8a97a6' }}>Lending Operations Suite</div>
-            </div>
+        {/* ── brand panel ── */}
+        <aside className="wl-left">
+          <div className="wl-brand">Fuehrer</div>
+          <div className="wl-tag">
+            Lending operations, beautifully unified — origination to collections in one portal.
+          </div>
+          <HeroFigure />
+        </aside>
 
-            {/* welcome */}
-            <div style={{ textAlign: 'center', marginTop: 16 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: LOGIN_BLUE }}>Welcome back</div>
-              <h1 style={{ margin: '4px 0 0', fontSize: 19, fontWeight: 800, color: '#10202f', letterSpacing: -0.3 }}>
-                Sign in to your account
-              </h1>
-              <div style={{ marginTop: 4, fontSize: 12.5, color: '#7c8896' }}>Enter your credentials to continue</div>
-            </div>
+        {/* ── form panel ── */}
+        <section className="wl-right">
+          <div className="wl-lang">ENGLISH (IN) <DownOutlined style={{ fontSize: 9 }} /></div>
 
-            {/* portal tabs */}
-            <div className="seg" style={{ marginTop: 16 }}>
+          <div className="wl-body">
+            <h1 className="wl-title">
+              {portal === 'Admin' ? 'Sign in to Fuehrer' : `${portal} sign in`}
+            </h1>
+            <div className="wl-sub">Staff access · secure &amp; RBI-compliant.</div>
+
+            {/* portal switcher — same three roles, restyled as outlined chips */}
+            <div className="wl-portals">
               {TABS.map((t) => (
                 <button
                   key={t.value}
                   type="button"
-                  className={`seg-item${portal === t.value ? ' active' : ''}`}
+                  className={`wl-portal${portal === t.value ? ' active' : ''}`}
                   onClick={() => switchPortal(t.value)}
                 >
-                  {t.icon}
-                  {t.label}
+                  {t.icon} {t.label}
                 </button>
               ))}
             </div>
 
-            {/* form */}
-            <div style={{ marginTop: 16 }}>
-              {portal === 'Admin' ? (
-                <Form form={adminForm} layout="vertical" onFinish={handleAdmin} requiredMark={false}>
-                  <Form.Item label="Username" name="username" rules={[{ required: true, message: 'Enter your username' }]}>
-                    <Input size="large" prefix={<UserOutlined style={{ color: '#94a3b8' }} />} placeholder="Enter your username" autoFocus />
-                  </Form.Item>
-                  <Form.Item label="Password" name="password" rules={[{ required: true, message: 'Enter your password' }]} style={{ marginBottom: 14 }}>
-                    <Input.Password size="large" prefix={<LockOutlined style={{ color: '#94a3b8' }} />} placeholder="Enter your password" />
-                  </Form.Item>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-                    <Checkbox defaultChecked>
-                      <span style={{ color: '#4a5663', fontSize: 13.5 }}>Remember me</span>
-                    </Checkbox>
-                    <Button type="link" size="small" style={{ padding: 0, fontWeight: 600 }}
-                      onClick={() => message.info('Contact your administrator to reset your password.')}>
-                      Forgot password?
-                    </Button>
-                  </div>
-                  <Button type="primary" size="large" htmlType="submit" block loading={loading}
-                    icon={!loading ? <ArrowRightOutlined /> : undefined} iconPosition="end">
-                    Sign in
+            {portal === 'Admin' ? (
+              <Form form={adminForm} layout="vertical" onFinish={handleAdmin} requiredMark={false}>
+                <Form.Item name="username" rules={[{ required: true, message: 'Enter your username' }]} className="wl-item">
+                  <Input className="u-input" variant="borderless" placeholder="Username" autoFocus />
+                </Form.Item>
+                <Form.Item name="password" rules={[{ required: true, message: 'Enter your password' }]} className="wl-item">
+                  <Input.Password className="u-input" variant="borderless" placeholder="Password" />
+                </Form.Item>
+                <div className="wl-row">
+                  <Checkbox defaultChecked><span className="wl-muted">Remember me</span></Checkbox>
+                  <Button type="link" size="small" style={{ padding: 0, fontWeight: 600 }}
+                    onClick={() => message.info('Contact your administrator to reset your password.')}>
+                    Forgot password?
                   </Button>
-                </Form>
-              ) : otpStage === 'phone' ? (
-                <Form form={phoneForm} layout="vertical" onFinish={sendOtp} requiredMark={false}>
-                  <Form.Item
-                    label="Phone Number"
-                    name="phone"
-                    rules={[
-                      { required: true, message: 'Enter your mobile number' },
-                      { pattern: /^[6-9]\d{9}$/, message: 'Enter a valid 10-digit mobile number' },
-                    ]}
-                    style={{ marginBottom: 22 }}
-                  >
-                    <Input size="large" addonBefore="+91" prefix={<MobileOutlined style={{ color: '#94a3b8' }} />}
-                      placeholder="Enter your phone number" maxLength={10} autoFocus />
-                  </Form.Item>
-                  <Button type="primary" size="large" htmlType="submit" block loading={loading}
-                    icon={!loading ? <ArrowRightOutlined /> : undefined} iconPosition="end">
-                    Send OTP
-                  </Button>
-                </Form>
-              ) : (
-                <Form form={otpForm} layout="vertical" onFinish={verifyOtp} requiredMark={false}>
-                  <div style={{ marginBottom: 18 }}>
-                    <Button type="link" size="small" icon={<ArrowLeftOutlined />} onClick={resetOtpFlow} style={{ paddingLeft: 0 }}>
-                      Change number
-                    </Button>
-                    <div style={{ fontSize: 13.5, color: '#4a5663', marginTop: 4 }}>
-                      Enter the 6-digit OTP sent to <strong>+91 {phone}</strong>
-                    </div>
-                  </div>
-                  <Form.Item name="otp" rules={[{ required: true, message: 'Enter the OTP' }, { len: 6, message: 'OTP is 6 digits' }]}>
-                    <Input.OTP length={6} size="large" autoFocus style={{ width: '100%' }} />
-                  </Form.Item>
-                  <Button type="primary" size="large" htmlType="submit" block loading={loading} style={{ marginTop: 4 }}>
-                    Verify &amp; Sign In
-                  </Button>
-                  <div style={{ textAlign: 'center', marginTop: 14, fontSize: 12.5, color: '#7c8896' }}>
-                    {resendIn > 0 ? (
-                      <>Resend OTP in 00:{String(resendIn).padStart(2, '0')}</>
-                    ) : (
-                      <Button type="link" size="small" onClick={() => { void requestOtp(phone); }}>
-                        Resend OTP
-                      </Button>
-                    )}
-                  </div>
-                </Form>
-              )}
+                </div>
+                <Button className="wl-btn" type="primary" htmlType="submit" block loading={loading}>
+                  Sign In
+                </Button>
+              </Form>
+            ) : otpStage === 'phone' ? (
+              <Form form={phoneForm} layout="vertical" onFinish={sendOtp} requiredMark={false}>
+                <Form.Item
+                  name="phone"
+                  rules={[
+                    { required: true, message: 'Enter your mobile number' },
+                    { pattern: /^[6-9]\d{9}$/, message: 'Enter a valid 10-digit mobile number' },
+                  ]}
+                  className="wl-item"
+                >
+                  <Input
+                    className="u-input"
+                    variant="borderless"
+                    prefix={<span className="wl-prefix">+91</span>}
+                    placeholder="Phone Number"
+                    maxLength={10}
+                    autoFocus
+                  />
+                </Form.Item>
+                <Button className="wl-btn" type="primary" htmlType="submit" block loading={loading} style={{ marginTop: 26 }}>
+                  Send OTP
+                </Button>
+              </Form>
+            ) : (
+              <Form form={otpForm} layout="vertical" onFinish={verifyOtp} requiredMark={false}>
+                <Button type="link" size="small" icon={<ArrowLeftOutlined />} onClick={resetOtpFlow} style={{ paddingLeft: 0 }}>
+                  Change number
+                </Button>
+                <div className="wl-muted" style={{ margin: '6px 0 16px' }}>
+                  Enter the 6-digit OTP sent to <strong>+91 {phone}</strong>
+                </div>
+                <Form.Item name="otp" rules={[{ required: true, message: 'Enter the OTP' }, { len: 6, message: 'OTP is 6 digits' }]}>
+                  <Input.OTP length={6} size="large" autoFocus style={{ width: '100%' }} />
+                </Form.Item>
+                <Button className="wl-btn" type="primary" htmlType="submit" block loading={loading}>
+                  Verify &amp; Sign In
+                </Button>
+                <div className="wl-muted" style={{ textAlign: 'center', marginTop: 14 }}>
+                  {resendIn > 0
+                    ? <>Resend OTP in 00:{String(resendIn).padStart(2, '0')}</>
+                    : <Button type="link" size="small" onClick={() => { void requestOtp(phone); }}>Resend OTP</Button>}
+                </div>
+              </Form>
+            )}
+
+            <div className="wl-foot">
+              Trouble signing in? <a onClick={() => message.info('Reach your administrator or ops desk.')}>Contact administrator</a>
             </div>
           </div>
-
-          {/* footer trust */}
-          <div className="login-foot">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, fontSize: 13.5, fontWeight: 600 }}>
-              <SafetyCertificateOutlined />
-              Secure &amp; compliant platform
-            </div>
-            <div style={{ marginTop: 8, fontSize: 12.5, color: '#6b7280' }}>
-              256-bit encryption &nbsp;·&nbsp; RBI Compliant &nbsp;·&nbsp; Trusted by NBFCs
-            </div>
-          </div>
-
-        </div>
-      </ConfigProvider>
+        </section>
+      </div>
     </div>
   );
 };
