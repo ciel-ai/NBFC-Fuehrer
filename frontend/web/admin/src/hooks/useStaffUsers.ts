@@ -5,6 +5,7 @@
 // it calls usersApi and then reload(); otherwise it falls back to the store.
 
 import { useEffect, useState } from 'react';
+import { USE_MOCK } from '../config';
 import { usersApi } from '../api/users.api';
 import { useAppStore } from '../store/appStore';
 import type { PortalUser } from '../types';
@@ -21,6 +22,7 @@ export function useStaffUsers(): {
   const [nonce, setNonce] = useState(0);
 
   useEffect(() => {
+    if (USE_MOCK) { setData(null); setLoading(false); return; }
     let alive = true;
     setLoading(true);
     usersApi.list()

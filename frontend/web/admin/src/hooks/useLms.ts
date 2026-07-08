@@ -6,6 +6,7 @@
 // screen can label the data honestly ("sample data").
 
 import { useEffect, useMemo, useState } from 'react';
+import { USE_MOCK } from '../config';
 import { lmsApi } from '../api/lms.api';
 import type { LiveLoanAccount } from '../api/lms.api';
 import { useAppStore } from '../store/appStore';
@@ -25,6 +26,7 @@ export function useLoanBook(): {
   const [nonce, setNonce] = useState(0);
 
   useEffect(() => {
+    if (USE_MOCK) { setData(null); setLoading(false); return; }
     let alive = true;
     setLoading(true);
     lmsApi.listAccounts({ limit: 100 })
@@ -55,7 +57,7 @@ export function useLoanAccount(loanNumber: string | undefined): {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!loanNumber) { setLiveLoan(null); setLoading(false); return; }
+    if (USE_MOCK || !loanNumber) { setLiveLoan(null); setLoading(false); return; }
     let alive = true;
     setLoading(true);
     (async () => {

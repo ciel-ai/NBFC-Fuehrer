@@ -8,6 +8,7 @@
 // so the existing preset tabs, filters and CSV export work unchanged.
 
 import { useEffect, useState } from 'react';
+import { USE_MOCK } from '../config';
 import { applicationsApi } from '../api/applications.api';
 import { useAppStore } from '../store/appStore';
 import type { AppStatus, LoanApplication } from '../types';
@@ -99,6 +100,7 @@ export function useApplications(): {
   const [nonce, setNonce] = useState(0);
 
   useEffect(() => {
+    if (USE_MOCK) { setData(null); setLoading(false); return; }
     let alive = true;
     setLoading(true);
     applicationsApi.list({ limit: 100 })

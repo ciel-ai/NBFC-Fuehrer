@@ -6,6 +6,7 @@
 // `live` flag lets it say so honestly.
 
 import { useEffect, useState } from 'react';
+import { USE_MOCK } from '../config';
 import { dashboardApi } from '../api/dashboard.api';
 import type { DashboardSummary } from '../api/dashboard.api';
 
@@ -18,6 +19,7 @@ export function useDashboardSummary(): {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (USE_MOCK) { setLoading(false); return; }
     let alive = true;
     dashboardApi.getSummary()
       .then((s) => { if (alive) { setSummary(s); setLoading(false); } })
