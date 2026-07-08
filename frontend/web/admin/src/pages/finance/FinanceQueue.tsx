@@ -7,7 +7,7 @@ import {
 } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import dayjs from 'dayjs';
-import { useAppStore } from '../../store/appStore';
+import { useApplications } from '../../hooks/useApplications';
 import { useAuthStore } from '../../store/authStore';
 import { scopedLoanType } from '../../auth/rbac';
 import PageHeader from '../../components/PageHeader';
@@ -24,7 +24,7 @@ const FinanceQueue: React.FC = () => {
   const { tab = 'pending' } = useParams<{ tab: FinanceTab }>();
   const activeTab = (['pending', 'emandates', 'disbursed'].includes(tab) ? tab : 'pending') as FinanceTab;
   const user = useAuthStore((s) => s.user)!;
-  const applications = useAppStore((s) => s.applications);
+  const { applications, live, loading } = useApplications();
   const scope = scopedLoanType(user.role);
   const [search, setSearch] = useState('');
 
@@ -167,7 +167,7 @@ const FinanceQueue: React.FC = () => {
     <div>
       <PageHeader
         title="Finance Operations"
-        subtitle={scope ? `Disbursement desk — ${scope} portfolio` : 'Disbursement desk across all loan products'}
+        subtitle={scope ? `Disbursement desk — ${scope} portfolio` : 'Disbursement desk across all loan products' + (live ? '' : ' · sample data (live API unreachable)')}
         extra={
           <Button
             icon={<DownloadOutlined />}
@@ -212,6 +212,7 @@ const FinanceQueue: React.FC = () => {
           />
         </div>
         <Table<LoanApplication>
+          loading={loading}
           dataSource={rows}
           columns={cols}
           rowKey="id"

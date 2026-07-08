@@ -7,7 +7,7 @@ import {
 } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import dayjs from 'dayjs';
-import { useAppStore } from '../../store/appStore';
+import { useApplications } from '../../hooks/useApplications';
 import { useAuthStore } from '../../store/authStore';
 import { scopedLoanType } from '../../auth/rbac';
 import PageHeader from '../../components/PageHeader';
@@ -32,7 +32,7 @@ const CreditQueue: React.FC = () => {
   const { tab = 'pending' } = useParams<{ tab: CreditTab }>();
   const activeTab = (['pending', 'approved', 'rejected', 'returned'].includes(tab) ? tab : 'pending') as CreditTab;
   const user = useAuthStore((s) => s.user)!;
-  const applications = useAppStore((s) => s.applications);
+  const { applications, live, loading } = useApplications();
   const scope = scopedLoanType(user.role);
 
   const [search, setSearch] = useState('');
@@ -172,7 +172,7 @@ const CreditQueue: React.FC = () => {
     <div>
       <PageHeader
         title="Credit Workbench"
-        subtitle={scope ? `Underwriting queue — ${scope} portfolio` : 'Underwriting queue across all loan products'}
+        subtitle={scope ? `Underwriting queue — ${scope} portfolio` : 'Underwriting queue across all loan products' + (live ? '' : ' · sample data (live API unreachable)')}
         extra={
           <Button
             icon={<DownloadOutlined />}
@@ -216,6 +216,7 @@ const CreditQueue: React.FC = () => {
           />
         </div>
         <Table<LoanApplication>
+          loading={loading}
           dataSource={rows}
           columns={activeTab === 'pending' ? pendingCols : decidedCols}
           rowKey="id"
