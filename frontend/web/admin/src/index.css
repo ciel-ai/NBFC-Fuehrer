@@ -736,15 +736,16 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 28px 18px;
+  padding: 24px 16px;
   background: #e8eaee;
 }
 
 .wl-card {
   display: flex;
-  width: 960px;
+  width: min(1240px, 95vw);
   max-width: 100%;
-  min-height: 560px;
+  height: min(820px, calc(100vh - 56px));
+  min-height: 540px;
   background: #ffffff;
   border-radius: 22px;
   box-shadow: 0 18px 44px rgba(16, 24, 40, 0.10), 0 4px 12px rgba(16, 24, 40, 0.05);
@@ -754,8 +755,8 @@ body {
 /* — left brand panel — */
 .wl-left {
   position: relative;
-  flex: 0 0 340px;
-  margin: 12px;
+  flex: 0 0 clamp(320px, 38%, 460px);
+  margin: 14px;
   border-radius: 16px;
   background: linear-gradient(170deg, #8ec9f2 0%, #6cb6ec 100%);
   padding: 30px 28px;
@@ -807,12 +808,12 @@ body {
   user-select: none;
 }
 .wl-body {
-  width: 340px;
+  width: 384px;
   max-width: 100%;
 }
 .wl-title {
   margin: 0;
-  font-size: 19px;
+  font-size: 22px;
   font-weight: 700;
   color: #111827;
   letter-spacing: -0.3px;
@@ -912,7 +913,10 @@ body {
 /* — login brand-panel hero: floating dashboard cards — */
 .wl-hero {
   position: absolute;
-  inset: 96px 0 0 0;
+  left: 0;
+  right: 0;
+  bottom: 30px;
+  height: 360px;
   pointer-events: none;
 }
 .wl-ring {
@@ -940,9 +944,10 @@ body {
   box-shadow: 0 12px 28px rgba(7, 55, 92, 0.22);
 }
 .wl-mock--main {
-  left: 26px;
-  top: 54px;
-  width: 200px;
+  left: 50%;
+  margin-left: -130px;
+  top: 20px;
+  width: 224px;
   padding: 16px 18px;
   transform: rotate(-2deg);
 }
@@ -976,8 +981,9 @@ body {
 .wl-mock-bars span:nth-child(4),
 .wl-mock-bars span:last-child { background: #0284c7; }
 .wl-mock--row {
-  left: 62px;
-  top: 208px;
+  left: 50%;
+  margin-left: -78px;
+  top: 188px;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -1017,8 +1023,9 @@ body {
   padding: 3px 8px;
 }
 .wl-mock--chip {
-  left: 120px;
-  top: 292px;
+  left: 50%;
+  margin-left: -20px;
+  top: 274px;
   display: inline-flex;
   align-items: center;
   gap: 7px;
