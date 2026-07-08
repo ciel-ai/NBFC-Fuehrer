@@ -16,40 +16,37 @@ const TABS: { label: string; value: Portal; icon: React.ReactNode }[] = [
   { label: 'Finance', value: 'Finance Team', icon: <BankOutlined /> },
 ];
 
-/** Flat line-art figure for the brand panel (matches the reference style). */
-const HeroFigure: React.FC = () => (
-  <svg className="wl-illus" viewBox="0 0 300 340" fill="none" aria-hidden="true">
-    {/* rear leg */}
-    <path d="M148 210 C120 250 78 268 52 296 L44 288 C70 258 108 240 132 202 Z"
-      fill="#eef6ff" stroke="#0f172a" strokeWidth="3" strokeLinejoin="round" />
-    {/* front leg */}
-    <path d="M170 214 C178 252 172 286 178 316 L162 318 C154 286 156 250 150 218 Z"
-      fill="#eef6ff" stroke="#0f172a" strokeWidth="3" strokeLinejoin="round" />
-    {/* shoe accents */}
-    <path d="M40 286 L58 300 L36 308 Z" fill="#0f172a" />
-    <path d="M158 314 L182 314 L176 330 L154 328 Z" fill="#0f172a" />
-    {/* torso — sweater */}
-    <path d="M132 108 C110 122 104 158 116 190 C134 214 176 216 192 196 C204 168 200 132 182 112 C166 100 146 100 132 108 Z"
-      fill="#7cc3f0" stroke="#0f172a" strokeWidth="3" strokeLinejoin="round" />
-    {/* pointing arm */}
-    <path d="M182 124 C210 122 238 116 258 106 L262 118 C242 130 214 138 188 142 Z"
-      fill="#7cc3f0" stroke="#0f172a" strokeWidth="3" strokeLinejoin="round" />
-    {/* hand */}
-    <path d="M258 104 L276 96 L280 104 L266 114 Z" fill="#f8d9c4" stroke="#0f172a" strokeWidth="3" strokeLinejoin="round" />
-    {/* back arm */}
-    <path d="M128 124 C116 142 112 162 118 178 L130 174 C126 158 130 142 138 130 Z"
-      fill="#5eb2ea" stroke="#0f172a" strokeWidth="3" strokeLinejoin="round" />
-    {/* neck + head */}
-    <path d="M150 108 L154 92 L172 94 L170 110 Z" fill="#f8d9c4" stroke="#0f172a" strokeWidth="3" />
-    <ellipse cx="164" cy="70" rx="24" ry="26" fill="#f8d9c4" stroke="#0f172a" strokeWidth="3" />
-    {/* hair + beard */}
-    <path d="M142 62 C142 44 158 38 168 40 C184 42 192 54 190 66 C182 58 172 54 164 56 C152 58 146 60 142 68 Z"
-      fill="#0f172a" />
-    <path d="M146 76 C148 92 158 100 168 98 C178 96 186 88 188 76 C186 92 180 106 166 106 C152 106 146 90 146 76 Z"
-      fill="#0f172a" opacity="0.9" />
-    {/* ground shadow */}
-    <ellipse cx="140" cy="326" rx="90" ry="8" fill="#0f172a" opacity="0.08" />
-  </svg>
+/** Floating dashboard-preview cards for the brand panel — pure shapes, always crisp. */
+const HeroCards: React.FC = () => (
+  <div className="wl-hero" aria-hidden="true">
+    <div className="wl-ring" />
+    <div className="wl-ring wl-ring--sm" />
+
+    {/* main stat card */}
+    <div className="wl-mock wl-mock--main">
+      <div className="wl-mock-label">Live Book</div>
+      <div className="wl-mock-value">₹2.4 Cr</div>
+      <div className="wl-mock-bars">
+        <span style={{ height: 16 }} /><span style={{ height: 26 }} /><span style={{ height: 20 }} />
+        <span style={{ height: 34 }} /><span style={{ height: 27 }} /><span style={{ height: 42 }} />
+      </div>
+    </div>
+
+    {/* secondary row card */}
+    <div className="wl-mock wl-mock--row">
+      <span className="wl-mock-dot" />
+      <div>
+        <div className="wl-mock-label">EMI collected</div>
+        <div className="wl-mock-strong">₹4,82,300</div>
+      </div>
+      <span className="wl-mock-pill">+12.4%</span>
+    </div>
+
+    {/* small chip card */}
+    <div className="wl-mock wl-mock--chip">
+      <span className="wl-mock-check">✓</span> Disbursal approved
+    </div>
+  </div>
 );
 
 const Login: React.FC = () => {
@@ -162,7 +159,7 @@ const Login: React.FC = () => {
           <div className="wl-tag">
             Lending operations, beautifully unified — origination to collections in one portal.
           </div>
-          <HeroFigure />
+          <HeroCards />
         </aside>
 
         {/* ── form panel ── */}
