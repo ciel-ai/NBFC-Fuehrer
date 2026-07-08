@@ -734,29 +734,21 @@ body {
 .wl-page {
   min-height: 100vh;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px 16px;
-  background: #e8eaee;
+  background: #ffffff;
 }
 
 .wl-card {
   display: flex;
-  width: min(1240px, 95vw);
-  max-width: 100%;
-  height: min(820px, calc(100vh - 56px));
-  min-height: 540px;
+  width: 100%;
+  min-height: 100vh;
   background: #ffffff;
-  border-radius: 22px;
-  box-shadow: 0 18px 44px rgba(16, 24, 40, 0.10), 0 4px 12px rgba(16, 24, 40, 0.05);
-  overflow: hidden;
 }
 
 /* — left brand panel — */
 .wl-left {
   position: relative;
-  flex: 0 0 clamp(320px, 38%, 460px);
-  margin: 14px;
+  flex: 0 0 clamp(360px, 42%, 640px);
+  margin: 16px;
   border-radius: 16px;
   background: linear-gradient(170deg, #8ec9f2 0%, #6cb6ec 100%);
   padding: 30px 28px;
@@ -915,8 +907,8 @@ body {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 30px;
-  height: 360px;
+  bottom: 8vh;
+  height: 380px;
   pointer-events: none;
 }
 .wl-ring {
