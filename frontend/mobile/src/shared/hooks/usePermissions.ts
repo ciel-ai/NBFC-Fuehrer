@@ -1,3 +1,4 @@
+import { logger } from '@/src/core/logger/logger';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Platform } from 'react-native';
 import * as Device from 'expo-device';
@@ -58,7 +59,7 @@ export function usePermissions(): UsePermissionsResult {
         camera: status === 'granted' ? 'granted' : 'denied',
       }));
     } catch (e) {
-      console.log('Camera error:', e);
+      logger.error('Camera permission error', e);
       if (!isMountedRef.current) return;
       setPermissions((p) => ({ ...p, camera: 'denied' }));
     }
@@ -105,7 +106,7 @@ export function usePermissions(): UsePermissionsResult {
         biometric: result.success ? 'granted' : 'denied',
       }));
     } catch (e) {
-      console.log('Biometric error:', e);
+      logger.error('Biometric check error', e);
       if (!isMountedRef.current) return;
       setPermissions((p) => ({ ...p, biometric: 'unavailable' }));
     }

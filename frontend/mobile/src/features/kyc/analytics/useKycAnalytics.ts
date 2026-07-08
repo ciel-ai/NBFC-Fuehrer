@@ -1,3 +1,4 @@
+import { logger } from '@/src/core/logger/logger';
 import { useCallback, useRef } from 'react';
 import { KycAnalyticsEvent, KycAnalyticsPayload } from '@/src/entities/analytics';
 import { KycStep } from '@/src/entities/kyc';
@@ -5,7 +6,7 @@ import { KycStep } from '@/src/entities/kyc';
 // Simple abstraction for analytics provider
 const trackEvent = (event: KycAnalyticsEvent, payload?: KycAnalyticsPayload) => {
   if (__DEV__) {
-    console.log(`[KYC Analytics] ${event}`, payload || {});
+    logger.debug(`[KYC Analytics] ${event}`, payload || {});
   }
   // In production, this would send to Mixpanel, Amplitude, etc.
 };
