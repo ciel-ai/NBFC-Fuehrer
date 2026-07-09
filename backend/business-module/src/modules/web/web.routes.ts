@@ -23,6 +23,7 @@ import { appraisalsWebRouter }  from './appraisals/appraisals.routes';
 import { lmsRouter }            from './lms/lms.routes';
 import { permissionsRouter } from './permissions/permissions.routes';
 import { productConfigRouter } from './settings/productConfig.routes';
+import { goldCustodyRouter } from './appraisals/goldCustody.routes';
 
 const router = Router();
 
@@ -43,5 +44,6 @@ router.use('/appraisals',    appraisalsWebRouter);
 router.use('/lms',           lmsRouter);
 router.use('/permissions', permissionsRouter);
 router.use('/settings/products', productConfigRouter);
+router.use('/appraisals/gold-custody', goldCustodyRouter);
 
 export { router as webRouter };
