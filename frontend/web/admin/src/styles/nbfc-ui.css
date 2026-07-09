@@ -2,12 +2,13 @@
    No JS animation loops. prefers-reduced-motion is respected at the bottom. */
 
 .nbfc-shell {
-  background: var(--nbfc-page, #e9ebef);
+  background: var(--nbfc-page, #f7f8fa);
   min-height: 100vh;
 }
 
 .nbfc-sidebar {
-  background: linear-gradient(180deg, #0b1e39 0%, #0f2a4d 100%);
+  background: #ffffff;
+  border-right: 1px solid var(--line);
   position: sticky;
   top: 0;
   height: 100vh;
@@ -20,12 +21,11 @@
 }
 
 .nbfc-sidebar .ant-menu-item {
-  color: #c3d4ec !important;
   transition: background-color 0.15s ease, color 0.15s ease;
 }
 
 .nbfc-sidebar .ant-menu-item-selected {
-  background: rgba(90, 169, 230, 0.22) !important;
+  background: var(--brand-soft) !important;
 }
 
 .nbfc-card {
@@ -37,7 +37,7 @@
 }
 
 .nbfc-accent-card {
-  background: linear-gradient(160deg, #5aa9e6 0%, #3c86c4 100%);
+  background: linear-gradient(160deg, #38bdf8 0%, #0284c7 100%);
   color: #fff;
 }
 .nbfc-accent-card .ant-typography,
@@ -60,7 +60,7 @@
   position: absolute;
   inset: -16px;
   border-radius: 150px 150px 0 0;
-  border: 16px solid #5aa9e6;
+  border: 16px solid #38bdf8;
   border-bottom: none;
   clip-path: polygon(0 0, 68% 0, 68% 100%, 0 100%);
   transform-origin: bottom center;
@@ -73,7 +73,7 @@
 
 .nbfc-bar {
   border-radius: 8px 8px 0 0;
-  background: #5aa9e6;
+  background: #38bdf8;
   transform-origin: bottom;
   animation: nbfc-bar-in 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
@@ -93,7 +93,7 @@
   border: none;
 }
 .nbfc-slot.on {
-  background: #5aa9e6;
+  background: #38bdf8;
   border: none;
 }
 

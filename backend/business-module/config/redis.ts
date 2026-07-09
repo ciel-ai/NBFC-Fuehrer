@@ -106,6 +106,12 @@ export const RedisKeys = {
 
     // Distributed lock — prevents double-disbursement
     disbursementLock: (applicationId: string) => `lock:disburse:${applicationId}`,
+
+    // ── Staff (web dashboard) auth — staff-auth module ──────────────────────
+    staffOtp: (phone: string) => `staff:otp:${phone}`,
+    staffOtpAttempts: (phone: string) => `staff:otp:attempts:${phone}`,
+    staffOtpSends: (phone: string) => `staff:otp:sends:${phone}`,
+    staffTokenDenylist: (jti: string) => `staff:token:deny:${jti}`,
 } as const;
 
 // ─── TTL constants (seconds) ───────────────────────────────────────────────────
@@ -116,6 +122,8 @@ export const RedisTTL = {
     EMI_SCHEDULE: 60 * 60,        // 1 hour
     WEBHOOK_PROCESSED: 24 * 60 * 60,   // 24 hours (idempotency window)
     DISBURSE_LOCK: 30,             // 30 seconds (distributed lock TTL)
+    STAFF_OTP: 5 * 60,             // 5 minutes — staff login OTP
+    STAFF_OTP_SEND_WINDOW: 60 * 60,    // 1 hour — window for the 3-sends/hour cap
 } as const;
 
 // ─── Distributed lock utility ──────────────────────────────────────────────────

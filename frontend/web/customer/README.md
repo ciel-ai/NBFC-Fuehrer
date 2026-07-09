@@ -1,32 +1,12 @@
-# React + TypeScript + Vite
+# web/customer — Customer Web Portal (NOT STARTED)
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+**Status (2026-07-08):** stock Vite scaffold only — no product code yet.
+Do not audit this as an in-progress build.
 
-Currently, two official plugins are available:
+Intended scope: public customer-facing web portal (loan status, payments,
+statements) complementing the mobile app. Target start: after the admin
+portal's live-data wiring completes (see frontend fix checklist, Week 2-3).
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
-```
-
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+The former `web/lms` scaffold was deleted 2026-07-08 — the LMS is part of
+the unified staff portal at `web/admin` (routes under `/lms/*`), per the
+unified-portal product decision.

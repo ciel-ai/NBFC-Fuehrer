@@ -224,7 +224,7 @@ const FinancePanel: React.FC<{ app: LoanApplication; readonly?: boolean }> = ({ 
         onCancel={() => { setDisburseModal(false); setMakerChecker(false); }}
         okText={`Disburse ${inr(app.finance?.netDisbursement ?? 0)}`}
         okButtonProps={{ disabled: !makerChecker }}
-        onOk={() => {
+        onOk={async () => {
           try {
             await financeApi.disburse(app.id, { mode: disburseMode });
           } catch {

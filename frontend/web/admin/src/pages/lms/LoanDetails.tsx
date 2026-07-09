@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { App, Avatar, Button, Card, Col, InputNumber, Modal, Progress, Result, Row, Select, Table, Tabs, Tag } from 'antd';
+import { App, Avatar, Button, Card, Col, InputNumber, Modal, Progress, Result, Row, Select, Spin, Table, Tabs, Tag } from 'antd';
 import type { TableProps } from 'antd';
 import {
   ArrowLeftOutlined, CalendarOutlined, DollarOutlined, FileProtectOutlined,
@@ -9,33 +9,41 @@ import { useNavigate, useParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { useAppStore } from '../../store/appStore';
 import { useAuthStore } from '../../store/authStore';
+import { useLoanAccount } from '../../hooks/useLms';
 import { InfoGrid, InfoItem, SectionTitle } from '../../components/InfoGrid';
 import { LoanTypeTag, StatusTag, dpdColor } from '../../components/StatusTag';
 import { DocumentsTab } from '../applications/tabs';
 import { fmtDate, fmtDateTime, initials, inr } from '../../utils/format';
 import type { EmiRow, LoanCharge, Repayment } from '../../types';
 
-const panel: React.CSSProperties = { border: '1px solid #e7ebf3' };
+const panel: React.CSSProperties = { boxShadow: 'var(--shadow-card)' };
 
 const LoanDetails: React.FC = () => {
   const { loanNumber } = useParams<{ loanNumber: string }>();
   const navigate = useNavigate();
   const { message } = App.useApp();
   const user = useAuthStore((s) => s.user)!;
-  const loans = useAppStore((s) => s.loans);
+  const { loan, live, loading, payments } = useLoanAccount(loanNumber);
   const applications = useAppStore((s) => s.applications);
   const repayments = useAppStore((s) => s.repayments);
   const charges = useAppStore((s) => s.charges);
   const recordPayment = useAppStore((s) => s.recordPayment);
-
-  const loan = useMemo(() => loans.find((l) => l.loanNumber === loanNumber), [loans, loanNumber]);
   const app = useMemo(() => applications.find((a) => a.id === loan?.applicationId), [applications, loan]);
-  const loanRepayments = useMemo(() => repayments.filter((r) => r.loanNumber === loanNumber), [repayments, loanNumber]);
+  const storeRepayments = useMemo(() => repayments.filter((r) => r.loanNumber === loanNumber), [repayments, loanNumber]);
+  const loanRepayments = payments ?? storeRepayments;
   const loanCharges = useMemo(() => charges.filter((c) => c.loanNumber === loanNumber), [charges, loanNumber]);
 
   const [payModal, setPayModal] = useState(false);
   const [payAmount, setPayAmount] = useState<number>(0);
   const [payMode, setPayMode] = useState<Repayment['mode']>('UPI');
+
+  if (loading && !loan) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', padding: '120px 0' }}>
+        <Spin size="large" tip="Loading loan account…" />
+      </div>
+    );
+  }
 
   if (!loan) {
     return <Result status="404" title="Loan account not found" extra={<Button type="primary" onClick={() => navigate('/lms/accounts')}>Back to Loan Accounts</Button>} />;
@@ -99,9 +107,10 @@ const LoanDetails: React.FC = () => {
                 <StatusTag status={loan.status} size="md" />
                 <LoanTypeTag type={loan.loanType} full />
                 {loan.dpd > 0 && <Tag style={{ borderRadius: 999, fontWeight: 700, color: dpdColor(loan.dpd), background: `${dpdColor(loan.dpd)}12`, borderColor: `${dpdColor(loan.dpd)}30` }}>DPD {loan.dpd}</Tag>}
+                {!live && <Tag style={{ borderRadius: 999, fontSize: 10.5, color: '#92700c', background: '#fdf6e3', borderColor: '#f0e0b0' }}>SAMPLE DATA</Tag>}
               </div>
               <div style={{ display: 'flex', gap: 16, marginTop: 6, fontSize: 12.5, color: '#7c8aa3', flexWrap: 'wrap' }}>
-                <span style={{ fontWeight: 600, color: '#2563eb' }}>{loan.loanNumber}</span>
+                <span style={{ fontWeight: 600, color: '#0284c7' }}>{loan.loanNumber}</span>
                 <span>+91 {loan.mobile}</span>
                 <span>{loan.branch}</span>
                 {app && (

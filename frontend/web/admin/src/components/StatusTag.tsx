@@ -7,7 +7,7 @@ interface Meta { label: string; color: string; bg: string }
 
 const META: Record<string, Meta> = {
   // application statuses
-  SUBMITTED: { label: 'Submitted', color: '#2563eb', bg: '#eef3f9' },
+  SUBMITTED: { label: 'Submitted', color: '#0284c7', bg: '#eef3f9' },
   CREDIT_PENDING: { label: 'Credit Pending', color: '#b26a00', bg: '#fdf6ea' },
   CREDIT_APPROVED: { label: 'Credit Approved', color: '#1d7a46', bg: '#eef7f1' },
   CREDIT_REJECTED: { label: 'Credit Rejected', color: '#c0392b', bg: '#fbeeec' },
@@ -32,7 +32,7 @@ const META: Record<string, Meta> = {
   FAILED: { label: 'Failed', color: '#c0392b', bg: '#fbeeec' },
   // emi
   PAID: { label: 'Paid', color: '#1d7a46', bg: '#eef7f1' },
-  DUE: { label: 'Due', color: '#2563eb', bg: '#eef3f9' },
+  DUE: { label: 'Due', color: '#0284c7', bg: '#eef3f9' },
   UPCOMING: { label: 'Upcoming', color: '#5a6675', bg: '#f4f6f9' },
   // charges
   UNPAID: { label: 'Unpaid', color: '#c2410c', bg: '#fbf0e9' },
@@ -42,7 +42,7 @@ const META: Record<string, Meta> = {
   // collections
   NORMAL: { label: 'Normal', color: '#5a6675', bg: '#eef1f5' },
   FOLLOW_UP: { label: 'Follow-up', color: '#b26a00', bg: '#fdf6ea' },
-  PTP: { label: 'PTP', color: '#2563eb', bg: '#eef3f9' },
+  PTP: { label: 'PTP', color: '#0284c7', bg: '#eef3f9' },
   FIELD_VISIT: { label: 'Field Visit', color: '#0e7490', bg: '#e9f5f7' },
   LEGAL: { label: 'Legal', color: '#a32219', bg: '#fbeeec' },
   // decisions
@@ -63,14 +63,13 @@ export const StatusTag: React.FC<{ status: string; size?: 'sm' | 'md' }> = ({ st
         display: 'inline-flex',
         alignItems: 'center',
         gap: 6,
-        padding: size === 'sm' ? '2px 8px' : '3px 11px',
-        borderRadius: 6,
+        padding: size === 'sm' ? '3px 10px' : '4px 13px',
+        borderRadius: 999,
         fontSize: size === 'sm' ? 11 : 12.5,
         fontWeight: 600,
         letterSpacing: 0.1,
         color: m.color,
         background: m.bg,
-        border: `1px solid ${m.color}24`,
         whiteSpace: 'nowrap',
         lineHeight: 1.5,
       }}
@@ -87,13 +86,12 @@ export const LoanTypeTag: React.FC<{ type: LoanType; full?: boolean }> = ({ type
     <span
       style={{
         display: 'inline-block',
-        padding: '2px 9px',
-        borderRadius: 6,
+        padding: '3px 11px',
+        borderRadius: 999,
         fontSize: 11,
         fontWeight: 600,
         color: m.color,
         background: m.bg,
-        border: `1px solid ${m.color}26`,
         whiteSpace: 'nowrap',
       }}
     >

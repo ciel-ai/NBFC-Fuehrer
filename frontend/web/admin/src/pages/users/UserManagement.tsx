@@ -8,6 +8,8 @@ import {
   UserSwitchOutlined, SafetyCertificateOutlined, BankOutlined, EditOutlined,
 } from '@ant-design/icons';
 import { useAppStore } from '../../store/appStore';
+import { useStaffUsers } from '../../hooks/useStaffUsers';
+import { usersApi } from '../../api/users.api';
 import { useAuthStore } from '../../store/authStore';
 import { ROLE_META } from '../../auth/rbac';
 import PageHeader from '../../components/PageHeader';
@@ -26,7 +28,7 @@ const ASSIGNABLE_ROLES: Role[] = [
 const UserManagement: React.FC = () => {
   const { message, modal } = App.useApp();
   const sessionUser = useAuthStore((s) => s.user)!;
-  const users = useAppStore((s) => s.users);
+  const { users, live, loading, reload } = useStaffUsers();
   const branches = useAppStore((s) => s.branches);
   const addUser = useAppStore((s) => s.addUser);
   const updateUser = useAppStore((s) => s.updateUser);
@@ -62,7 +64,37 @@ const UserManagement: React.FC = () => {
     setDrawerOpen(true);
   };
 
-  const onSubmit = (values: any): void => {
+  const onSubmit = async (values: any): Promise<void> => {
+    // Live: write through the real staff-users API, then re-fetch the list.
+    // Fallback: local store (sample data) when the API is unreachable.
+    if (live) {
+      try {
+        if (editing) {
+          await usersApi.update(editing.id, {
+            name: values.name, phone: values.phone, email: values.email,
+            role: values.role, status: values.status ? 'ACTIVE' : 'INACTIVE',
+          });
+          message.success(`${values.name} updated`);
+        } else {
+          await usersApi.create({
+            name: values.name, phone: values.phone, email: values.email, role: values.role,
+          });
+          const isSales = ROLE_META[values.role as Role].family === 'SALES';
+          message.success(
+            isSales
+              ? `${values.name} created — mobile app OTP login enabled on ${values.phone}`
+              : `${values.name} created — web OTP login enabled on ${values.phone}`,
+          );
+        }
+        reload();
+        setDrawerOpen(false);
+      } catch (err) {
+        const e = err as { response?: { data?: { message?: string } } };
+        message.error(e.response?.data?.message ?? 'Could not save the user — please retry.');
+      }
+      return;
+    }
+
     if (editing) {
       updateUser(editing.id, {
         name: values.name, phone: values.phone, email: values.email,
@@ -158,8 +190,18 @@ const UserManagement: React.FC = () => {
             size="small"
             checked={r.status === 'ACTIVE'}
             disabled={r.role === 'ADMIN'}
-            onChange={() => {
-              toggleUserStatus(r.id, actor);
+            onChange={async () => {
+              if (live) {
+                try {
+                  await (r.status === 'ACTIVE' ? usersApi.deactivate(r.id) : usersApi.activate(r.id));
+                  reload();
+                } catch {
+                  message.error('Could not change user status — please retry.');
+                  return;
+                }
+              } else {
+                toggleUserStatus(r.id, actor);
+              }
               message.success(`${r.name} ${r.status === 'ACTIVE' ? 'deactivated' : 'activated'}`);
             }}
           />
@@ -177,18 +219,18 @@ const UserManagement: React.FC = () => {
     <div>
       <PageHeader
         title="User Management"
-        subtitle="Provision credit & finance users, assign roles and control access"
+        subtitle={`Provision credit & finance users, assign roles and control access${live ? '' : ' · sample data (live API unreachable)'}`}
         extra={<Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>Create User</Button>}
       />
 
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-        <Col xs={24} sm={12} xl={6}><KpiCard label="Total Users" value={users.length} sub={`${active} active · ${users.length - active} deactivated`} icon={<TeamOutlined />} tint="#2563eb" /></Col>
+        <Col xs={24} sm={12} xl={6}><KpiCard label="Total Users" value={users.length} sub={`${active} active · ${users.length - active} deactivated`} icon={<TeamOutlined />} tint="#0284c7" /></Col>
         <Col xs={24} sm={12} xl={6}><KpiCard label="Sales Team" value={salesCount} sub="mobile app field agents" icon={<UserSwitchOutlined />} tint="#0e7490" /></Col>
         <Col xs={24} sm={12} xl={6}><KpiCard label="Credit Team" value={creditCount} sub="underwriters across products" icon={<SafetyCertificateOutlined />} tint="#d97706" /></Col>
         <Col xs={24} sm={12} xl={6}><KpiCard label="Finance Team" value={financeCount} sub="disbursement officers" icon={<BankOutlined />} tint="#047857" /></Col>
       </Row>
 
-      <Card variant="borderless" style={{ border: '1px solid #e7ebf3' }} styles={{ body: { padding: 0 } }}>
+      <Card variant="borderless" style={{ boxShadow: 'var(--shadow-card)' }} styles={{ body: { padding: 0 } }}>
         <div style={{ display: 'flex', gap: 10, padding: '16px 18px', flexWrap: 'wrap', borderBottom: '1px solid #eef1f7' }}>
           <Input
             prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
@@ -211,6 +253,7 @@ const UserManagement: React.FC = () => {
           dataSource={rows}
           columns={columns}
           rowKey="id"
+          loading={loading}
           size="middle"
           scroll={{ x: 1180 }}
           pagination={{ pageSize: 10, showTotal: (t) => `${t} users` }}
@@ -220,7 +263,7 @@ const UserManagement: React.FC = () => {
       <Drawer
         title={
           <span>
-            <UserAddOutlined style={{ marginRight: 8, color: '#2563eb' }} />
+            <UserAddOutlined style={{ marginRight: 8, color: '#0284c7' }} />
             {editing ? `Edit User — ${editing.name}` : 'Create User'}
           </span>
         }

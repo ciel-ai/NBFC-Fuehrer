@@ -15,18 +15,18 @@ const PageHeader: React.FC<PageHeaderProps> = ({ title, subtitle, extra, back })
       justifyContent: 'space-between',
       alignItems: 'flex-start',
       gap: 16,
-      marginBottom: 20,
+      marginBottom: 24,
       flexWrap: 'wrap',
     }}
   >
     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
       {back}
       <div>
-        <h1 style={{ margin: 0, fontSize: 23, fontWeight: 800, color: '#10202f', letterSpacing: -0.4 }}>
+        <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, color: '#111827', letterSpacing: -0.5 }}>
           {title}
         </h1>
         {subtitle && (
-          <div style={{ marginTop: 4, fontSize: 13, color: '#5a6675' }}>{subtitle}</div>
+          <div style={{ marginTop: 4, fontSize: 13.5, color: '#6b7280' }}>{subtitle}</div>
         )}
       </div>
     </div>

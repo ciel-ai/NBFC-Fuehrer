@@ -1,6 +1,7 @@
 // src/modules/loans/loans.service.ts
 import type { Request } from 'express';
 import { loansRepository } from './loans.repository';
+import { isStaffRole } from '@/constants/roles.constants';
 import { loanEvents } from './loans.events';
 import { setAuditContext } from '@/middlewares';
 import { kycRepository } from '@/modules/kyc';
@@ -526,8 +527,8 @@ export const loansService = {
     ): Promise<LoanApplicationResponse> {
         const application = await loansRepository.findApplicationByIdOrThrow(loanId);
 
-        const staffRoles = ['OPS_EXECUTIVE', 'CREDIT_MANAGER', 'FINANCE', 'SUPER_ADMIN', 'COLLECTION_AGENT'];
-        if (!staffRoles.includes(role) && application.userId !== userId) {
+        // Central staff predicate — includes the web-portal staff vocabulary
+        if (!isStaffRole(role as never) && application.userId !== userId) {
             throw new ForbiddenError('You can only view your own loan applications');
         }
 
@@ -554,8 +555,8 @@ export const loansService = {
     ): Promise<LoanAccountResponse> {
         const account = await loansRepository.findAccountByIdOrThrow(accountId);
 
-        const staffRoles = ['OPS_EXECUTIVE', 'CREDIT_MANAGER', 'FINANCE', 'SUPER_ADMIN', 'COLLECTION_AGENT'];
-        if (!staffRoles.includes(role) && account.userId !== userId) {
+        // Central staff predicate — includes the web-portal staff vocabulary
+        if (!isStaffRole(role as never) && account.userId !== userId) {
             throw new ForbiddenError('You can only view your own loan account');
         }
 
@@ -572,7 +573,18 @@ export const loansService = {
         return loansRepository.findAccountsByUserId(userId, pagination);
     },
 
-    // ── 14. EMI calculation helper (used by disbursement.service) ─────────────
+    // ── 14. Staff loan book — all accounts with servicing metrics (LMS) ───────
+
+    async listLoanAccounts(filters: {
+        status?: string;
+        search?: string;
+        page?: number;
+        limit?: number;
+    }) {
+        return loansRepository.listAccounts(filters);
+    },
+
+    // ── 15. EMI calculation helper (used by disbursement.service) ─────────────
 
     calculateEmi,
 };

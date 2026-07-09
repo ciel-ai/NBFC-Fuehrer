@@ -9,6 +9,8 @@ import {
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
 import { useAppStore } from '../../store/appStore';
+import { useApplications } from '../../hooks/useApplications';
+import { useLoanBook } from '../../hooks/useLms';
 import { useAuthStore } from '../../store/authStore';
 import { ROLE_META, scopedLoanType } from '../../auth/rbac';
 import PageHeader from '../../components/PageHeader';
@@ -31,7 +33,7 @@ const TAB_LABEL: Record<ReportTab, string> = {
 };
 
 const StatStrip: React.FC<{ stats: { label: string; value: React.ReactNode }[] }> = ({ stats }) => (
-  <Card variant="borderless" style={{ border: '1px solid #e7ebf3', marginBottom: 16 }} styles={{ body: { padding: '16px 22px' } }}>
+  <Card variant="borderless" style={{ boxShadow: 'var(--shadow-card)', marginBottom: 16 }} styles={{ body: { padding: '16px 22px' } }}>
     <div style={{ display: 'flex', gap: 40, flexWrap: 'wrap' }}>
       {stats.map((s) => (
         <div key={s.label}>
@@ -48,14 +50,16 @@ const Reports: React.FC = () => {
   const { message } = App.useApp();
   const { tab = 'los' } = useParams<{ tab: ReportTab }>();
   const user = useAuthStore((s) => s.user)!;
-  const applications = useAppStore((s) => s.applications);
-  const loans = useAppStore((s) => s.loans);
+  const { applications, live: appsLive } = useApplications();
+  const { loans, live: loansLive } = useLoanBook();
+  // Cross-portfolio repayments have no list-all endpoint yet — sample data
   const repayments = useAppStore((s) => s.repayments);
+  const live = appsLive && loansLive;
   const scope = scopedLoanType(user.role);
   const family = ROLE_META[user.role].family;
 
   const allowedTabs: ReportTab[] =
-    (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') ? ['los', 'credit', 'finance', 'collections']
+    user.role === 'ADMIN' ? ['los', 'credit', 'finance', 'collections']
     : family === 'CREDIT' ? ['credit'] : ['finance'];
   const activeTab = (allowedTabs.includes(tab as ReportTab) ? tab : allowedTabs[0]) as ReportTab;
 
@@ -157,7 +161,7 @@ const Reports: React.FC = () => {
     <div className="print-area">
       <PageHeader
         title="Reports & Analytics"
-        subtitle="Regulatory-grade MIS across origination, credit, finance and collections"
+        subtitle={`Regulatory-grade MIS across origination, credit, finance and collections${live ? '' : ' · sample data (live API unreachable)'}`}
         extra={
           <div className="no-print" style={{ display: 'flex', gap: 8 }}>
             <Button icon={<FilePdfOutlined />} onClick={() => { message.info('Preparing print-ready PDF…'); setTimeout(() => window.print(), 300); }}>PDF</Button>
@@ -167,7 +171,7 @@ const Reports: React.FC = () => {
         }
       />
 
-      <Card variant="borderless" className="no-print" style={{ border: '1px solid #e7ebf3', marginBottom: 16 }} styles={{ body: { padding: '14px 18px' } }}>
+      <Card variant="borderless" className="no-print" style={{ boxShadow: 'var(--shadow-card)', marginBottom: 16 }} styles={{ body: { padding: '14px 18px' } }}>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
           <Segmented
             value={activeTab}
@@ -235,7 +239,7 @@ const Reports: React.FC = () => {
               </ChartCard>
             </Col>
             <Col span={24}>
-              <Card variant="borderless" style={{ border: '1px solid #e7ebf3' }} styles={{ body: { padding: '8px 10px' } }} title={<span style={{ fontSize: 14, fontWeight: 600 }}>Branch-wise Performance</span>}>
+              <Card variant="borderless" style={{ boxShadow: 'var(--shadow-card)' }} styles={{ body: { padding: '8px 10px' } }} title={<span style={{ fontSize: 14, fontWeight: 600 }}>Branch-wise Performance</span>}>
                 <Table dataSource={branchSummary} columns={branchCols} rowKey="branch" size="small" pagination={false} />
               </Card>
             </Col>
@@ -345,14 +349,14 @@ const Reports: React.FC = () => {
               </ChartCard>
             </Col>
             <Col span={24}>
-              <Card variant="borderless" style={{ border: '1px solid #e7ebf3' }} styles={{ body: { padding: '8px 10px' } }} title={<span style={{ fontSize: 14, fontWeight: 600 }}>Recent Disbursements</span>}>
+              <Card variant="borderless" style={{ boxShadow: 'var(--shadow-card)' }} styles={{ body: { padding: '8px 10px' } }} title={<span style={{ fontSize: 14, fontWeight: 600 }}>Recent Disbursements</span>}>
                 <Table
                   dataSource={disbursedApps.slice(0, 8)}
                   rowKey="id"
                   size="small"
                   pagination={false}
                   columns={[
-                    { title: 'Application', dataIndex: 'appNumber', render: (v: string) => <span style={{ fontWeight: 600, color: '#2563eb', fontSize: 12.5 }}>{v}</span> },
+                    { title: 'Application', dataIndex: 'appNumber', render: (v: string) => <span style={{ fontWeight: 600, color: '#0284c7', fontSize: 12.5 }}>{v}</span> },
                     { title: 'Customer', render: (_: unknown, r: any) => r.customer.name },
                     { title: 'Net Disbursed', align: 'right' as const, render: (_: unknown, r: any) => <span className="tnum" style={{ fontWeight: 600 }}>{inr(r.finance.disbursement.amount)}</span> },
                     { title: 'Mode', render: (_: unknown, r: any) => r.finance.disbursement.mode },
@@ -407,7 +411,7 @@ const Reports: React.FC = () => {
               </ChartCard>
             </Col>
             <Col span={24}>
-              <Card variant="borderless" style={{ border: '1px solid #e7ebf3' }} styles={{ body: { padding: '8px 10px' } }} title={<span style={{ fontSize: 14, fontWeight: 600 }}>Bucket Summary</span>}>
+              <Card variant="borderless" style={{ boxShadow: 'var(--shadow-card)' }} styles={{ body: { padding: '8px 10px' } }} title={<span style={{ fontSize: 14, fontWeight: 600 }}>Bucket Summary</span>}>
                 <Table
                   dataSource={buckets}
                   rowKey="bucket"

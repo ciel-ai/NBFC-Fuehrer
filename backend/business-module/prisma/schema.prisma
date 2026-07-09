@@ -522,6 +522,8 @@ model admin_users {
   branch                                    branches?          @relation(fields: [branch_id], references: [id], onUpdate: NoAction)
   branches_branches_manager_idToadmin_users branches[]         @relation("branches_manager_idToadmin_users")
   collection_cases                          collection_cases[] @relation("AssignedAgent")
+  refresh_tokens                            admin_refresh_tokens[]
+  
 
   @@index([role, status])
   @@index([email])
@@ -762,6 +764,22 @@ model reconciliation_reports {
   @@index([status])
 }
 
+model admin_refresh_tokens {
+  id            String      @id @default(uuid()) @db.Uuid
+  admin_user_id String      @db.Uuid
+  token_hash    String      @db.Text
+  expires_at    DateTime    @db.Timestamptz(6)
+  revoked_at    DateTime?   @db.Timestamptz(6)
+  ip            String?     @db.VarChar(45)
+  user_agent    String?     @db.VarChar(500)
+  created_at    DateTime    @default(now()) @db.Timestamptz(6)
+  admin_user    admin_users @relation(fields: [admin_user_id], references: [id], onDelete: Cascade)
+
+  @@index([admin_user_id])
+  @@index([token_hash])
+  @@index([expires_at])
+}
+
 model number_sequences {
   sequence_key  String   @id @db.VarChar(50)
   current_value Int      @default(0)
@@ -783,3 +801,10 @@ model loan_products {
   is_active          Boolean  @default(true)
   updated_at         DateTime @default(now()) @db.Timestamptz(6)
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ADMIN REFRESH TOKENS
+// Rotating refresh tokens for staff (web dashboard) sessions — staff-auth module.
+// Only the SHA-256 hash of the token is stored — never the raw token.
+// ─────────────────────────────────────────────────────────────────────────────
+

@@ -10,6 +10,7 @@
 
 import type { Logger } from 'winston';
 import type { Role } from '@/config/constants';
+import type { StaffAuthUser } from '@/modules/staff-auth/staffAuth.types';
 
 declare global {
     namespace Express {
@@ -29,6 +30,11 @@ declare global {
             // Use AuthRequest (below) or getAuthUser() in protected route handlers
             // to access this as a guaranteed non-undefined value.
             user?: AuthenticatedUser;
+
+            // ── Attached by verifyStaffToken middleware (web dashboard) ───────────
+            // Present on staff/web-dashboard routes. Separate from `user` (customer
+            // /agent auth) so the two auth systems never collide.
+            staffUser?: StaffAuthUser;
 
             // ── Attached by validate middleware ───────────────────────────────────
             // Joi-validated and type-safe versions of req.body / req.query / req.params
@@ -60,10 +66,13 @@ declare global {
 // Coordinate with them on any changes here.
 
 export interface AuthenticatedUser {
-    id: string;   // UUID — maps to users.id in DB
-    phone: string;   // +91XXXXXXXXXX format
-    role: Role;     // One of the ROLE constants
+    id: string;   // UUID — users.id (customers/agents) or admin_users.id (staff)
+    phone: string;   // +91XXXXXXXXXX format ('' for staff tokens — they carry no phone)
+    role: Role;     // One of the ROLE constants (staff roles are first-class members)
     agentId?: string;   // Set when role === ROLE.AGENT
+    staffRole?: string; // Set when the caller authenticated via /staff/auth —
+                        // the staff role as minted (ADMIN, CREDIT_GOLD, …)
+    branchId?: string | null; // Staff tokens only — branch the staff member belongs to
     jti: string;   // JWT ID — used for token revocation via Redis denylist
     iat: number;   // Issued at (Unix timestamp)
     exp: number;   // Expiry (Unix timestamp)

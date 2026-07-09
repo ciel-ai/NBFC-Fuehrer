@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   BackHandler,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -16,9 +15,7 @@ import { FontFamily, FontSize, Typography } from '@/src/core/theme/typography';
 import { Spacing, BorderRadius, Shadow } from '@/src/core/theme/spacing';
 import { Button } from '@/src/shared/components/common/Button';
 import { scale } from '@/src/core/utils/responsive';
-import { formatCurrency, calculateEMI } from '@/src/core/utils/formatters';
-import { useServices } from '@/src/core/services/ServiceProvider';
-import { HOUSING_INTEREST_RATE } from '@/src/entities/housingLoan';
+import { formatCurrency } from '@/src/core/utils/formatters';
 
 function generateRef() {
   const n = Math.floor(10000 + Math.random() * 90000);
@@ -44,36 +41,9 @@ export default function HousingReviewPendingScreen() {
     }, [])
   );
 
-  const { housingLoanService } = useServices();
-  const [deciding, setDeciding] = useState(false);
-
   const loanAmount = Number(params.amount) || 3600000;
   const propertyValue = Number(params.agreementValue) || 4500000;
   const ltv = Math.round((loanAmount / propertyValue) * 100);
-  const tenureYears = Number(params.tenure) || 20;
-  const emi = Number(params.emi) || calculateEMI(loanAmount, HOUSING_INTEREST_RATE, tenureYears * 12);
-
-  const handleDecision = async () => {
-    setDeciding(true);
-    try {
-      const decision = await housingLoanService.getCommitteeDecision(
-        params.applicationId ?? 'hl_mock',
-        { amount: loanAmount, emi },
-      );
-      if (decision.decision === 'approved') {
-        router.replace({
-          pathname: '/(main)/apply/housing-agreement',
-          params: { ...params, emi: String(emi) },
-        });
-      } else {
-        router.replace({ pathname: '/(main)/apply/loan-rejected', params: { reason: decision.note ?? '' } });
-      }
-    } catch {
-      Alert.alert('Decision unavailable', 'Please try again.');
-    } finally {
-      setDeciding(false);
-    }
-  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -166,8 +136,8 @@ export default function HousingReviewPendingScreen() {
             'Site visit by technical valuer (Day 1)',
             'Legal title verification by panel counsel (Day 1–2)',
             'Credit committee sanction decision (Day 2)',
-            'Sanction letter eSigned via eMudhra (Day 2)',
-            'You complete eSign + eNACH → Disbursal to builder',
+            'Sanction letter issued — you eSign the agreement',
+            'Finance team disburses to the builder',
           ].map((step, i) => (
             <View key={i} style={styles.timelineRow}>
               <View style={styles.timelineDot} />
@@ -179,17 +149,15 @@ export default function HousingReviewPendingScreen() {
 
       <View style={styles.footer}>
         <Button
-          title={deciding ? 'Getting committee decision…' : 'Get Committee Decision'}
-          loading={deciding}
-          disabled={deciding}
-          onPress={handleDecision}
+          title="Track from My Loans"
+          onPress={() => router.replace('/(main)/(tabs)/loans')}
         />
         <TouchableOpacity
           style={styles.homeLink}
-          onPress={() => router.replace('/(main)/(tabs)/loans')}
+          onPress={() => router.replace('/(main)/(tabs)/home')}
         >
-          <Ionicons name="time-outline" size={16} color={Colors.primary} />
-          <Text style={styles.homeLinkText}>Track later from My Loans</Text>
+          <Ionicons name="home-outline" size={16} color={Colors.primary} />
+          <Text style={styles.homeLinkText}>Back to Home</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

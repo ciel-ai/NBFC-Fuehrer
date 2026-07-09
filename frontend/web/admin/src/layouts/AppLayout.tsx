@@ -22,7 +22,7 @@ import { fmtTimeAgo, initials } from '../utils/format';
 const { Sider, Header, Content } = Layout;
 
 const NOTIF_ICON: Record<string, React.ReactNode> = {
-  application: <FileTextOutlined style={{ color: '#2563eb' }} />,
+  application: <FileTextOutlined style={{ color: '#0284c7' }} />,
   credit: <SafetyCertificateOutlined style={{ color: '#b26a00' }} />,
   finance: <BankOutlined style={{ color: '#1d7a46' }} />,
   collection: <ExclamationCircleOutlined style={{ color: '#c0392b' }} />,
@@ -100,7 +100,21 @@ const LayoutInner: React.FC<{ user: SessionUser }> = ({ user }) => {
         ],
       });
     }
-    
+    if (canAccess(user.role, 'lms')) {
+      items.push({
+        key: 'g-lms',
+        icon: <WalletOutlined />,
+        label: 'Loan Management',
+        children: [
+          { key: '/lms/accounts', label: 'Loan Accounts' },
+          { key: '/lms/emi-schedule', label: 'EMI Schedule' },
+          { key: '/lms/repayments', label: 'Repayments' },
+          { key: '/lms/charges', label: 'Charges' },
+          { key: '/lms/documents', label: 'Document Repository' },
+        ],
+      });
+    }
+
     if (canAccess(user.role, 'collections')) {
       items.push({
         key: 'g-collections',
@@ -117,16 +131,17 @@ const LayoutInner: React.FC<{ user: SessionUser }> = ({ user }) => {
     if (canAccess(user.role, 'reports')) {
       const fam = ROLE_META[user.role].family;
       const children = [
-        { key: '/reports/los', label: 'LOS Reports', show: user.role === 'ADMIN' || user.role === 'SUPER_ADMIN' },
-        { key: '/reports/credit', label: 'Credit Reports', show: user.role === 'ADMIN' || user.role === 'SUPER_ADMIN' || fam === 'CREDIT' },
-        { key: '/reports/finance', label: 'Finance Reports', show: user.role === 'ADMIN' || user.role === 'SUPER_ADMIN' || fam === 'FINANCE' },
-        { key: '/reports/collections', label: 'Collection Reports', show: user.role === 'ADMIN' || user.role === 'SUPER_ADMIN' },
+        { key: '/reports/los', label: 'LOS Reports', show: user.role === 'ADMIN' },
+        { key: '/reports/credit', label: 'Credit Reports', show: user.role === 'ADMIN' || fam === 'CREDIT' },
+        { key: '/reports/finance', label: 'Finance Reports', show: user.role === 'ADMIN' || fam === 'FINANCE' },
+        { key: '/reports/collections', label: 'Collection Reports', show: user.role === 'ADMIN' },
       ].filter((c) => c.show).map(({ key, label }) => ({ key, label }));
       items.push({ key: 'g-reports', icon: <BarChartOutlined />, label: 'Reports', children });
     }
     if (canAccess(user.role, 'agents')) items.push({ key: '/agents', icon: <UsergroupAddOutlined />, label: 'Agents' });
     if (canAccess(user.role, 'branches')) items.push({ key: '/branches', icon: <ApartmentOutlined />, label: 'Branches' });
     if (canAccess(user.role, 'users')) items.push({ key: '/users', icon: <TeamOutlined />, label: 'User Management' });
+    if (canAccess(user.role, 'permissions')) items.push({ key: '/permissions', icon: <SafetyCertificateOutlined />, label: 'Roles & Permissions' });
     if (canAccess(user.role, 'audit')) items.push({ key: '/audit', icon: <AuditOutlined />, label: 'Audit Logs' });
     if (canAccess(user.role, 'settings')) items.push({ key: '/settings', icon: <SettingOutlined />, label: 'Settings' });
     return items;
@@ -154,7 +169,7 @@ const LayoutInner: React.FC<{ user: SessionUser }> = ({ user }) => {
     key.startsWith('/applications') ? 'g-applications'
     : key.startsWith('/credit') ? 'g-credit'
     : key.startsWith('/finance') ? 'g-finance'
-    
+    : key.startsWith('/lms') ? 'g-lms'
     : key.startsWith('/collections') ? 'g-collections'
     : key.startsWith('/reports') ? 'g-reports' : '';
 
@@ -188,7 +203,7 @@ const LayoutInner: React.FC<{ user: SessionUser }> = ({ user }) => {
         value: `app:${a.id}`,
         label: (
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-            <span><FileTextOutlined style={{ color: '#2563eb', marginRight: 8 }} />{a.appNumber} · {a.customer.name}</span>
+            <span><FileTextOutlined style={{ color: '#0284c7', marginRight: 8 }} />{a.appNumber} · {a.customer.name}</span>
             <span style={{ color: '#94a3b8', fontSize: 12 }}>{a.status.replace(/_/g, ' ')}</span>
           </div>
         ),
@@ -296,7 +311,7 @@ const LayoutInner: React.FC<{ user: SessionUser }> = ({ user }) => {
     <Layout className="nbfc-shell" style={{ minHeight: '100vh' }}>
       <Sider
         className="app-sider nbfc-sidebar"
-        theme="dark"
+        theme="light"
         collapsible
         collapsed={collapsed}
         trigger={null}
@@ -311,8 +326,8 @@ const LayoutInner: React.FC<{ user: SessionUser }> = ({ user }) => {
           <div className="brand-mark">F</div>
           {!collapsed && (
             <div>
-              <div style={{ color: '#ffffff', fontWeight: 800, fontSize: 15, letterSpacing: 0.3 }}>FUEHRER CAPITAL</div>
-              <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 9.5, letterSpacing: 1.1, textTransform: 'uppercase', marginTop: 1 }}>Lending Operations</div>
+              <div style={{ color: 'var(--ink)', fontWeight: 800, fontSize: 15, letterSpacing: 0.3 }}>FUEHRER CAPITAL</div>
+              <div style={{ color: 'var(--muted)', fontSize: 9.5, letterSpacing: 1.1, textTransform: 'uppercase', marginTop: 1 }}>Lending Operations</div>
             </div>
           )}
         </div>
@@ -349,7 +364,7 @@ const LayoutInner: React.FC<{ user: SessionUser }> = ({ user }) => {
           }}
         >
           <Menu
-            theme="dark"
+            theme="light"
             mode="inline"
             items={menuItems}
             selectedKeys={[selectedKey]}
@@ -362,7 +377,7 @@ const LayoutInner: React.FC<{ user: SessionUser }> = ({ user }) => {
 
         {!collapsed && (
           <div className="sider-foot">
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.1, textTransform: 'uppercase', color: 'rgba(255,255,255,0.5)', marginBottom: 9 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.1, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 9 }}>
               Platform
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5 }}>

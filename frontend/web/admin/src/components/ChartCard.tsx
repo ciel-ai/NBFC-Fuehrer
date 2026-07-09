@@ -14,7 +14,7 @@ const ChartCard: React.FC<ChartCardProps> = ({ title, subtitle, extra, height = 
   <Card
     className="lift nbfc-card"
     variant="borderless"
-    style={{ border: '1px solid #e4e8ee', height: '100%' }}
+    style={{ boxShadow: 'var(--shadow-card)', height: '100%' }}
     styles={{ body: { padding: '17px 20px 12px' } }}
   >
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>

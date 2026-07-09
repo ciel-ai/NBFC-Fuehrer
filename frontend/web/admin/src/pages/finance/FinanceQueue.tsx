@@ -7,7 +7,7 @@ import {
 } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import dayjs from 'dayjs';
-import { useAppStore } from '../../store/appStore';
+import { useApplications } from '../../hooks/useApplications';
 import { useAuthStore } from '../../store/authStore';
 import { scopedLoanType } from '../../auth/rbac';
 import PageHeader from '../../components/PageHeader';
@@ -24,7 +24,7 @@ const FinanceQueue: React.FC = () => {
   const { tab = 'pending' } = useParams<{ tab: FinanceTab }>();
   const activeTab = (['pending', 'emandates', 'disbursed'].includes(tab) ? tab : 'pending') as FinanceTab;
   const user = useAuthStore((s) => s.user)!;
-  const applications = useAppStore((s) => s.applications);
+  const { applications, live, loading } = useApplications();
   const scope = scopedLoanType(user.role);
   const [search, setSearch] = useState('');
 
@@ -51,7 +51,7 @@ const FinanceQueue: React.FC = () => {
       dataIndex: 'appNumber',
       render: (v: string, r) => (
         <div>
-          <div style={{ fontWeight: 600, color: '#2563eb', fontSize: 12.5 }}>{v}</div>
+          <div style={{ fontWeight: 600, color: '#0284c7', fontSize: 12.5 }}>{v}</div>
           <div style={{ fontWeight: 600, color: '#1e293b', marginTop: 2 }}>{r.customer.name}</div>
         </div>
       ),
@@ -167,7 +167,7 @@ const FinanceQueue: React.FC = () => {
     <div>
       <PageHeader
         title="Finance Operations"
-        subtitle={scope ? `Disbursement desk — ${scope} portfolio` : 'Disbursement desk across all loan products'}
+        subtitle={scope ? `Disbursement desk — ${scope} portfolio` : 'Disbursement desk across all loan products' + (live ? '' : ' · sample data (live API unreachable)')}
         extra={
           <Button
             icon={<DownloadOutlined />}
@@ -185,13 +185,13 @@ const FinanceQueue: React.FC = () => {
       />
 
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-        <Col xs={24} sm={12} xl={6}><KpiCard label="Pending Disbursement" value={buckets.pending.length} sub={inrCompact(buckets.pending.reduce((s, a) => s + (a.creditDecision?.approvedAmount ?? a.loan.amount), 0)) + ' sanctioned'} icon={<BankOutlined />} tint="#4338ca" onClick={() => navigate('/finance/pending')} /></Col>
+        <Col xs={24} sm={12} xl={6}><KpiCard label="Pending Disbursement" value={buckets.pending.length} sub={inrCompact(buckets.pending.reduce((s, a) => s + (a.creditDecision?.approvedAmount ?? a.loan.amount), 0)) + ' sanctioned'} icon={<BankOutlined />} tint="#0369a1" onClick={() => navigate('/finance/pending')} /></Col>
         <Col xs={24} sm={12} xl={6}><KpiCard label="E-Mandate Pending" value={buckets.emandates.length} sub={`${buckets.emandates.filter((a) => a.finance?.emandate.status === 'ACTIVE').length} ready to disburse`} icon={<ThunderboltOutlined />} tint="#0e7490" onClick={() => navigate('/finance/emandates')} /></Col>
         <Col xs={24} sm={12} xl={6}><KpiCard label="Disbursed Today" value={disbursedToday.length} sub={inrCompact(disbursedToday.reduce((s, a) => s + a.finance!.disbursement!.amount, 0)) + ' credited'} icon={<FundOutlined />} tint="#0f766e" onClick={() => navigate('/finance/disbursed')} /></Col>
         <Col xs={24} sm={12} xl={6}><KpiCard label="Total Disbursed" value={buckets.disbursed.length} sub="lifetime conversions" icon={<FundOutlined />} tint="#7c3aed" /></Col>
       </Row>
 
-      <Card variant="borderless" style={{ border: '1px solid #e7ebf3' }} styles={{ body: { padding: 0 } }}>
+      <Card variant="borderless" style={{ boxShadow: 'var(--shadow-card)' }} styles={{ body: { padding: 0 } }}>
         <div style={{ display: 'flex', gap: 12, padding: '16px 18px', flexWrap: 'wrap', alignItems: 'center', borderBottom: '1px solid #eef1f7' }}>
           <Segmented
             value={activeTab}
@@ -212,6 +212,7 @@ const FinanceQueue: React.FC = () => {
           />
         </div>
         <Table<LoanApplication>
+          loading={loading}
           dataSource={rows}
           columns={cols}
           rowKey="id"

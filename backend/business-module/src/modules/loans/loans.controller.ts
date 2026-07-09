@@ -132,6 +132,20 @@ export const loansController = {
         } catch (err) { next(err); }
     },
 
+    // GET /loans/accounts — staff loan book (LMS portal)
+    async listAccounts(req: AuthRequest, res: Response, next: NextFunction) {
+        try {
+            const query = getValidatedQuery<{
+                status?: string;
+                search?: string;
+                page?: number;
+                limit?: number;
+            }>(req);
+            const result = await loansService.listLoanAccounts(query);
+            res.status(HTTP.OK).json(paginatedResponse(result));
+        } catch (err) { next(err); }
+    },
+
     // GET /loans/accounts/:id
     async getAccount(req: AuthRequest, res: Response, next: NextFunction) {
         try {

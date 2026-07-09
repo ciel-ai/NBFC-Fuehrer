@@ -4,7 +4,8 @@ import type { TableProps } from 'antd';
 import { DownloadOutlined, EyeOutlined, SearchOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
-import { useAppStore } from '../../store/appStore';
+import { useApplications } from '../../hooks/useApplications';
+import { useLoanBook } from '../../hooks/useLms';
 import { useAuthStore } from '../../store/authStore';
 import { scopedLoanType } from '../../auth/rbac';
 import PageHeader from '../../components/PageHeader';
@@ -27,8 +28,8 @@ interface CustomerRow {
 const CustomersList: React.FC = () => {
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user)!;
-  const applications = useAppStore((s) => s.applications);
-  const loans = useAppStore((s) => s.loans);
+  const { applications, live, loading } = useApplications();
+  const { loans } = useLoanBook();
   const scope = scopedLoanType(user.role);
 
   const [search, setSearch] = useState('');
@@ -84,7 +85,7 @@ const CustomersList: React.FC = () => {
       dataIndex: ['customer', 'name'],
       render: (_: string, r) => (
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-          <Avatar size={38} style={{ background: '#eaf1fe', color: '#2563eb', fontWeight: 700, fontSize: 13 }}>{initials(r.customer.name)}</Avatar>
+          <Avatar size={38} style={{ background: '#e0f2fe', color: '#0284c7', fontWeight: 700, fontSize: 13 }}>{initials(r.customer.name)}</Avatar>
           <div>
             <div style={{ fontWeight: 600, color: '#1e293b' }}>{r.customer.name}</div>
             <div style={{ fontSize: 11.5, color: '#94a3b8' }}>+91 {r.mobile}</div>
@@ -127,11 +128,11 @@ const CustomersList: React.FC = () => {
     <div>
       <PageHeader
         title="Customers"
-        subtitle={`Unified customer directory · ${filtered.length} customers`}
+        subtitle={`Unified customer directory · ${filtered.length} customers${live ? '' : ' · sample data (live API unreachable)'}`}
         extra={<Button icon={<DownloadOutlined />} onClick={handleExport}>Export CSV</Button>}
       />
 
-      <Card variant="borderless" style={{ border: '1px solid #e7ebf3' }} styles={{ body: { padding: 0 } }}>
+      <Card variant="borderless" style={{ boxShadow: 'var(--shadow-card)' }} styles={{ body: { padding: 0 } }}>
         <div style={{ display: 'flex', gap: 10, padding: '16px 18px', flexWrap: 'wrap', borderBottom: '1px solid #eef1f7' }}>
           <Input
             prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
@@ -157,6 +158,7 @@ const CustomersList: React.FC = () => {
           )}
         </div>
         <Table<CustomerRow>
+          loading={loading}
           dataSource={filtered}
           columns={columns}
           rowKey="mobile"

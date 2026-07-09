@@ -19,6 +19,8 @@ import { moneyConverterMiddleware } from '@/middlewares/moneyConverter.middlewar
 
 // â”€â”€ Module routers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 import { authRouter } from '@/modules/auth';
+import { staffAuthRouter } from '@/modules/staff-auth';
+import { staffUsersRouter, staffBranchesRouter } from '@/modules/staff-users';
 import { healthRouter } from '@/modules/health';
 import { webhooksRouter } from '@/modules/webhooks';
 import { kycRouter } from '@/modules/kyc';
@@ -81,6 +83,9 @@ app.use(moneyConverterMiddleware());
 
     // â”€â”€ 11. Domain routes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     app.use('/auth', authRouter);
+    app.use('/staff/auth', staffAuthRouter);
+    app.use('/staff/users', staffUsersRouter);
+    app.use('/staff/branches', staffBranchesRouter);
     app.use('/user', profileRouter);
 app.use(`${api}/notifications`, notificationsRouter);
     app.use(`${api}/kyc`, kycRouter);

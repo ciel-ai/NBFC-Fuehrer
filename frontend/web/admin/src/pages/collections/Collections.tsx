@@ -36,7 +36,9 @@ const Collections: React.FC = () => {
   const loans = useAppStore((s) => s.loans);
   const repayments = useAppStore((s) => s.repayments);
   const logCollectionNote = useAppStore((s) => s.logCollectionNote);
-const [realCases, setRealCases] = React.useState<any[]>([]);
+  // Live collection cases — fetched for connectivity; screen merge is the
+  // next Step-3 task (buckets below still derive from the local store).
+  const [, setRealCases] = React.useState<unknown[]>([]);
 
   React.useEffect(() => {
     collectionsApi.listCases({ limit: 100 })
@@ -79,7 +81,7 @@ const [realCases, setRealCases] = React.useState<any[]>([]);
   }, [recoveryTxns, search]);
 
   const loanCols: TableProps<LoanAccount>['columns'] = [
-    { title: 'Loan Number', dataIndex: 'loanNumber', width: 180, render: (v: string) => <span style={{ fontWeight: 600, color: '#2563eb', fontSize: 12.5 }}>{v}</span> },
+    { title: 'Loan Number', dataIndex: 'loanNumber', width: 180, render: (v: string) => <span style={{ fontWeight: 600, color: '#0284c7', fontSize: 12.5 }}>{v}</span> },
     {
       title: 'Customer', dataIndex: 'customerName',
       render: (v: string, r) => (
@@ -131,7 +133,7 @@ const [realCases, setRealCases] = React.useState<any[]>([]);
 
   const recoveryCols: TableProps<Repayment>['columns'] = [
     { title: 'Date', dataIndex: 'date', width: 150, render: (v: string) => <span style={{ fontSize: 12.5, color: '#475569' }}>{fmtDate(v)}</span>, sorter: (a, b) => dayjs(a.date).valueOf() - dayjs(b.date).valueOf(), defaultSortOrder: 'descend' },
-    { title: 'Loan Number', dataIndex: 'loanNumber', width: 185, render: (v: string) => <span style={{ fontWeight: 600, color: '#2563eb', fontSize: 12.5 }}>{v}</span> },
+    { title: 'Loan Number', dataIndex: 'loanNumber', width: 185, render: (v: string) => <span style={{ fontWeight: 600, color: '#0284c7', fontSize: 12.5 }}>{v}</span> },
     { title: 'Customer', dataIndex: 'customerName', render: (v: string) => <span style={{ fontWeight: 600 }}>{v}</span> },
     { title: 'Type', dataIndex: 'loanType', width: 90, render: (t) => <LoanTypeTag type={t} /> },
     { title: 'Recovered', dataIndex: 'amount', align: 'right', width: 130, render: (v: number) => <span className="tnum" style={{ fontWeight: 700, color: '#047857' }}>{inr(v)}</span> },
@@ -170,7 +172,7 @@ const [realCases, setRealCases] = React.useState<any[]>([]);
         <Col xs={24} sm={12} xl={6}><KpiCard label="Recovery (Month)" value={inrCompact(kpis.recovered)} sub={`${recoveryTxns.length} recovery receipts total`} icon={<FundOutlined />} tint="#047857" onClick={() => navigate('/collections/recovery')} /></Col>
       </Row>
 
-      <Card variant="borderless" style={{ border: '1px solid #e7ebf3' }} styles={{ body: { padding: 0 } }}>
+      <Card variant="borderless" style={{ boxShadow: 'var(--shadow-card)' }} styles={{ body: { padding: 0 } }}>
         <div style={{ display: 'flex', gap: 12, padding: '16px 18px', flexWrap: 'wrap', alignItems: 'center', borderBottom: '1px solid #eef1f7' }}>
           <Segmented
             value={activeTab}

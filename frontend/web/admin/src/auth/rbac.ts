@@ -13,6 +13,7 @@ export type ModuleKey =
   | 'agents'
   | 'branches'
   | 'users'
+  | 'permissions'
   | 'audit'
   | 'settings';
 
@@ -31,7 +32,7 @@ const CREDIT_MODULES: ModuleKey[] = ['dashboard', 'applications', 'customers', '
 const FINANCE_MODULES: ModuleKey[] = ['dashboard', 'applications', 'customers', 'finance', 'lms', 'reports'];
 const ALL_MODULES: ModuleKey[] = [
   'dashboard', 'applications', 'customers', 'appraisals', 'credit', 'finance', 'lms',
-  'collections', 'reports', 'agents', 'branches', 'users', 'audit', 'settings',
+  'collections', 'reports', 'agents', 'branches', 'users', 'permissions', 'audit', 'settings',
 ];
 
 export const ROLE_META: Record<Role, RoleMeta> = {
@@ -52,7 +53,7 @@ export const ROLE_META: Record<Role, RoleMeta> = {
   CREDIT_MANAGER: { label: 'Credit Manager', short: 'Credit Mgr', family: 'CREDIT', color: '#b26a00', modules: CREDIT_MODULES },
   OPS_EXECUTIVE: { label: 'Ops Executive', short: 'Ops', family: 'CREDIT', color: '#0e7490', modules: ['dashboard', 'applications', 'customers', 'appraisals', 'reports'] },
   FINANCE: { label: 'Finance', short: 'Finance', family: 'FINANCE', color: '#1d7a46', modules: FINANCE_MODULES },
-  COLLECTION_AGENT: { label: 'Collections Agent', short: 'Collections', family: 'FINANCE', color: '#c0392b', modules: ['dashboard', 'collections', 'reports'] },
+  COLLECTION_AGENT: { label: 'Collections Agent', short: 'Collections', family: 'FINANCE', color: '#c0392b', modules: ['dashboard', 'collections', 'lms', 'reports'] },
   AGENT: { label: 'Field Agent', short: 'Agent', family: 'SALES', color: '#0e7490', modules: [] },
 };
 
@@ -65,7 +66,7 @@ export const scopedLoanType = (role: Role): LoanType | undefined => ROLE_META[ro
 export const roleFamily = (role: Role): RoleFamily => ROLE_META[role].family;
 
 export const LOAN_TYPE_META: Record<LoanType, { label: string; short: string; color: string; bg: string }> = {
-  CDL: { label: 'Consumer Durable Loan', short: 'CDL', color: '#2563eb', bg: '#eef3f9' },
+  CDL: { label: 'Consumer Durable Loan', short: 'CDL', color: '#0284c7', bg: '#eef3f9' },
   GOLD: { label: 'Gold Loan', short: 'Gold', color: '#b26a00', bg: '#fdf6ea' },
   HOUSING: { label: 'Affordable Housing', short: 'Housing', color: '#6d4ea8', bg: '#f3effa' },
 };

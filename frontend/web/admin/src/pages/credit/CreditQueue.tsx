@@ -7,7 +7,7 @@ import {
 } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import dayjs from 'dayjs';
-import { useAppStore } from '../../store/appStore';
+import { useApplications } from '../../hooks/useApplications';
 import { useAuthStore } from '../../store/authStore';
 import { scopedLoanType } from '../../auth/rbac';
 import PageHeader from '../../components/PageHeader';
@@ -32,7 +32,7 @@ const CreditQueue: React.FC = () => {
   const { tab = 'pending' } = useParams<{ tab: CreditTab }>();
   const activeTab = (['pending', 'approved', 'rejected', 'returned'].includes(tab) ? tab : 'pending') as CreditTab;
   const user = useAuthStore((s) => s.user)!;
-  const applications = useAppStore((s) => s.applications);
+  const { applications, live, loading } = useApplications();
   const scope = scopedLoanType(user.role);
 
   const [search, setSearch] = useState('');
@@ -64,7 +64,7 @@ const CreditQueue: React.FC = () => {
       dataIndex: 'appNumber',
       render: (v: string, r) => (
         <div>
-          <div style={{ fontWeight: 600, color: '#2563eb', fontSize: 12.5 }}>{v}</div>
+          <div style={{ fontWeight: 600, color: '#0284c7', fontSize: 12.5 }}>{v}</div>
           <div style={{ fontWeight: 600, color: '#1e293b', marginTop: 2 }}>{r.customer.name}</div>
           <div style={{ fontSize: 11.5, color: '#94a3b8' }}>+91 {r.customer.mobile}</div>
         </div>
@@ -172,7 +172,7 @@ const CreditQueue: React.FC = () => {
     <div>
       <PageHeader
         title="Credit Workbench"
-        subtitle={scope ? `Underwriting queue — ${scope} portfolio` : 'Underwriting queue across all loan products'}
+        subtitle={scope ? `Underwriting queue — ${scope} portfolio` : 'Underwriting queue across all loan products' + (live ? '' : ' · sample data (live API unreachable)')}
         extra={
           <Button
             icon={<DownloadOutlined />}
@@ -196,7 +196,7 @@ const CreditQueue: React.FC = () => {
         <Col xs={24} sm={12} xl={6}><KpiCard label="Returned Applications" value={buckets.returned.length} sub="with sales for rework" icon={<RollbackOutlined />} tint="#7e22ce" onClick={() => navigate('/credit/returned')} /></Col>
       </Row>
 
-      <Card variant="borderless" style={{ border: '1px solid #e7ebf3' }} styles={{ body: { padding: 0 } }}>
+      <Card variant="borderless" style={{ boxShadow: 'var(--shadow-card)' }} styles={{ body: { padding: 0 } }}>
         <div style={{ display: 'flex', gap: 12, padding: '16px 18px', flexWrap: 'wrap', alignItems: 'center', borderBottom: '1px solid #eef1f7' }}>
           <Segmented
             value={activeTab}
@@ -216,6 +216,7 @@ const CreditQueue: React.FC = () => {
           />
         </div>
         <Table<LoanApplication>
+          loading={loading}
           dataSource={rows}
           columns={activeTab === 'pending' ? pendingCols : decidedCols}
           rowKey="id"

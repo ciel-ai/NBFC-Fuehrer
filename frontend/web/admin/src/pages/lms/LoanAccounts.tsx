@@ -7,7 +7,7 @@ import {
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
-import { useAppStore } from '../../store/appStore';
+import { useLoanBook } from '../../hooks/useLms';
 import { useAuthStore } from '../../store/authStore';
 import { scopedLoanType } from '../../auth/rbac';
 import PageHeader from '../../components/PageHeader';
@@ -20,7 +20,7 @@ import type { LoanAccount, LoanStatus, LoanType } from '../../types';
 const LoanAccounts: React.FC = () => {
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user)!;
-  const loans = useAppStore((s) => s.loans);
+  const { loans, live, loading } = useLoanBook();
   const scope = scopedLoanType(user.role);
 
   const [search, setSearch] = useState('');
@@ -49,7 +49,7 @@ const LoanAccounts: React.FC = () => {
       title: 'Loan Number',
       dataIndex: 'loanNumber',
       width: 185,
-      render: (v: string) => <span style={{ fontWeight: 600, color: '#2563eb', fontSize: 12.5 }}>{v}</span>,
+      render: (v: string) => <span style={{ fontWeight: 600, color: '#0284c7', fontSize: 12.5 }}>{v}</span>,
     },
     {
       title: 'Customer',
@@ -124,7 +124,7 @@ const LoanAccounts: React.FC = () => {
     <div>
       <PageHeader
         title="Loan Accounts"
-        subtitle={`Loan management system · ${scoped.length} accounts ${scope ? `· ${scope} portfolio` : ''}`}
+        subtitle={`Loan management system · ${scoped.length} accounts ${scope ? `· ${scope} portfolio` : ''}${live ? '' : ' · sample data (live API unreachable)'}`}
         extra={
           <Button
             icon={<DownloadOutlined />}
@@ -143,12 +143,12 @@ const LoanAccounts: React.FC = () => {
 
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
         <Col xs={24} sm={12} xl={6}><KpiCard label="Active Book" value={open.length} sub="open loan accounts" icon={<WalletOutlined />} tint="#7c3aed" /></Col>
-        <Col xs={24} sm={12} xl={6}><KpiCard label="Book Outstanding" value={inrCompact(bookSize)} sub="principal outstanding" icon={<FundOutlined />} tint="#2563eb" /></Col>
+        <Col xs={24} sm={12} xl={6}><KpiCard label="Book Outstanding" value={inrCompact(bookSize)} sub="principal outstanding" icon={<FundOutlined />} tint="#0284c7" /></Col>
         <Col xs={24} sm={12} xl={6}><KpiCard label="Overdue Accounts" value={overdueCount} sub="DPD 1–90" icon={<WarningOutlined />} tint="#ea580c" /></Col>
         <Col xs={24} sm={12} xl={6}><KpiCard label="NPA Accounts" value={npaCount} sub="DPD 90+" icon={<CheckCircleOutlined />} tint="#dc2626" /></Col>
       </Row>
 
-      <Card variant="borderless" style={{ border: '1px solid #e7ebf3' }} styles={{ body: { padding: 0 } }}>
+      <Card variant="borderless" style={{ boxShadow: 'var(--shadow-card)' }} styles={{ body: { padding: 0 } }}>
         <div style={{ display: 'flex', gap: 10, padding: '16px 18px', flexWrap: 'wrap', borderBottom: '1px solid #eef1f7' }}>
           <Input
             prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
@@ -185,6 +185,7 @@ const LoanAccounts: React.FC = () => {
           dataSource={rows}
           columns={columns}
           rowKey="loanNumber"
+          loading={loading}
           size="middle"
           className="row-link"
           scroll={{ x: 1100 }}

@@ -22,6 +22,7 @@ import { branchesWebRouter }    from './branches/branches.routes';
 import { appraisalsWebRouter }  from './appraisals/appraisals.routes';
 import { lmsRouter }            from './lms/lms.routes';
 import { permissionsRouter } from './permissions/permissions.routes';
+import { productConfigRouter } from './settings/productConfig.routes';
 
 const router = Router();
 
@@ -41,5 +42,6 @@ router.use('/branches',      branchesWebRouter);
 router.use('/appraisals',    appraisalsWebRouter);
 router.use('/lms',           lmsRouter);
 router.use('/permissions', permissionsRouter);
+router.use('/settings/products', productConfigRouter);
 
 export { router as webRouter };

@@ -7,7 +7,9 @@ import {
 } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import dayjs from 'dayjs';
-import { useAppStore } from '../../store/appStore';
+import { useApplications } from '../../hooks/useApplications';
+import { useLoanBook } from '../../hooks/useLms';
+import { PageLoader } from '../../components/StateViews';
 import { useAuthStore } from '../../store/authStore';
 import { scopedLoanType } from '../../auth/rbac';
 import { InfoGrid, InfoItem, SectionTitle } from '../../components/InfoGrid';
@@ -17,15 +19,15 @@ import PageHeader from '../../components/PageHeader';
 import { fmtDate, initials, inr } from '../../utils/format';
 import type { LoanAccount, LoanApplication } from '../../types';
 
-const panel: React.CSSProperties = { border: '1px solid #e7ebf3' };
+const panel: React.CSSProperties = { boxShadow: 'var(--shadow-card)' };
 const panelBody = { body: { padding: '20px 22px' } };
 
 const CustomerDetails: React.FC = () => {
   const { mobile } = useParams<{ mobile: string }>();
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user)!;
-  const applications = useAppStore((s) => s.applications);
-  const loans = useAppStore((s) => s.loans);
+  const { applications, loading: appsLoading } = useApplications();
+  const { loans, loading: loansLoading } = useLoanBook();
   const scope = scopedLoanType(user.role);
 
   const apps = useMemo(
@@ -42,6 +44,10 @@ const CustomerDetails: React.FC = () => {
     return latest?.customer;
   }, [apps]);
 
+  if ((appsLoading || loansLoading) && !customer) {
+    return <PageLoader />;
+  }
+
   if (!customer) {
     return <Result status="404" title="Customer not found" extra={<Button type="primary" onClick={() => navigate('/customers')}>Back to Customers</Button>} />;
   }
@@ -51,7 +57,7 @@ const CustomerDetails: React.FC = () => {
   const liveBook = custLoans.filter((l) => l.status !== 'CLOSED').reduce((s, l) => s + l.outstandingPrincipal, 0);
 
   const appCols: TableProps<LoanApplication>['columns'] = [
-    { title: 'Application', dataIndex: 'appNumber', render: (v: string) => <span style={{ fontWeight: 600, color: '#2563eb', fontSize: 12.5 }}>{v}</span> },
+    { title: 'Application', dataIndex: 'appNumber', render: (v: string) => <span style={{ fontWeight: 600, color: '#0284c7', fontSize: 12.5 }}>{v}</span> },
     { title: 'Product', dataIndex: 'loanType', width: 120, render: (t) => <LoanTypeTag type={t} /> },
     { title: 'Amount', dataIndex: ['loan', 'amount'], align: 'right', width: 130, render: (v: number) => <span className="tnum" style={{ fontWeight: 600 }}>{inr(v)}</span> },
     { title: 'Stage', dataIndex: 'status', width: 155, render: (s: string) => <StatusTag status={s} /> },
@@ -75,7 +81,7 @@ const CustomerDetails: React.FC = () => {
       />
 
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-        <Col xs={24} sm={12} xl={6}><KpiCard label="Applications" value={apps.length} sub="lifetime" icon={<UserOutlined />} tint="#2563eb" /></Col>
+        <Col xs={24} sm={12} xl={6}><KpiCard label="Applications" value={apps.length} sub="lifetime" icon={<UserOutlined />} tint="#0284c7" /></Col>
         <Col xs={24} sm={12} xl={6}><KpiCard label="Live Loans" value={custLoans.filter((l) => l.status !== 'CLOSED').length} sub={`${custLoans.length} total`} icon={<WalletOutlined />} tint="#0f766e" /></Col>
         <Col xs={24} sm={12} xl={6}><KpiCard label="Total Requested" value={inr(totalRequested)} sub="across applications" icon={<CreditCardOutlined />} tint="#b45309" /></Col>
         <Col xs={24} sm={12} xl={6}><KpiCard label="Live Book" value={inr(liveBook)} sub="outstanding principal" icon={<ShopOutlined />} tint="#6d4ea8" /></Col>
@@ -86,7 +92,7 @@ const CustomerDetails: React.FC = () => {
           <Card variant="borderless" style={panel} styles={panelBody}>
             <SectionTitle><UserOutlined /> Profile</SectionTitle>
             <div style={{ display: 'flex', gap: 14, alignItems: 'center', marginBottom: 16 }}>
-              <Avatar size={52} style={{ background: '#eaf1fe', color: '#2563eb', fontWeight: 700, fontSize: 18 }}>{initials(customer.name)}</Avatar>
+              <Avatar size={52} style={{ background: '#e0f2fe', color: '#0284c7', fontWeight: 700, fontSize: 18 }}>{initials(customer.name)}</Avatar>
               <div>
                 <div style={{ fontWeight: 700, fontSize: 16, color: '#0f172a' }}>{customer.name}</div>
                 <div style={{ fontSize: 12.5, color: '#7c8aa3' }}>{customer.gender} · {customer.age} yrs · {customer.maritalStatus}</div>

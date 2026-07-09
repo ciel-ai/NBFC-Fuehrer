@@ -11,7 +11,7 @@ import { useAuthStore } from '../../store/authStore';
 import type { ProductConfig } from '../../types';
 import { settingsApi } from '../../api/settings.api';
 
-const panel: React.CSSProperties = { border: '1px solid #e7ebf3' };
+const panel: React.CSSProperties = { boxShadow: 'var(--shadow-card)' };
 
 const Settings: React.FC = () => {
   const { message } = App.useApp();
@@ -223,7 +223,7 @@ const Settings: React.FC = () => {
       />
 
       <Drawer
-        title={<span><SettingOutlined style={{ marginRight: 8, color: '#2563eb' }} />Edit Product — {editingProduct?.product}</span>}
+        title={<span><SettingOutlined style={{ marginRight: 8, color: '#0284c7' }} />Edit Product — {editingProduct?.product}</span>}
         width={460}
         open={!!editingProduct}
         onClose={() => setEditingProduct(null)}

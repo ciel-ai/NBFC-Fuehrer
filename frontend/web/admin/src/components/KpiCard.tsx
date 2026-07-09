@@ -15,11 +15,11 @@ const KpiCard: React.FC<KpiCardProps> = ({ label, value, sub, icon, tint, onClic
     className="kpi-card nbfc-card"
     variant="borderless"
     style={{
-      border: '1px solid #e4e8ee',
+      boxShadow: 'var(--shadow-card)',
       cursor: onClick ? 'pointer' : 'default',
       height: '100%',
     }}
-    styles={{ body: { padding: '17px 18px' } }}
+    styles={{ body: { padding: '20px' } }}
     onClick={onClick}
   >
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
@@ -56,7 +56,7 @@ const KpiCard: React.FC<KpiCardProps> = ({ label, value, sub, icon, tint, onClic
     </div>
     <div
       className="tnum"
-      style={{ fontSize: 26, fontWeight: 700, color: '#10202f', lineHeight: 1.1, letterSpacing: -0.6, marginTop: 12 }}
+      style={{ fontSize: 28, fontWeight: 700, color: '#111827', lineHeight: 1.1, letterSpacing: -0.7, marginTop: 14 }}
     >
       {value}
     </div>

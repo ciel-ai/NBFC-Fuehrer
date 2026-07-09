@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { App, Avatar, Button, Card, Result, Tabs, Tag } from 'antd';
 import {
   ArrowLeftOutlined, AuditOutlined, BankOutlined, FileProtectOutlined, FileTextOutlined,
@@ -7,6 +7,8 @@ import {
 } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAppStore } from '../../store/appStore';
+import { useApplicationDetail } from '../../hooks/useApplications';
+import { PageLoader } from '../../components/StateViews';
 import { useAuthStore } from '../../store/authStore';
 import { ROLE_META, scopedLoanType } from '../../auth/rbac';
 import { LoanTypeTag, RiskGradeTag, StatusTag } from '../../components/StatusTag';
@@ -20,14 +22,17 @@ const ApplicationDetails: React.FC = () => {
   const navigate = useNavigate();
   const { message } = App.useApp();
   const user = useAuthStore((s) => s.user)!;
-  const applications = useAppStore((s) => s.applications);
   const pickForReview = useAppStore((s) => s.pickForReview);
 
-  const app = useMemo(() => applications.find((a) => a.id === id), [applications, id]);
+  const { app, live, loading } = useApplicationDetail(id);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const meta = ROLE_META[user.role];
   const scope = scopedLoanType(user.role);
+
+  if (loading && !app) {
+    return <PageLoader />;
+  }
 
   if (!app) {
     return <Result status="404" title="Application not found" extra={<Button type="primary" onClick={() => navigate('/applications')}>Back to Applications</Button>} />;
@@ -68,24 +73,25 @@ const ApplicationDetails: React.FC = () => {
       {/* ── sticky application header ── */}
       <Card
         variant="borderless"
-        style={{ border: '1px solid #e7ebf3', marginBottom: 16 }}
+        style={{ boxShadow: 'var(--shadow-card)', marginBottom: 16 }}
         styles={{ body: { padding: '18px 22px' } }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
           <div style={{ display: 'flex', gap: 16, alignItems: 'center', minWidth: 0 }}>
             <Button shape="circle" icon={<ArrowLeftOutlined />} onClick={() => navigate(-1)} />
-            <Avatar size={52} style={{ background: '#2563eb', fontWeight: 600, fontSize: 17, minWidth: 52 }}>
+            <Avatar size={52} style={{ background: '#0284c7', fontWeight: 600, fontSize: 17, minWidth: 52 }}>
               {initials(app.customer.name)}
             </Avatar>
             <div style={{ minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: 18, fontWeight: 700, color: '#0f172a' }}>{app.customer.name}</span>
                 <StatusTag status={app.status} size="md" />
+                {live && <Tag style={{ borderRadius: 999, fontSize: 10.5, color: '#047857', background: '#ecfdf5', borderColor: '#a7f3d0' }}>LIVE</Tag>}
                 <LoanTypeTag type={app.loanType} full />
                 {app.creditDecision && <RiskGradeTag grade={app.creditDecision.riskGrade} />}
               </div>
               <div style={{ display: 'flex', gap: 16, marginTop: 6, fontSize: 12.5, color: '#7c8aa3', flexWrap: 'wrap' }}>
-                <span style={{ fontWeight: 600, color: '#2563eb' }}>{app.appNumber}</span>
+                <span style={{ fontWeight: 600, color: '#0284c7' }}>{app.appNumber}</span>
                 <span>+91 {app.customer.mobile}</span>
                 <span>{app.branch}</span>
                 <span>Updated {fmtTimeAgo(app.updatedAt)}</span>

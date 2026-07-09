@@ -8,6 +8,7 @@ import {
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../store/appStore';
+import { appraisalsApi } from '../../api/appraisals.api';
 import { useAuthStore } from '../../store/authStore';
 import { scopedLoanType } from '../../auth/rbac';
 import PageHeader from '../../components/PageHeader';
@@ -98,11 +99,23 @@ const Appraisals: React.FC = () => {
     }
   };
 
-  const submit = (values: any): void => {
+  const submit = async (values: any): Promise<void> => {
     if (!active) return;
     if (active.loanType === 'GOLD') {
       const valuation = Math.round((values.netWeightGrams ?? 0) * (values.ratePerGram ?? 0));
       const ltv = valuation ? Math.round((active.loan.amount / valuation) * 100) : 0;
+      try {
+        // Real appraisal engine first (writes collateral_gold, advances the loan)
+        await appraisalsApi.submitGold(active.id, {
+          netWeightGrams: values.netWeightGrams,
+          grossWeightGrams: values.grossWeightGrams,
+          purityKarat: values.purityKarat,
+          ratePerGram: values.ratePerGram,
+          items: [{ description: values.itemsDescription, weightGrams: values.netWeightGrams }],
+        });
+      } catch {
+        // API unreachable / sample row — still record locally below
+      }
       saveGoldAppraisal(active.id, {
         grossWeightGrams: values.grossWeightGrams,
         netWeightGrams: values.netWeightGrams,
@@ -115,6 +128,17 @@ const Appraisals: React.FC = () => {
       message.success(`Gold appraisal saved for ${active.appNumber} · LTV ${ltv}%`);
     } else {
       const ltv = values.marketValue ? Math.round((active.loan.amount / values.marketValue) * 100) : 0;
+      try {
+        await appraisalsApi.submitHousing(active.id, {
+          propertyType: values.type,
+          address: values.address,
+          estimatedMarketValue: values.marketValue,
+          builderName: values.builder,
+          constructionStage: values.constructionStage,
+        });
+      } catch {
+        // API unreachable / sample row — still record locally below
+      }
       savePropertyAppraisal(active.id, {
         type: values.type,
         address: values.address,
@@ -129,7 +153,7 @@ const Appraisals: React.FC = () => {
   };
 
   const columns: TableProps<LoanApplication>['columns'] = [
-    { title: 'Application', dataIndex: 'appNumber', width: 165, render: (v: string) => <span style={{ fontWeight: 600, color: '#2563eb', fontSize: 12.5 }}>{v}</span> },
+    { title: 'Application', dataIndex: 'appNumber', width: 165, render: (v: string) => <span style={{ fontWeight: 600, color: '#0284c7', fontSize: 12.5 }}>{v}</span> },
     {
       title: 'Customer',
       dataIndex: ['customer', 'name'],
@@ -202,11 +226,11 @@ const Appraisals: React.FC = () => {
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
         <Col xs={24} sm={12} xl={6}><KpiCard label="Gold — Pending" value={pendingGold} sub="awaiting appraisal" icon={<GoldOutlined />} tint="#b45309" /></Col>
         <Col xs={24} sm={12} xl={6}><KpiCard label="Property — Pending" value={pendingProp} sub="awaiting assessment" icon={<HomeOutlined />} tint="#6d4ea8" /></Col>
-        <Col xs={24} sm={12} xl={6}><KpiCard label="Gold Files" value={collateralApps.filter((a) => a.loanType === 'GOLD').length} sub="total gold applications" icon={<GoldOutlined />} tint="#2563eb" /></Col>
+        <Col xs={24} sm={12} xl={6}><KpiCard label="Gold Files" value={collateralApps.filter((a) => a.loanType === 'GOLD').length} sub="total gold applications" icon={<GoldOutlined />} tint="#0284c7" /></Col>
         <Col xs={24} sm={12} xl={6}><KpiCard label="Property Files" value={collateralApps.filter((a) => a.loanType === 'HOUSING').length} sub="total housing applications" icon={<HomeOutlined />} tint="#0e7490" /></Col>
       </Row>
 
-      <Card variant="borderless" style={{ border: '1px solid #e7ebf3' }} styles={{ body: { padding: 0 } }}>
+      <Card variant="borderless" style={{ boxShadow: 'var(--shadow-card)' }} styles={{ body: { padding: 0 } }}>
         <div style={{ display: 'flex', gap: 10, padding: '16px 18px', flexWrap: 'wrap', borderBottom: '1px solid #eef1f7', alignItems: 'center' }}>
           {!scope && (
             <Segmented

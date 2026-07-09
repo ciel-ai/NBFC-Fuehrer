@@ -22,13 +22,23 @@ export const creditApi = {
     return res.data.data;
   },
 
+  // Backend exposes a single decision endpoint: POST /credit/decision/:id
+  // { decision: 'APPROVED'|'REJECTED', approvedAmount?, approvedRate?, processingFee?, reason? }
   approve: async (id: string, payload: ApproveLoanPayload) => {
-    const res = await apiClient.post(`/credit/${id}/approve`, payload);
-    return res.data.data;
+    const res = await apiClient.post(`/credit/decision/${id}`, {
+      decision: 'APPROVED',
+      approvedAmount: payload.approvedAmount,
+      approvedRate: payload.interestRate,
+      processingFee: payload.processingFee,
+    });
+    return res.data;
   },
 
   reject: async (id: string, payload: RejectLoanPayload) => {
-    const res = await apiClient.post(`/credit/${id}/reject`, payload);
-    return res.data.data;
+    const res = await apiClient.post(`/credit/decision/${id}`, {
+      decision: 'REJECTED',
+      reason: payload.reason,
+    });
+    return res.data;
   },
 };

@@ -7,13 +7,15 @@
 
 const REQUIRED = [
     'DATABASE_URL',
-    'JWT_SECRET',
+    'JWT_ACCESS_SECRET',
+    'JWT_REFRESH_SECRET',
     'ENCRYPTION_KEY',
 ];
 
 const PRODUCTION_REQUIRED = [
-    'MSG91_AUTH_KEY',
-    'MSG91_OTP_TEMPLATE_ID',
+    'TWILIO_ACCOUNT_SID',
+    'TWILIO_AUTH_TOKEN',
+    'TWILIO_PHONE_NUMBER',
 ];
 
 const validateEnv = () => {
@@ -54,10 +56,25 @@ const validateEnv = () => {
         process.exit(1);
     }
 
-    // Validate JWT_SECRET length — minimum 32 characters
-    if (process.env.JWT_SECRET.length < 32) {
-        console.error('\n❌ JWT_SECRET must be at least 32 characters long.');
-        console.error('   Generate one with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"');
+    // Validate JWT secret lengths — minimum 32 characters each, and they must
+    // be different from one another (a leaked access secret must not be able to
+    // forge refresh tokens).
+    const jwtSecrets = {
+        JWT_ACCESS_SECRET: process.env.JWT_ACCESS_SECRET,
+        JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET,
+    };
+
+    for (const [key, value] of Object.entries(jwtSecrets)) {
+        if (value.length < 32) {
+            console.error(`\n❌ ${key} must be at least 32 characters long.`);
+            console.error('   Generate one with: node -e "console.log(require(\'crypto\').randomBytes(64).toString(\'hex\'))"');
+            console.error('');
+            process.exit(1);
+        }
+    }
+
+    if (jwtSecrets.JWT_ACCESS_SECRET === jwtSecrets.JWT_REFRESH_SECRET) {
+        console.error('\n❌ JWT_ACCESS_SECRET and JWT_REFRESH_SECRET must be different values.');
         console.error('');
         process.exit(1);
     }

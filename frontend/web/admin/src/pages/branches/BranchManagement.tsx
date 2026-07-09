@@ -103,7 +103,7 @@ const BranchManagement: React.FC = () => {
       dataIndex: 'name',
       render: (v: string, r) => (
         <div>
-          <div style={{ fontWeight: 600, color: '#1e293b' }}><BankOutlined style={{ marginRight: 8, color: '#2563eb' }} />{v}</div>
+          <div style={{ fontWeight: 600, color: '#1e293b' }}><BankOutlined style={{ marginRight: 8, color: '#0284c7' }} />{v}</div>
           <div style={{ fontSize: 11.5, color: '#94a3b8' }}>{r.code} · {r.city}, {r.state}</div>
         </div>
       ),
@@ -158,13 +158,13 @@ const BranchManagement: React.FC = () => {
       />
 
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-        <Col xs={24} sm={12} xl={6}><KpiCard label="Total Branches" value={branchList.length} sub={`${activeCount} active`} icon={<BankOutlined />} tint="#2563eb" /></Col>
+        <Col xs={24} sm={12} xl={6}><KpiCard label="Total Branches" value={branchList.length} sub={`${activeCount} active`} icon={<BankOutlined />} tint="#0284c7" /></Col>
         <Col xs={24} sm={12} xl={6}><KpiCard label="States Covered" value={states} sub="geographic spread" icon={<EnvironmentOutlined />} tint="#6d4ea8" /></Col>
         <Col xs={24} sm={12} xl={6}><KpiCard label="Total Staff" value={users.length} sub="across branches" icon={<TeamOutlined />} tint="#0e7490" /></Col>
         <Col xs={24} sm={12} xl={6}><KpiCard label="Inactive" value={branchList.length - activeCount} sub="non-operational" icon={<BankOutlined />} tint="#c0392b" /></Col>
       </Row>
 
-      <Card variant="borderless" style={{ border: '1px solid #e7ebf3' }} styles={{ body: { padding: 0 } }}>
+      <Card variant="borderless" style={{ boxShadow: 'var(--shadow-card)' }} styles={{ body: { padding: 0 } }}>
         <div style={{ display: 'flex', gap: 10, padding: '16px 18px', flexWrap: 'wrap', borderBottom: '1px solid #eef1f7' }}>
           <Input
             prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
@@ -186,7 +186,7 @@ const BranchManagement: React.FC = () => {
       </Card>
 
       <Drawer
-        title={<span><BankOutlined style={{ marginRight: 8, color: '#2563eb' }} />{editing ? `Edit Branch — ${editing.name}` : 'Add Branch'}</span>}
+        title={<span><BankOutlined style={{ marginRight: 8, color: '#0284c7' }} />{editing ? `Edit Branch — ${editing.name}` : 'Add Branch'}</span>}
         width={480}
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}

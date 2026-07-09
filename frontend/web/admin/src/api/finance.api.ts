@@ -12,8 +12,12 @@ export const financeApi = {
     return res.data.data;
   },
 
-  disburse: async (id: string, payload: { mode: string }) => {
-    const res = await apiClient.post(`/finance/${id}/disburse`, payload);
-    return res.data.data;
+  // Backend: POST /finance/disburse/:id { beneficiaryName, accountNumber, ifsc, mode }
+  disburse: async (
+    id: string,
+    payload: { mode: string; beneficiaryName?: string; accountNumber?: string; ifsc?: string },
+  ) => {
+    const res = await apiClient.post(`/finance/disburse/${id}`, payload);
+    return res.data;
   },
 };

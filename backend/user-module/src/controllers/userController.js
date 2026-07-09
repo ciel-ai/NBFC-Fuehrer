@@ -1,4 +1,4 @@
-﻿const userService = require('../services/userService');
+const userService = require('../services/userService');
 const asyncHandler = require('../utils/asyncHandler');
 const { sendSuccess } = require('../utils/response');
 
@@ -43,14 +43,23 @@ const login = asyncHandler(async (req, res) => {
   });
 });
 
-const refresh = asyncHandler(async (req, res) => {
-  const { generateToken } = require('../utils/jwtUtils');
-  const newToken = generateToken(req.user.userId, req.user.phone, req.user.role);
-  sendSuccess(res, { message: 'Token refreshed.', data: { token: newToken } });
+const refreshToken = asyncHandler(async (req, res) => {
+  const result = await userService.refreshTokens(req.body && req.body.refreshToken);
+
+  sendSuccess(res, {
+    message: 'Token refreshed successfully.',
+    data: result,
+  });
 });
 
 const logout = asyncHandler(async (req, res) => {
-  const result = await userService.logoutUser(req.user.userId, req.token, req.user.exp);
+  const bodyRefreshToken = req.body && req.body.refreshToken;
+  const result = await userService.logoutUser(
+    req.user.userId,
+    req.token,
+    req.user.exp,
+    bodyRefreshToken,
+  );
 
   sendSuccess(res, {
     message: 'Logged out successfully.',
@@ -86,15 +95,13 @@ const getUserById = asyncHandler(async (req, res) => {
 });
 
 module.exports = {
-  refresh,
   register,
   sendOtp,
   verifyOtp,
+  refreshToken,
   login,
   logout,
   getProfile,
   updateProfile,
   getUserById,
 };
-
-

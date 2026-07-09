@@ -5,6 +5,7 @@ import { createModuleLogger } from '@/config/logger';
 import { generateLoanAccountNumber, generateLoanApplicationNumber } from '@/utils/referenceNumber.util';
 import {
     LOAN_STATUS,
+    EMI_STATUS,
     PAGINATION,
 } from '@/config/constants';
 import type { LoanStatus, ProductType } from '@/config/constants';
@@ -27,6 +28,31 @@ import type {
 import { NotFoundError } from '@/errors';
 
 const log = createModuleLogger('loans.repository');
+
+// ─── Staff loan-book list item ─────────────────────────────────────────────────
+// Shape returned by listAccounts() for the LMS portal — account terms joined
+// with customer identity and servicing metrics derived from the EMI schedule.
+
+export interface StaffLoanAccountListItem {
+    id: string;
+    accountNumber: string;
+    applicationId: string;
+    customerName: string;
+    customerPhone: string;
+    principalAmount: number;
+    interestRate: number;
+    tenureMonths: number;
+    monthlyEmi: number;
+    outstandingBalance: number;
+    status: string;
+    disbursedAt: Date | null;
+    firstEmiDate: Date | null;
+    nextDueDate: Date | null;
+    paidCount: number;
+    totalEmis: number;
+    overdueAmount: number;
+    dpd: number;
+}
 
 // ─── Mappers ───────────────────────────────────────────────────────────────────
 
@@ -301,6 +327,102 @@ export const loansRepository = {
         const acc = await this.findAccountById(id);
         if (!acc) throw new NotFoundError('Loan account', id);
         return acc;
+    },
+
+    // ── Staff loan book — all accounts with servicing metrics (LMS portal) ────
+    // Joins customer identity + EMI schedule and derives per-account servicing
+    // figures (paid count, next due, overdue amount, DPD) in one query.
+
+    async listAccounts(filters: {
+        status?: string;
+        search?: string;
+        page?: number;
+        limit?: number;
+    }): Promise<PaginatedResult<StaffLoanAccountListItem>> {
+        const page = filters.page ?? PAGINATION.DEFAULT_PAGE;
+        const limit = filters.limit ?? PAGINATION.DEFAULT_LIMIT;
+
+        const where: Record<string, unknown> = {};
+        if (filters.status) where.status = filters.status;
+        if (filters.search) {
+            const q = filters.search.trim();
+            where.OR = [
+                { account_number: { contains: q, mode: 'insensitive' } },
+                { user: { full_name: { contains: q, mode: 'insensitive' } } },
+                { user: { phone: { contains: q } } },
+            ];
+        }
+
+        const [rows, total] = await prisma.$transaction([
+            prisma.loan_accounts.findMany({
+                where,
+                include: {
+                    user: { select: { full_name: true, phone: true } },
+                    emi_schedule: {
+                        select: {
+                            due_date: true,
+                            emi_amount: true,
+                            penalty_amount: true,
+                            status: true,
+                        },
+                        orderBy: { emi_number: 'asc' },
+                    },
+                },
+                orderBy: { created_at: 'desc' },
+                ...toPrismaPage({ page, limit }),
+            }),
+            prisma.loan_accounts.count({ where }),
+        ]);
+
+        const data: StaffLoanAccountListItem[] = rows.map((row) => {
+            const emis = row.emi_schedule;
+            const settled = new Set<string>([EMI_STATUS.PAID, EMI_STATUS.WAIVED]);
+            const overdueStates = new Set<string>([EMI_STATUS.OVERDUE, EMI_STATUS.BOUNCED]);
+
+            const paidCount = emis.filter((e) => settled.has(e.status)).length;
+            const overdueEmis = emis.filter((e) => overdueStates.has(e.status));
+            const firstUnpaid = emis.find((e) => !settled.has(e.status));
+
+            const overdueAmount = overdueEmis.reduce(
+                (sum, e) => sum + toNumber(e.emi_amount) + toNumber(e.penalty_amount),
+                0,
+            );
+
+            // DPD = days since the earliest overdue EMI's due date
+            const earliestOverdue = overdueEmis[0];
+            const dpd = earliestOverdue
+                ? Math.max(0, Math.floor(
+                    (Date.now() - new Date(earliestOverdue.due_date).getTime())
+                    / 86_400_000,
+                ))
+                : 0;
+
+            return {
+                id: row.id,
+                accountNumber: row.account_number,
+                applicationId: row.application_id,
+                customerName: row.user.full_name,
+                customerPhone: row.user.phone,
+                principalAmount: toNumber(row.principal_amount),
+                interestRate: toNumber(row.interest_rate),
+                tenureMonths: row.tenure_months,
+                monthlyEmi: toNumber(row.monthly_emi),
+                outstandingBalance: toNumber(row.outstanding_balance),
+                status: row.status,
+                disbursedAt: row.disbursed_at,
+                firstEmiDate: emis[0]?.due_date ?? null,
+                nextDueDate: firstUnpaid?.due_date ?? null,
+                paidCount,
+                totalEmis: emis.length,
+                overdueAmount: Math.round(overdueAmount * 100) / 100,
+                dpd,
+            };
+        });
+
+        return {
+            data,
+            pagination: buildPaginationMeta(page, limit, total),
+        };
     },
 
     async findAccountsByUserId(

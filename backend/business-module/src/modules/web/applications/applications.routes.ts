@@ -49,8 +49,32 @@ router.get('/', requireAuth(), async (req: AuthRequest, res: Response, next: Nex
 
         const result = await loansService.listApplications(filters);
 
+        // Join customer identity — list rows carry userId only, but the
+        // dashboard renders name/phone on every row (and the Customers
+        // screens aggregate by phone).
+        const rows: any[] = result.data ?? result;
+        const userIds = [...new Set(rows.map((r: any) => r.userId).filter(Boolean))];
+        const { prisma } = await import('@/config/database');
+        const users = userIds.length
+            ? await prisma.users.findMany({
+                where: { id: { in: userIds as string[] } },
+                select: { id: true, full_name: true, phone: true, email: true },
+            })
+            : [];
+        const byId = new Map(users.map((u) => [u.id, u]));
+        const data = rows.map((r: any) => ({
+            ...r,
+            customer: r.customer ?? (byId.get(r.userId)
+                ? {
+                    name: byId.get(r.userId)!.full_name,
+                    phone: byId.get(r.userId)!.phone,
+                    email: byId.get(r.userId)!.email,
+                }
+                : null),
+        }));
+
         res.status(HTTP.OK).json({
-            data: result.data ?? result,
+            data,
             meta: {
                 page: filters.page,
                 pageSize: filters.limit,

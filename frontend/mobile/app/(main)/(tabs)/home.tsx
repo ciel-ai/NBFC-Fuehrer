@@ -289,7 +289,7 @@ export default function HomeScreen() {
     });
   }, [activeLoans, applicationStatus, kycStatus]);
 
-  const hasUnread = true; // TODO: wire to notifications store
+  const hasUnread = true; // TODO(owner, blocked-on-backend 2026-07-08): wire to a notifications store once the API exposes unread counts
   const firstName = user?.name?.split(' ')[0] ?? 'there';
   const topPad = (Platform.OS === 'ios' ? insets.top : ANDROID_STATUS_PAD) + Spacing.sm;
 
