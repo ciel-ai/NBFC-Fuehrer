@@ -69,7 +69,7 @@ export async function runNpaWatchJob(): Promise<void> {
       WHERE
         la.status   = 'ACTIVE'
         AND es.status IN ('OVERDUE', 'BOUNCED', 'PENDING')
-        AND es.due_date < NOW() - INTERVAL '${BUSINESS_RULES.NPA_TRIGGER_DAYS} days'
+        AND es.due_date < NOW() - (${BUSINESS_RULES.NPA_TRIGGER_DAYS} * INTERVAL '1 day')
       GROUP BY la.id, la.user_id
       HAVING MAX(EXTRACT(DAY FROM NOW() - es.due_date)) >= ${BUSINESS_RULES.NPA_TRIGGER_DAYS}
     `;
