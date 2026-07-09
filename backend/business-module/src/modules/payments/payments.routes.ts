@@ -18,6 +18,7 @@ import {
     paymentIdParamSchema,
 } from './payments.dto';
 import { ROLE } from '@/config/constants';
+import { idempotency } from '@/middlewares/idempotency.middleware';
 
 const router = Router();
 
@@ -60,6 +61,7 @@ router.post(
         ROLE.COLLECTION_AGENT,
         ROLE.SUPER_ADMIN,
     ),
+    idempotency(),
     validateBody(paymentLinkSchema),
     paymentsController.createPaymentLink,
 );
@@ -69,6 +71,7 @@ router.post(
     '/cash',
     requireAuth(),
     allowRoles(ROLE.COLLECTION_AGENT, ROLE.SUPER_ADMIN),
+    idempotency(),
     validateBody(recordCashPaymentSchema),
     paymentsController.recordCash,
 );

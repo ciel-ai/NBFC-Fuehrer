@@ -780,6 +780,19 @@ model admin_refresh_tokens {
   @@index([expires_at])
 }
 
+model idempotency_keys {
+  id           String   @id @default(uuid()) @db.Uuid
+  key          String   @unique @db.VarChar(255)
+  request_path String   @db.VarChar(200)
+  response     Json
+  status_code  Int
+  expires_at   DateTime @db.Timestamptz(6)
+  created_at   DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([key])
+  @@index([expires_at])
+}
+
 model number_sequences {
   sequence_key  String   @id @db.VarChar(50)
   current_value Int      @default(0)

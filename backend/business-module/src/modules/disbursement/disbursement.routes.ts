@@ -14,6 +14,7 @@ import {
     disbursementIdParamSchema,
 } from './disbursement.dto';
 import { ROLE } from '@/config/constants';
+import { idempotency } from '@/middlewares/idempotency.middleware';
 
 const router = Router();
 
@@ -34,6 +35,7 @@ router.post(
     requireAuth(),
     allowRoles(ROLE.FINANCE, ROLE.SUPER_ADMIN),
     disbursementLimiter,
+    idempotency(),
     validateParams(loanIdParamSchema),
     validateBody(initiateDisbursementSchema),
     disbursementController.initiate,
@@ -45,6 +47,7 @@ router.post(
     requireAuth(),
     allowRoles(ROLE.FINANCE, ROLE.SUPER_ADMIN),
     disbursementLimiter,
+    idempotency(),
     validateParams(disbursementIdParamSchema),
     disbursementController.retry,
 );
