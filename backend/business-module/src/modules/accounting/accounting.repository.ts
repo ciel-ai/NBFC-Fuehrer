@@ -144,12 +144,10 @@ export const accountingRepository = {
         fromDate?: Date,
         toDate?: Date,
     ): Promise<AccountBalance[]> {
-        const dateFilter = (fromDate || toDate) ? `
-            WHERE entry_date >= ${fromDate ? `'${fromDate.toISOString().split('T')[0]}'` : "'1900-01-01'"}
-            AND   entry_date <= ${toDate   ? `'${toDate.toISOString().split('T')[0]}'`   : "'2099-12-31'"}
-        ` : '';
+        const from = fromDate ?? new Date('1900-01-01');
+        const to   = toDate   ?? new Date('2099-12-31');
 
-        const rows = await prisma.$queryRawUnsafe<any[]>(`
+        const rows = await prisma.$queryRaw<any[]>`
             SELECT
                 g.code,
                 g.name,
@@ -158,12 +156,14 @@ export const accountingRepository = {
                 COALESCE(SUM(CASE WHEN j.debit_account  = g.code THEN j.amount ELSE 0 END), 0) AS total_debits,
                 COALESCE(SUM(CASE WHEN j.credit_account = g.code THEN j.amount ELSE 0 END), 0) AS total_credits
             FROM gl_accounts g
-            LEFT JOIN journal_entries j ON (j.debit_account = g.code OR j.credit_account = g.code)
-            ${dateFilter}
+            LEFT JOIN journal_entries j
+                ON (j.debit_account = g.code OR j.credit_account = g.code)
+                AND j.entry_date >= ${from}
+                AND j.entry_date <= ${to}
             WHERE g.is_active = true
             GROUP BY g.code, g.name, g.type, g.normal_balance
             ORDER BY g.code
-        `);
+        `;
 
         return rows.map((r) => {
             const debits  = Number(r.total_debits);
@@ -182,4 +182,4 @@ export const accountingRepository = {
             };
         });
     },
-};
+}

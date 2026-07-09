@@ -5,6 +5,65 @@ import { env } from './env';
 // ─── Custom log levels ─────────────────────────────────────────────────────────
 // http level sits between info and debug — captures all HTTP traffic
 
+// ─── Sensitive data masking ────────────────────────────────────────────────────
+// Masks Aadhaar, PAN, phone numbers and other PII in logs before they're written.
+// RBI requires that audit logs do not contain raw PII.
+
+const SENSITIVE_KEYS = [
+    'aadhaar', 'aadhaarNumber', 'aadhaar_number',
+    'pan', 'panNumber', 'pan_number',
+    'phone', 'mobile', 'phoneNumber', 'phone_number',
+    'password', 'passwordHash', 'password_hash',
+    'token', 'accessToken', 'refreshToken', 'access_token', 'refresh_token',
+    'otp', 'otpCode', 'otp_code',
+    'cvv', 'cardNumber', 'card_number',
+    'accountNumber', 'account_number',
+    'ifsc',
+];
+
+function maskValue(key: string, value: any): any {
+    if (typeof value === 'string') {
+        if (key.toLowerCase().includes('aadhaar')) {
+            return `XXXX-XXXX-${value.slice(-4)}`;
+        }
+        if (key.toLowerCase().includes('pan')) {
+            return `${value.slice(0, 2)}XXXXX${value.slice(-2)}`;
+        }
+        if (key.toLowerCase().includes('phone') || key.toLowerCase().includes('mobile')) {
+            return `XXXXXX${value.slice(-4)}`;
+        }
+        if (key.toLowerCase().includes('password') || key.toLowerCase().includes('token') || key.toLowerCase().includes('otp')) {
+            return '[REDACTED]';
+        }
+        if (key.toLowerCase().includes('account_number') || key.toLowerCase().includes('accountnumber')) {
+            return `XXXXXX${value.slice(-4)}`;
+        }
+    }
+    return value;
+}
+
+function maskSensitiveData(obj: any): any {
+    if (!obj || typeof obj !== 'object') return obj;
+    if (Array.isArray(obj)) return obj.map(maskSensitiveData);
+
+    const masked: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+        const lowerKey = key.toLowerCase();
+        if (SENSITIVE_KEYS.some(k => lowerKey.includes(k.toLowerCase()))) {
+            masked[key] = maskValue(key, value);
+        } else if (typeof value === 'object') {
+            masked[key] = maskSensitiveData(value);
+        } else {
+            masked[key] = value;
+        }
+    }
+    return masked;
+}
+
+const maskingFormat = winston.format((info) => {
+    return maskSensitiveData(info);
+})();
+
 const levels = {
     error: 0,
     warn: 1,
@@ -17,13 +76,15 @@ const levels = {
 
 // Production: structured JSON — CloudWatch can index and query every field
 const jsonFormat = winston.format.combine(
+    maskingFormat,
     winston.format.timestamp({ format: 'YYYY-MM-DDTHH:mm:ss.SSSZ' }),
-    winston.format.errors({ stack: true }),    // Include stack traces
+    winston.format.errors({ stack: true }),
     winston.format.json(),
 );
 
 // Development: human-readable coloured output
 const prettyFormat = winston.format.combine(
+    maskingFormat,
     winston.format.colorize({ all: true }),
     winston.format.timestamp({ format: 'HH:mm:ss' }),
     winston.format.errors({ stack: true }),
