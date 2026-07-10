@@ -39,6 +39,8 @@ import { housingLoansRouter } from '@/modules/housingLoans';
 import { cdlLoansRouter } from '@/modules/cdlLoans';
 import { salesRouter } from '@/modules/sales';
 import { webRouter } from '@/modules/web/web.routes';
+import swaggerUi from 'swagger-ui-express';
+import { swaggerSpec } from '@/config/swagger';
 
 export function createApp(): express.Application {
     const app = express();
@@ -61,6 +63,15 @@ export function createApp(): express.Application {
 
     // â”€â”€ 5. Health â€” no auth, no body parsing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     app.use('/health', healthRouter);
+
+    // API Documentation — available in development only
+if (env.nodeEnv !== 'production') {
+    app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+        customSiteTitle: 'Fuehrer NBFC API Docs',
+        customCss: '.swagger-ui .topbar { background-color: #0F2C4F; }',
+    }));
+    app.get('/api-docs.json', (_req, res) => res.json(swaggerSpec));
+}
 
     // â”€â”€ 6. Webhooks â€” MUST be before express.json() â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     app.use(`${api}/webhooks`, webhooksRouter);
