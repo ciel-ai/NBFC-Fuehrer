@@ -81,7 +81,6 @@ app.use(moneyConverterMiddleware());
     // â”€â”€ 10. Bootstrap event + notification handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     bootstrapEventHandlers();
 
-    // â”€â”€ 11. Domain routes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     app.use('/auth', authRouter);
     app.use('/staff/auth', staffAuthRouter);
     app.use('/staff/users', staffUsersRouter);
