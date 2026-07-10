@@ -11,7 +11,6 @@ on:
 env:
   AWS_REGION:         ap-south-1
   ECR_REPOSITORY:     fuehrer-nbfc-backend
-  APP_RUNNER_SERVICE: fuehrer-nbfc-backend
 
 jobs:
   deploy:
