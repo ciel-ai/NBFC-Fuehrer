@@ -83,4 +83,16 @@ router.get('/npa', requireAuth(), allowRoles(...LMS_ROLES), async (req: AuthRequ
     } catch (err) { next(err); }
 });
 
+// GET /lms/reports/aum?asOfDate=
+router.get('/aum', requireAuth(), allowRoles(...LMS_ROLES), async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const { asOfDate } = req.query;
+        const result = await reportsService.getAumReport({
+            asOfDate: asOfDate ? new Date(asOfDate as string) : undefined,
+        });
+        res.status(HTTP.OK).json(result);
+    } catch (err) { next(err); }
+});
+
+
 export { router as lmsReportsRouter };

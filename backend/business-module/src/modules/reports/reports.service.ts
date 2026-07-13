@@ -1,9 +1,11 @@
 // src/modules/reports/reports.service.ts
+import { prisma } from '@/config/database';
 import { portfolioMISService } from './portfolioMIS.service';
 import { collectionEfficiencyService } from './collectionEfficiency.service';
 import { rbiReturnService } from './rbiReturn.service';
 import { createModuleLogger } from '@/config/logger';
 import { ForbiddenError } from '@/errors';
+
 import type {
     PortfolioMISReport,
     CollectionEfficiencyReport,
@@ -213,5 +215,72 @@ export const reportsService = {
         }
 
         return { data: report, contentType: 'application/json' };
+    },
+    async getAumReport(filters: {
+        asOfDate?: Date;
+    }) {
+        const asOf = filters.asOfDate ?? new Date();
+
+        const loans = await prisma.loan_accounts.findMany({
+            where: { status: { in: ['ACTIVE', 'OVERDUE', 'NPA'] } },
+            include: {
+                application: { select: { product_type: true } },
+            },
+        });
+
+        const byProduct: Record<string, {
+            count:       number;
+            disbursed:   number;
+            outstanding: number;
+            overdue:     number;
+            npa:         number;
+        }> = {};
+
+        let totalDisbursed   = 0;
+        let totalOutstanding = 0;
+        let totalOverdue     = 0;
+        let totalNpa         = 0;
+
+        for (const loan of loans) {
+            const product = loan.application?.product_type ?? 'UNKNOWN';
+            if (!byProduct[product]) {
+                byProduct[product] = { count: 0, disbursed: 0, outstanding: 0, overdue: 0, npa: 0 };
+            }
+
+            const principal   = Number(loan.principal_amount   ?? 0);
+            const outstanding = Number(loan.outstanding_balance ?? 0);
+            const overdue     = loan.status === 'OVERDUE' ? outstanding : 0;
+            const npa         = loan.status === 'NPA'     ? outstanding : 0;
+
+            byProduct[product].count++;
+            byProduct[product].disbursed    += principal;
+            byProduct[product].outstanding  += outstanding;
+            byProduct[product].overdue      += overdue;
+            byProduct[product].npa          += npa;
+
+            totalDisbursed   += principal;
+            totalOutstanding += outstanding;
+            totalOverdue     += overdue;
+            totalNpa         += npa;
+        }
+
+        return {
+            success: true,
+            data: {
+                asOfDate:        asOf,
+                totalLoans:      loans.length,
+                totalDisbursed,
+                totalOutstanding,
+                totalOverdue,
+                totalNpa,
+                npaRatio:        totalOutstanding > 0
+                    ? Math.round((totalNpa / totalOutstanding) * 10000) / 100
+                    : 0,
+                byProduct: Object.entries(byProduct).map(([product, data]) => ({
+                    product, ...data,
+                })),
+                generatedAt: new Date(),
+            },
+        };
     },
 };
