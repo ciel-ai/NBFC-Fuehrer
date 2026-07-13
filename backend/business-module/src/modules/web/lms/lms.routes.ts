@@ -6,6 +6,7 @@ import { lmsPaymentsRouter }    from './lms.payments.routes';
 import { lmsReportsRouter }     from './lms.reports.routes';
 import { lmsLedgerRouter }      from './lms.ledger.routes';
 import { lmsReconciliationRouter } from './lms.reconciliation.routes';
+import { lmsDocumentsRouter } from './lms.documents.routes';
 
 const router = Router();
 
@@ -15,5 +16,6 @@ router.use('/payments',    lmsPaymentsRouter);
 router.use('/reports',     lmsReportsRouter);
 router.use('/ledger',      lmsLedgerRouter);
 router.use('/reconciliation', lmsReconciliationRouter);
+router.use('/documents', lmsDocumentsRouter);
 
 export { router as lmsRouter };
