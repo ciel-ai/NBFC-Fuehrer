@@ -233,16 +233,20 @@ if (!loanAccountId) { res.status(400).json({ success: false, message: 'loanAccou
                 loanAccountId, user.id, user.role,
             );
 
+            const debitDay = req.body.debitDay && [4, 7, 12].includes(req.body.debitDay)
+                ? req.body.debitDay
+                : 4;
+
             const result = {
                 loanAccountId:  account.id,
                 accountNumber:  account.accountNumber,
                 monthlyEmi:     account.monthlyEmi,
-                debitDay:       5,
+                debitDay,
                 maxAmount:      Math.round(account.monthlyEmi * 1.3),
                 currency:       'INR',
                 mandateType:    'E_NACH',
                 frequency:      'MONTHLY',
-                note:           'Auto-debit will be initiated on the 5th of every month.',
+                note:           `Auto-debit will be initiated on the ${debitDay}th of every month.`,
             };
 
             res.status(HTTP.OK).json({ success: true, data: result });

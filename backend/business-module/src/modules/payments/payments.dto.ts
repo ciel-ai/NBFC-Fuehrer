@@ -2,11 +2,13 @@
 import Joi from 'joi';
 
 export const createMandateSchema = Joi.object({
-    loanAccountId: Joi.string().uuid({ version: 'uuidv4' }).required(),
+    loanAccountId:     Joi.string().uuid({ version: 'uuidv4' }).required(),
     bankAccountNumber: Joi.string().min(9).max(18).required(),
-    ifscCode: Joi.string().length(11).uppercase().required(),
+    ifscCode:          Joi.string().length(11).uppercase().required(),
     accountHolderName: Joi.string().max(100).required(),
-    maxAmount: Joi.number().positive().max(10_000_000).required(),
+    maxAmount:         Joi.number().positive().max(10_000_000).required(),
+    debitDay:          Joi.number().valid(4, 7, 12).required()
+                          .messages({ 'any.only': 'debitDay must be 4, 7, or 12' }),
 });
 
 export const paymentLinkSchema = Joi.object({
