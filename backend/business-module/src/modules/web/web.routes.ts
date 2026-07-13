@@ -24,6 +24,7 @@ import { lmsRouter }            from './lms/lms.routes';
 import { permissionsRouter } from './permissions/permissions.routes';
 import { productConfigRouter } from './settings/productConfig.routes';
 import { goldCustodyRouter } from './appraisals/goldCustody.routes';
+import { cdlAutoApprovalRouter } from './credit/cdlAutoApproval.routes';
 
 const router = Router();
 
@@ -45,5 +46,6 @@ router.use('/lms',           lmsRouter);
 router.use('/permissions', permissionsRouter);
 router.use('/settings/products', productConfigRouter);
 router.use('/appraisals/gold-custody', goldCustodyRouter);
+router.use('/credit/cdl', cdlAutoApprovalRouter);
 
 export { router as webRouter };
