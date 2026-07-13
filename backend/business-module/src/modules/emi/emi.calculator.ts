@@ -206,6 +206,7 @@ export function computeForeclosureAmount(params: {
     outstandingPrincipal: Rupees;
     accruedInterest: Rupees;
     foreclosureFee: Rupees;
+    foreclosureFeeGst: Rupees;
     penalty: Rupees;
     total: Rupees;
 } {
@@ -235,10 +236,16 @@ export function computeForeclosureAmount(params: {
         Math.ceil(toPaisa(outstandingPrincipal) * (foreclosureFeePct / 100)),
     );
 
+    // GST at 18% on foreclosure fee (per client requirements)
+    const foreclosureFeeGst = toRupees(
+        Math.ceil(toPaisa(foreclosureFee) * 0.18),
+    );
+
     const total = toRupees(
         toPaisa(outstandingPrincipal) +
         toPaisa(accruedInterest) +
         toPaisa(foreclosureFee) +
+        toPaisa(foreclosureFeeGst) +
         toPaisa(accumulatedPenalty),
     );
 
@@ -246,6 +253,7 @@ export function computeForeclosureAmount(params: {
         outstandingPrincipal,
         accruedInterest,
         foreclosureFee,
+        foreclosureFeeGst,
         penalty: accumulatedPenalty,
         total,
     };

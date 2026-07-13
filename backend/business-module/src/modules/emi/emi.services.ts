@@ -293,7 +293,7 @@ export const emiService = {
             annualRatePct: 0, // Fetched from loan account in controller
             lastEmiDate: lastPaidDate,
             settlementDate: new Date(),
-            foreclosureFeePct: 2,   // 2% foreclosure fee
+            foreclosureFeePct: 5,   // 5% per client requirements (principal outstanding + GST)
             accumulatedPenalty: summary.totalPenalty,
         });
     },
