@@ -93,6 +93,10 @@ export interface GoldLoanAppointmentRequest {
     preferredDate:  string;
     preferredSlot:  string;
     userId:     string;
+    nomineeName?:         string;
+    nomineeRelationship?: string;
+    nomineeAddress?:      string;
+    nomineeAge?:          number;
 }
 
 export interface GoldLoanAppointment {

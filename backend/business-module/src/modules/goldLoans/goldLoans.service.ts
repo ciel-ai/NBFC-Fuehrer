@@ -4,6 +4,7 @@ import { goldLoansRepository } from './goldLoans.repository';
 import { loansRepository } from '@/modules/loans/loans.repository';
 import { LOAN_STATUS } from '@/config/constants';
 import { NotFoundError, LoanStateError } from '@/errors';
+import { prisma } from '@/config/database';
 import type {
     GoldRate,
     GoldEligibilityRequest,
@@ -145,6 +146,19 @@ export const goldLoansService = {
             req.loanId,
             LOAN_STATUS.APPOINTMENT_BOOKED,
         );
+
+        // Save nomination details if provided
+        if (req.nomineeName) {
+            await prisma.loan_applications.update({
+                where: { id: req.loanId },
+                data: {
+                    nominee_name:         req.nomineeName,
+                    nominee_relationship: req.nomineeRelationship,
+                    nominee_address:      req.nomineeAddress,
+                    nominee_age:          req.nomineeAge,
+                },
+            });
+        }
 
         log.info('Gold loan appointment booked', {
             appointmentId: appointment.id,
