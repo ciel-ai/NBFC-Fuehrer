@@ -25,6 +25,7 @@ import { permissionsRouter } from './permissions/permissions.routes';
 import { productConfigRouter } from './settings/productConfig.routes';
 import { goldCustodyRouter } from './appraisals/goldCustody.routes';
 import { cdlAutoApprovalRouter } from './credit/cdlAutoApproval.routes';
+import { goldAuctionRouter } from './appraisals/goldAuction.routes';
 
 const router = Router();
 
@@ -47,5 +48,6 @@ router.use('/permissions', permissionsRouter);
 router.use('/settings/products', productConfigRouter);
 router.use('/appraisals/gold-custody', goldCustodyRouter);
 router.use('/credit/cdl', cdlAutoApprovalRouter);
+router.use('/appraisals/gold-auction', goldAuctionRouter);
 
 export { router as webRouter };
