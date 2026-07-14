@@ -61,6 +61,9 @@ export const productConfigService = {
             maxLtvPct:        config.max_ltv_pct ? Number(config.max_ltv_pct) : null,
             isActive:         config.is_active,
             updatedAt:        config.updated_at,
+            appraiserFee:       Number(config.appraiser_fee ?? 0),
+secondAppraiserFee: Number(config.second_appraiser_fee ?? 0),
+incidentalCharges:  Number(config.incidental_charges ?? 0),
         };
     },
 
@@ -82,6 +85,9 @@ export const productConfigService = {
             maxLtvPct:        r.max_ltv_pct ? Number(r.max_ltv_pct) : null,
             isActive:         r.is_active,
             updatedAt:        r.updated_at,
+            appraiserFee:       Number(r.appraiser_fee ?? 0),
+secondAppraiserFee: Number(r.second_appraiser_fee ?? 0),
+incidentalCharges:  Number(r.incidental_charges ?? 0),
         }));
     },
 
@@ -99,6 +105,9 @@ export const productConfigService = {
             documentationFee?: number;
             maxLtvPct?:        number | null;
             isActive?:         boolean;
+            appraiserFee?:       number;
+secondAppraiserFee?: number;
+incidentalCharges?:  number;
         },
     ) {
         const result = await prisma.loan_products.update({
@@ -115,6 +124,9 @@ export const productConfigService = {
                 ...(data.documentationFee !== undefined && { documentation_fee:  data.documentationFee }),
                 ...(data.maxLtvPct        !== undefined && { max_ltv_pct:        data.maxLtvPct }),
                 ...(data.isActive         !== undefined && { is_active:          data.isActive }),
+                ...(data.appraiserFee       !== undefined && { appraiser_fee:        data.appraiserFee }),
+...(data.secondAppraiserFee !== undefined && { second_appraiser_fee: data.secondAppraiserFee }),
+...(data.incidentalCharges  !== undefined && { incidental_charges:   data.incidentalCharges }),
                 updated_at: new Date(),
             },
         });

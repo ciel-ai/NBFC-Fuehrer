@@ -824,6 +824,9 @@ model loan_products {
   stamp_duty         Decimal  @default(0) @db.Decimal(10, 2)
   documentation_fee  Decimal  @default(0) @db.Decimal(10, 2)
   max_ltv_pct        Decimal? @db.Decimal(5, 2)
+  appraiser_fee        Decimal? @default(0) @db.Decimal(10, 2)
+  second_appraiser_fee Decimal? @default(0) @db.Decimal(10, 2)
+  incidental_charges   Decimal? @default(0) @db.Decimal(10, 2)
   is_active          Boolean  @default(true)
   updated_at         DateTime @default(now()) @db.Timestamptz(6)
 }
@@ -833,4 +836,6 @@ model loan_products {
 // Rotating refresh tokens for staff (web dashboard) sessions — staff-auth module.
 // Only the SHA-256 hash of the token is stored — never the raw token.
 // ─────────────────────────────────────────────────────────────────────────────
+
+
 
