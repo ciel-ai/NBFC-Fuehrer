@@ -67,4 +67,14 @@ router.get('/legal-notice/:loanAccountId', requireAuth(), allowRoles(...FINANCE_
     } catch (err) { next(err); }
 });
 
+// GET /lms/documents/repayment-schedule/:loanAccountId
+router.get('/repayment-schedule/:loanAccountId', requireAuth(), allowRoles(...LMS_ROLES), async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const pdf = await pdfService.generateRepaymentSchedule(req.params.loanAccountId as string);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="repayment-schedule-${req.params.loanAccountId}.pdf"`);
+        res.status(HTTP.OK).send(pdf);
+    } catch (err) { next(err); }
+});
+
 export { router as lmsDocumentsRouter };

@@ -370,4 +370,98 @@ export const pdfService = {
             doc.end();
         });
     },
+
+    // ── 6. Repayment Schedule ─────────────────────────────────────────────────
+
+    async generateRepaymentSchedule(loanAccountId: string): Promise<Buffer> {
+        log.info('Generating repayment schedule', { loanAccountId });
+
+        const loan = await prisma.loan_accounts.findUnique({
+            where: { id: loanAccountId },
+            include: {
+                user:         { select: { full_name: true, phone: true } },
+                application:  { select: { product_type: true, interest_rate: true, tenure_months: true } },
+                emi_schedule: { orderBy: { emi_number: 'asc' } },
+            },
+        });
+
+        if (!loan) throw new NotFoundError('Loan Account', loanAccountId);
+
+        return new Promise((resolve, reject) => {
+            const doc = new PDFDocument({ margin: 50, size: 'A4' });
+            const chunks: Buffer[] = [];
+
+            doc.on('data', (chunk) => chunks.push(chunk));
+            doc.on('end',  () => resolve(Buffer.concat(chunks)));
+            doc.on('error', reject);
+
+            addHeader(doc, 'REPAYMENT SCHEDULE');
+
+            addField(doc, 'Loan Account No.:', loan.account_number);
+            addField(doc, 'Customer Name:',    loan.user?.full_name ?? 'N/A');
+            addField(doc, 'Product:',          loan.application?.product_type ?? 'N/A');
+            addField(doc, 'Interest Rate:',    `${loan.application?.interest_rate ?? 0}% p.a.`);
+            addField(doc, 'Tenure:',           `${loan.application?.tenure_months ?? 0} months`);
+            addField(doc, 'Generated On:',     formatDate(new Date()));
+            doc.moveDown(1);
+
+            // Table header
+            const tableTop = doc.y;
+            doc.fontSize(9).fillColor('#FFFFFF')
+                .rect(50, tableTop, 495, 20).fill('#0F2C4F');
+            doc.fillColor('#FFFFFF')
+                .text('#',          55,  tableTop + 5)
+                .text('Due Date',   90,  tableTop + 5)
+                .text('EMI',        200, tableTop + 5)
+                .text('Principal',  270, tableTop + 5)
+                .text('Interest',   340, tableTop + 5)
+                .text('Balance',    410, tableTop + 5)
+                .text('Status',     480, tableTop + 5);
+
+            let y = tableTop + 20;
+            let totalEmi       = 0;
+            let totalPrincipal = 0;
+            let totalInterest  = 0;
+
+            loan.emi_schedule.forEach((emi, i) => {
+                const bg = i % 2 === 0 ? '#F8FAFC' : '#FFFFFF';
+                const emiAmt  = Number(emi.emi_amount ?? 0);
+                const prinAmt = Number(emi.principal_component ?? 0);
+                const intAmt  = Number(emi.interest_component ?? 0);
+                const bal     = Number(emi.outstanding_after ?? 0);
+
+                totalEmi       += emiAmt;
+                totalPrincipal += prinAmt;
+                totalInterest  += intAmt;
+
+                doc.rect(50, y, 495, 18).fill(bg);
+                doc.fontSize(8).fillColor('#1E293B')
+                    .text(String(i + 1),           55,  y + 4)
+                    .text(formatDate(emi.due_date), 90,  y + 4)
+                    .text(inr(emiAmt),              200, y + 4)
+                    .text(inr(prinAmt),             270, y + 4)
+                    .text(inr(intAmt),              340, y + 4)
+                    .text(inr(bal),                 410, y + 4)
+                    .text(emi.status,               480, y + 4);
+                y += 18;
+
+                // Add new page if needed
+                if (y > doc.page.height - 80) {
+                    doc.addPage();
+                    y = 50;
+                }
+            });
+
+            // Totals row
+            doc.rect(50, y, 495, 20).fill('#0F2C4F');
+            doc.fontSize(9).fillColor('#FFFFFF')
+                .text('TOTAL',          55,  y + 5)
+                .text(inr(totalEmi),    200, y + 5)
+                .text(inr(totalPrincipal), 270, y + 5)
+                .text(inr(totalInterest),  340, y + 5);
+
+            addFooter(doc);
+            doc.end();
+        });
+    },
 };
