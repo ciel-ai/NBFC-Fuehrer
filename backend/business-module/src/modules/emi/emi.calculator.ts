@@ -228,9 +228,16 @@ export function computeForeclosureAmount(params: {
     );
 
     const dailyRate = annualRatePct / 365 / 100;
-    const accruedInterest = toRupees(
+    const rawAccruedInterest = toRupees(
         Math.ceil(toPaisa(outstandingPrincipal) * dailyRate * daysSinceLastEmi),
     );
+
+    // Minimum interest rule for Gold Loans — 10 days interest or ₹500, whichever is higher
+    const tenDaysInterest = toRupees(
+        Math.ceil(toPaisa(outstandingPrincipal) * dailyRate * 10),
+    );
+    const minimumInterest = Math.max(tenDaysInterest, 500);
+    const accruedInterest = Math.max(rawAccruedInterest, minimumInterest);
 
     const foreclosureFee = toRupees(
         Math.ceil(toPaisa(outstandingPrincipal) * (foreclosureFeePct / 100)),
