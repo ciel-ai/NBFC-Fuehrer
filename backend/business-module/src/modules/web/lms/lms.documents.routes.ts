@@ -77,4 +77,18 @@ router.get('/repayment-schedule/:loanAccountId', requireAuth(), allowRoles(...LM
     } catch (err) { next(err); }
 });
 
+// GET /lms/documents/interest-certificate/:loanAccountId?fy=2025-26
+router.get('/interest-certificate/:loanAccountId', requireAuth(), allowRoles(...LMS_ROLES), async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const fy = (req.query.fy as string) ?? '2025-26';
+        const pdf = await pdfService.generateInterestCertificate(
+            req.params.loanAccountId as string,
+            fy,
+        );
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="interest-certificate-${req.params.loanAccountId}-${fy}.pdf"`);
+        res.status(HTTP.OK).send(pdf);
+    } catch (err) { next(err); }
+});
+
 export { router as lmsDocumentsRouter };

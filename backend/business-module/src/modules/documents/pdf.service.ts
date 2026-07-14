@@ -464,4 +464,104 @@ export const pdfService = {
             doc.end();
         });
     },
+
+    // ── 7. Interest Certificate ───────────────────────────────────────────────
+
+    async generateInterestCertificate(
+        loanAccountId: string,
+        financialYear: string, // e.g. "2025-26"
+    ): Promise<Buffer> {
+        log.info('Generating interest certificate', { loanAccountId, financialYear });
+
+        const parts = financialYear.split('-');
+        const fromDate = new Date(`${parts[0]}-04-01`);
+        const toDate   = new Date(`20${parts[1]}-03-31`);
+
+        const loan = await prisma.loan_accounts.findUnique({
+            where: { id: loanAccountId },
+            include: {
+                user:        { select: { full_name: true, phone: true } },
+                application: { select: { product_type: true, interest_rate: true } },
+                emi_schedule: {
+                    where: {
+                        due_date: { gte: fromDate, lte: toDate },
+                        status:   'PAID',
+                    },
+                    orderBy: { due_date: 'asc' },
+                },
+            },
+        });
+
+        if (!loan) throw new NotFoundError('Loan Account', loanAccountId);
+
+        const totalInterestPaid = loan.emi_schedule.reduce(
+            (sum, e) => sum + Number(e.interest_component ?? 0), 0,
+        );
+
+        const totalPrincipalPaid = loan.emi_schedule.reduce(
+            (sum, e) => sum + Number(e.principal_component ?? 0), 0,
+        );
+
+        return new Promise((resolve, reject) => {
+            const doc = new PDFDocument({ margin: 50, size: 'A4' });
+            const chunks: Buffer[] = [];
+
+            doc.on('data', (chunk) => chunks.push(chunk));
+            doc.on('end',  () => resolve(Buffer.concat(chunks)));
+            doc.on('error', reject);
+
+            addHeader(doc, 'INTEREST CERTIFICATE');
+
+            doc.fontSize(10).fillColor('#475569')
+                .text(`Financial Year: ${financialYear}`, { align: 'right' });
+            doc.fontSize(10).fillColor('#1E293B')
+                .text(`Date: ${formatDate(new Date())}`, { align: 'right' });
+            doc.moveDown(1);
+
+            doc.fontSize(10).fillColor('#475569').text('To Whomsoever It May Concern,');
+            doc.moveDown(0.5);
+
+            doc.fontSize(10).fillColor('#1E293B').text(
+                `This is to certify that the following interest has been paid by the borrower during the financial year ${financialYear} against the loan account mentioned below:`,
+                { align: 'justify' },
+            );
+            doc.moveDown(1);
+
+            addField(doc, 'Loan Account No.:', loan.account_number);
+            addField(doc, 'Customer Name:',    loan.user?.full_name ?? 'N/A');
+            addField(doc, 'Phone:',            loan.user?.phone ?? 'N/A');
+            addField(doc, 'Product:',          loan.application?.product_type ?? 'N/A');
+            addField(doc, 'Interest Rate:',    `${loan.application?.interest_rate ?? 0}% p.a.`);
+            addField(doc, 'Financial Year:',   financialYear);
+            doc.moveDown(1);
+
+            // Summary box
+            doc.rect(50, doc.y, 495, 80).fill('#F8FAFC').stroke('#E2E8F0');
+            const boxY = doc.y + 5;
+            doc.fontSize(11).fillColor('#0F2C4F')
+                .text('Total Interest Paid:', 70, boxY + 10)
+                .text(inr(totalInterestPaid), 300, boxY + 10);
+            doc.fontSize(11).fillColor('#475569')
+                .text('Total Principal Repaid:', 70, boxY + 35)
+                .text(inr(totalPrincipalPaid), 300, boxY + 35);
+            doc.fontSize(9).fillColor('#94A3B8')
+                .text(`(For the period 01 Apr ${financialYear.split('-')[0]} to 31 Mar 20${financialYear.split('-')[1]})`, 70, boxY + 60);
+
+            doc.moveDown(5);
+            doc.moveDown(1);
+
+            doc.fontSize(10).fillColor('#1E293B').text(
+                'This certificate is issued for income tax purposes under Section 24(b) of the Income Tax Act, 1961.',
+                { align: 'justify' },
+            );
+            doc.moveDown(2);
+
+            doc.fontSize(10).fillColor('#475569').text('Authorized Signatory');
+            doc.text('Fuehrer Capital');
+            doc.text('NBFC — RBI Registered');
+
+            addFooter(doc);
+            doc.end();
+        });
+    },
 };
