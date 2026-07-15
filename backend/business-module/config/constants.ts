@@ -291,5 +291,6 @@ export const CRON_SCHEDULE = {
     DEBIT_RETRY: '0 11 * * *',   // Daily 11:00 AM IST (after bounce window)
     NPA_WATCH: '0 1 * * *',    // Daily 1:00 AM IST (low traffic window)
     SETTLEMENT: '0 22 * * *',   // Daily 10:00 PM IST
+    BUREAU_REPORTING: '0 2 1 * *', // Monthly, 1st at 2:00 AM IST (bureau submissions are monthly)
 } as const;
 
