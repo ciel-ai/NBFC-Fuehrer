@@ -21,6 +21,7 @@ model users {
   kyc_documents     kyc_documents?
   loan_accounts     loan_accounts[]
   loan_applications loan_applications[]
+  grievances        grievances[]
   customer          customers?
 
   @@index([phone])
@@ -199,6 +200,7 @@ model loan_accounts {
   user                users               @relation(fields: [user_id], references: [id])
   payments            payments[]
   gold_auctions gold_auctions[]
+  grievances          grievances[]
 
   @@index([user_id])
   @@index([status])
@@ -437,6 +439,32 @@ model collection_cases {
   @@index([status, overdue_days])
   @@index([ptp_date])
   @@index([opened_at])
+}
+
+model grievances {
+  id                String         @id @default(uuid()) @db.Uuid
+  user_id           String         @db.Uuid
+  loan_account_id   String?        @db.Uuid
+  reference_number  String         @unique @db.VarChar(20)
+  category          String         @db.VarChar(50)
+  description       String
+  status            String         @default("OPEN") @db.VarChar(20)
+  priority          String         @default("NORMAL") @db.VarChar(20)
+  assigned_to       String?        @db.Uuid
+  resolution_notes  String?
+  raised_at         DateTime       @default(now()) @db.Timestamptz(6)
+  sla_due_at        DateTime       @db.Timestamptz(6)
+  resolved_at       DateTime?      @db.Timestamptz(6)
+  closed_at         DateTime?      @db.Timestamptz(6)
+  escalated_at      DateTime?      @db.Timestamptz(6)
+  created_at        DateTime       @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime       @updatedAt @db.Timestamptz(6)
+  user              users          @relation(fields: [user_id], references: [id])
+  loan_account      loan_accounts? @relation(fields: [loan_account_id], references: [id])
+
+  @@index([user_id])
+  @@index([status])
+  @@index([loan_account_id])
 }
 
 model contact_logs {
