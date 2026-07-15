@@ -3,6 +3,7 @@ import { env } from '@/config/env';
 import { createModuleLogger } from '@/config/logger';
 import { scheduleNpaWatchJob }       from '@/jobs/npaWatch.job';
 import { scheduleReconciliationJob } from '@/jobs/reconciliation.job';
+import { scheduleBureauReportingJob } from '@/jobs/bureauReporting.job';
 
 const log = createModuleLogger('server');
 
@@ -19,6 +20,7 @@ const server = app.listen(env.port, () => {
     // CRON_SCHEDULE.NPA_WATCH (01:00 IST) per config/constants.ts.
     scheduleNpaWatchJob();
     scheduleReconciliationJob();
+    scheduleBureauReportingJob();
     log.info('NPA watch job started and scheduled');
 });
 
