@@ -12,14 +12,9 @@ export type DpdBucket =
     | 'NPA'           // 90+ DPD — non-performing asset
     | 'WRITTEN_OFF';  // 180+ DPD — written off
 
-export function classifyDpd(overdueDays: number): DpdBucket {
-    if (overdueDays <= 0) return 'CURRENT';
-    if (overdueDays <= 30) return 'BUCKET_1';
-    if (overdueDays <= 60) return 'BUCKET_2';
-    if (overdueDays <= 90) return 'BUCKET_3';
-    if (overdueDays <= 180) return 'NPA';
-    return 'WRITTEN_OFF';
-}
+// classifyDpd logic now lives in src/constants/npa.constants.ts (single source of truth).
+// Re-exported here so existing imports from collections.types.ts keep working.
+export { classifyDpd } from '@/constants/npa.constants';
 
 // ─── Collection case status ────────────────────────────────────────────────────
 
