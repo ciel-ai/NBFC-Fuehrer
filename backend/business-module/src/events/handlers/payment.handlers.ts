@@ -234,6 +234,11 @@ eventBus.on('emi.bounced', 'loan:check-npa-threshold', async (payload) => {
 });
 
 // ─── emi.overdue ──────────────────────────────────────────────────────────────
+//
+// ⚠️ Not currently wired to any live cron job — see notes in project tracker
+// re: penal interest pending client clarification. Fixed here (transactional +
+// idempotent) so whoever wires this later inherits a safe implementation,
+// not the previous non-transactional double-write with no re-fire guard.
 
 eventBus.on('emi.overdue', 'emi:apply-overdue-penalty', async (payload) => {
     const dailyPenaltyRate = BUSINESS_RULES.EMI_OVERDUE_PENALTY_RATE / 365;
@@ -242,19 +247,43 @@ eventBus.on('emi.overdue', 'emi:apply-overdue-penalty', async (payload) => {
         toNumber(payload.overdueAmount) * dailyPenaltyRate,
     );
 
-    await prisma.emi_schedule.update({
-        where: { id: payload.emiId },
-        data: {
-            status: EMI_STATUS.OVERDUE,
-            penalty_amount: { increment: dailyPenalty },
-        },
-    });
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-    await prisma.loan_accounts.update({
-        where: { id: payload.loanAccountId },
-        data: {
-            outstanding_balance: { increment: dailyPenalty },
-        },
+    await withTransaction(async (tx) => {
+        // Idempotency guard: only apply if not already applied today.
+        // updateMany + count check avoids a separate SELECT-then-UPDATE race.
+        const result = await tx.emi_schedule.updateMany({
+            where: {
+                id: payload.emiId,
+                OR: [
+                    { last_penalty_applied_date: null },
+                    { last_penalty_applied_date: { lt: today } },
+                ],
+            },
+            data: {
+                status: EMI_STATUS.OVERDUE,
+                penalty_amount: { increment: dailyPenalty },
+                last_penalty_applied_date: today,
+            },
+        });
+
+        // Already applied today (or emiId not found) — skip the account-level
+        // write too, so the two stay in lockstep and nothing gets double-counted.
+        if (result.count === 0) {
+            log.info('Overdue penalty already applied today, skipping', {
+                emiId: payload.emiId,
+                loanAccountId: payload.loanAccountId,
+            });
+            return;
+        }
+
+        await tx.loan_accounts.update({
+            where: { id: payload.loanAccountId },
+            data: {
+                outstanding_balance: { increment: dailyPenalty },
+            },
+        });
     });
 });
 

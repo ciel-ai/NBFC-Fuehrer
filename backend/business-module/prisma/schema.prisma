@@ -255,6 +255,7 @@ model emi_schedule {
   outstanding_after   Decimal       @db.Decimal(15, 2)
   status              String        @default("PENDING") @db.VarChar(20)
   penalty_amount      Decimal       @default(0) @db.Decimal(15, 2)
+  last_penalty_applied_date DateTime? @db.Date
   bounce_count        Int           @default(0)
   last_bounce_at      DateTime?     @db.Timestamptz(6)
   next_retry_at       DateTime?     @db.Timestamptz(6)
