@@ -29,6 +29,7 @@ router.post(
     '/mandate',
     requireAuth(),
     allowRoles(ROLE.CUSTOMER),
+    idempotency(),
     validateBody(createMandateSchema),
     paymentsController.createMandate,
 );
@@ -98,6 +99,7 @@ router.post(
     '/process',
     requireAuth(),
     allowRoles(ROLE.CUSTOMER),
+    idempotency(),
     paymentsController.createPaymentLink,
 );
 
@@ -115,6 +117,7 @@ router.post(
     '/nach',
     requireAuth(),
     allowRoles(ROLE.CUSTOMER),
+    idempotency(),
     validateBody(createMandateSchema),
     paymentsController.createMandate,
 );
