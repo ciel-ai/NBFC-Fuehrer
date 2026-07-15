@@ -1,10 +1,9 @@
 // src/modules/web/search/search.routes.ts
 //
 // Global search across applications and loan accounts, per frontend
-// spec section 5.8. Searches by customer name/phone and surfaces the
-// computed FHR-YYYY-XXXXX reference number (same formula as
-// loansService's toApplicationResponse — not stored in DB, so search
-// matches on name/phone/status, not the reference itself).
+// spec section 5.8. Searches by customer name/phone and returns the
+// real, stored reference_number (atomic sequence, same value shown on
+// KFS/application detail/everywhere else) — no longer computed locally.
 
 import { Router } from 'express';
 import type { Response, NextFunction } from 'express';
@@ -13,12 +12,6 @@ import { HTTP } from '@/config/constants';
 import type { AuthRequest } from '@/types/express';
 
 const router = Router();
-
-function buildReferenceNumber(appliedAt: Date, id: string): string {
-    const year = new Date(appliedAt).getFullYear();
-    const shortRef = id.replace(/-/g, '').slice(-5).toUpperCase();
-    return `FHR-${year}-${shortRef}`;
-}
 
 // GET /search?q=
 router.get('/', requireAuth(), async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -41,7 +34,12 @@ router.get('/', requireAuth(), async (req: AuthRequest, res: Response, next: Nex
                 },
                 take: 8,
                 orderBy: { applied_at: 'desc' },
-                include: { user: { select: { full_name: true } } },
+                select: {
+                    id: true,
+                    reference_number: true,
+                    status: true,
+                    user: { select: { full_name: true } },
+                },
             }),
             prisma.loan_accounts.findMany({
                 where: {
@@ -58,7 +56,7 @@ router.get('/', requireAuth(), async (req: AuthRequest, res: Response, next: Nex
         res.status(HTTP.OK).json({
             applications: applications.map((a) => ({
                 id: a.id,
-                appNumber: buildReferenceNumber(a.applied_at, a.id),
+                appNumber: a.reference_number,
                 customerName: a.user?.full_name ?? null,
                 status: a.status,
             })),
