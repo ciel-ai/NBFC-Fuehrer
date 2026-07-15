@@ -25,3 +25,9 @@ export async function generateLoanApplicationNumber(): Promise<string> {
     const seq = await getNextSequenceValue(`LOAN_APP_${year}`);
     return `FHR-${year}-${String(seq).padStart(6, '0')}`;
 }
+
+export async function generateGrievanceReferenceNumber(): Promise<string> {
+    const year = new Date().getFullYear();
+    const seq = await getNextSequenceValue(`GRIEVANCE_${year}`);
+    return `GRV-${year}-${String(seq).padStart(6, '0')}`;
+}
