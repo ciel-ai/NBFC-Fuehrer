@@ -266,6 +266,95 @@ export function computeForeclosureAmount(params: {
     };
 }
 
+// ─── Annual Percentage Rate (APR) ──────────────────────────────────────────────
+//
+// RBI Digital Lending Guidelines require the Key Fact Statement (KFS) to
+// disclose the "all-in cost" APR — the effective annual rate once processing
+// fee and other upfront charges are netted against the disbursed amount.
+// This is always ≥ the nominal interest rate shown to the customer.
+//
+// Solved via Newton-Raphson on the reducing-balance PMT equation, using the
+// *net* disbursed amount (principal − upfront charges) against the EMI that
+// was actually computed on the *gross* principal.
+
+export function computeApr(params: {
+    principal: Rupees;
+    monthlyEmi: Rupees;
+    tenureMonths: number;
+    upfrontCharges: Rupees;   // processing fee + GST + any other charges deducted at disbursal
+}): number {
+    const { principal, monthlyEmi, tenureMonths, upfrontCharges } = params;
+    const netDisbursed = principal - upfrontCharges;
+
+    if (netDisbursed <= 0) {
+        throw new Error('Net disbursed amount must be > 0 after upfront charges');
+    }
+
+    let r = 0.01; // initial guess: 1% monthly
+    for (let i = 0; i < 100; i++) {
+        const power = Math.pow(1 + r, tenureMonths);
+        const f = (netDisbursed * r * power) / (power - 1) - monthlyEmi;
+        const df = netDisbursed * (
+            (power * (1 + r * tenureMonths) - power) / Math.pow(power - 1, 2)
+        );
+        if (df === 0) break;
+        const rNew = r - f / df;
+        if (Math.abs(rNew - r) < 1e-10) { r = rNew; break; }
+        r = rNew;
+    }
+
+    return Math.round(r * 12 * 100 * 100) / 100; // annualized %, 2 decimal places
+}
+
+// ─── Cooling-off / Look-up Period ──────────────────────────────────────────────
+//
+// RBI Digital Lending Guidelines, 2022: borrower may exit the loan within the
+// cooling-off period by paying principal + proportionate interest, WITHOUT any
+// penalty or foreclosure fee. This is stricter than a normal foreclosure — no
+// foreclosure fee, no GST on fee, no penalty charges, no minimum-interest floor.
+//
+// ⚠️ ASSUMPTION (no client policy confirmed yet): window is measured from
+// disbursement date. Revisit if client specifies a different start point
+// (e.g. eSign date) — see COOLING_OFF_PERIOD_DAYS in config/nbfc.constants.ts.
+
+export function isWithinCoolingOffPeriod(
+    disbursedAt: Date,
+    asOfDate: Date,
+    coolingOffPeriodDays: number,
+): boolean {
+    const daysSinceDisbursement = Math.floor(
+        (asOfDate.getTime() - disbursedAt.getTime()) / (1000 * 60 * 60 * 24),
+    );
+    return daysSinceDisbursement >= 0 && daysSinceDisbursement <= coolingOffPeriodDays;
+}
+
+export function computeCoolingOffPayoff(params: {
+    outstandingPrincipal: Rupees;
+    annualRatePct: number;
+    disbursedAt: Date;
+    exitDate: Date;
+}): {
+    outstandingPrincipal: Rupees;
+    accruedInterest: Rupees;
+    total: Rupees;
+} {
+    const { outstandingPrincipal, annualRatePct, disbursedAt, exitDate } = params;
+
+    const daysElapsed = Math.max(
+        0,
+        Math.floor((exitDate.getTime() - disbursedAt.getTime()) / (1000 * 60 * 60 * 24)),
+    );
+
+    const dailyRate = annualRatePct / 365 / 100;
+    const accruedInterest = toRupees(
+        Math.ceil(toPaisa(outstandingPrincipal) * dailyRate * daysElapsed),
+    );
+
+    const total = toRupees(toPaisa(outstandingPrincipal) + toPaisa(accruedInterest));
+
+    return { outstandingPrincipal, accruedInterest, total };
+}
+
 // ─── Partial payment allocation ────────────────────────────────────────────────
 //
 // When a customer pays a partial amount (less than full EMI),

@@ -91,4 +91,13 @@ router.get('/interest-certificate/:loanAccountId', requireAuth(), allowRoles(...
     } catch (err) { next(err); }
 });
 
+router.get('/kfs/:applicationId', requireAuth(), allowRoles(...LMS_ROLES), async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const pdf = await pdfService.generateKfs(req.params.applicationId as string);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="kfs-${req.params.applicationId}.pdf"`);
+        res.status(HTTP.OK).send(pdf);
+    } catch (err) { next(err); }
+});
+
 export { router as lmsDocumentsRouter };

@@ -81,7 +81,8 @@ export const emiController = {
 
             await assertLoanAccountAccess(loanAccountId, user.id, user.role);
 
-            const quote = await emiService.getForeclosureQuote(loanAccountId);
+            const account = await loansRepository.findAccountByIdOrThrow(loanAccountId);
+            const quote = await emiService.getForeclosureQuote(loanAccountId, account.interestRate);
             res.status(HTTP.OK).json(successResponse(quote));
         } catch (err) { next(err); }
     },

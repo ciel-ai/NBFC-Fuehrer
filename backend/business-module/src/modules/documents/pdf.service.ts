@@ -11,6 +11,8 @@ import PDFDocument from 'pdfkit';
 import { prisma } from '@/config/database';
 import { createModuleLogger } from '@/config/logger';
 import { NotFoundError } from '@/errors';
+import { computeMonthlyEmi, computeApr } from '@/modules/emi/emi.calculator';
+import { NBFC_IDENTITY, INTEREST_METHOD_LABEL, COOLING_OFF_PERIOD_DAYS } from '@/config/nbfc.constants';
 
 const log = createModuleLogger('pdf.service');
 
@@ -18,6 +20,10 @@ const log = createModuleLogger('pdf.service');
 
 function inr(amount: number): string {
     return `₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+}
+
+function roundToPaisa(amount: number): number {
+    return Math.round(amount * 100) / 100;
 }
 
 function formatDate(date: Date | string): string {
@@ -559,6 +565,155 @@ export const pdfService = {
             doc.fontSize(10).fillColor('#475569').text('Authorized Signatory');
             doc.text('Fuehrer Capital');
             doc.text('NBFC — RBI Registered');
+
+            addFooter(doc);
+            doc.end();
+        });
+    },
+
+    async generateKfs(applicationId: string): Promise<Buffer> {
+        log.info('Generating KFS', { applicationId });
+
+        const application = await prisma.loan_applications.findUnique({
+            where: { id: applicationId },
+            include: {
+                user: { select: { full_name: true, phone: true } },
+                customer: true,
+            },
+        });
+
+        if (!application) throw new NotFoundError('Loan Application', applicationId);
+
+        const productType = application.product_type;
+        const product = await prisma.loan_products.findUnique({
+            where: { product_type: productType },
+        });
+
+        const principal = Number(application.approved_amount ?? application.amount_requested);
+        const annualRatePct = Number(application.interest_rate ?? product?.min_rate ?? 0);
+        const tenureMonths = application.tenure_months;
+
+        const processingFee = Number(application.processing_fee ?? 0);
+        const processingFeeGst = Number(application.processing_fee_gst ?? 0);
+        const insuranceAmount = product
+            ? Math.round(principal * (Number(product.insurance_pct) / 100) * 100) / 100
+            : 0;
+        const stampDuty = Number(product?.stamp_duty ?? 0);
+        const documentationFee = Number(product?.documentation_fee ?? 0);
+        const appraiserFee = Number(product?.appraiser_fee ?? 0);
+        const incidentalCharges = Number(product?.incidental_charges ?? 0);
+
+        const totalUpfrontCharges = roundToPaisa(
+            processingFee + processingFeeGst + insuranceAmount + stampDuty +
+            documentationFee + appraiserFee + incidentalCharges,
+        );
+
+        const monthlyEmi = application.monthly_emi
+            ? Number(application.monthly_emi)
+            : computeMonthlyEmi(principal, annualRatePct, tenureMonths);
+
+        const totalRepayable = roundToPaisa(monthlyEmi * tenureMonths);
+        const totalInterest = roundToPaisa(totalRepayable - principal);
+
+        let apr = annualRatePct;
+        try {
+            apr = computeApr({
+                principal,
+                monthlyEmi,
+                tenureMonths,
+                upfrontCharges: totalUpfrontCharges,
+            });
+        } catch (err) {
+            log.warn('APR calculation fell back to nominal rate', { applicationId, err });
+        }
+
+        const netDisbursedAmount = roundToPaisa(principal - totalUpfrontCharges);
+
+        return new Promise((resolve, reject) => {
+            const doc = new PDFDocument({ margin: 50, size: 'A4' });
+            const chunks: Buffer[] = [];
+
+            doc.on('data', (chunk) => chunks.push(chunk));
+            doc.on('end', () => resolve(Buffer.concat(chunks)));
+            doc.on('error', reject);
+
+            addHeader(doc, 'KEY FACT STATEMENT (KFS)');
+
+            doc.fontSize(9).fillColor('#94A3B8')
+                .text('Issued pursuant to RBI Digital Lending Guidelines, 2022', { align: 'center' });
+            doc.moveDown(1);
+
+            doc.fontSize(11).fillColor('#0F2C4F').text('A. Loan Details');
+            doc.moveDown(0.3);
+            addField(doc, 'Application Reference No.:', application.reference_number ?? application.id.slice(0, 8).toUpperCase());
+            addField(doc, 'Borrower Name:', application.user?.full_name ?? 'N/A');
+            addField(doc, 'Phone:', application.user?.phone ?? 'N/A');
+            addField(doc, 'Product:', productType);
+            addField(doc, 'Date of KFS:', formatDate(new Date()));
+            doc.moveDown(0.7);
+
+            doc.fontSize(11).fillColor('#0F2C4F').text('B. Loan Amount & Tenure');
+            doc.moveDown(0.3);
+            addField(doc, 'Sanctioned Loan Amount:', inr(principal));
+            addField(doc, 'Loan Tenure:', `${tenureMonths} months`);
+            addField(doc, 'Interest Computation Method:', INTEREST_METHOD_LABEL);
+            addField(doc, 'Nominal Interest Rate:', `${annualRatePct.toFixed(2)}% p.a.`);
+            addField(doc, 'Annual Percentage Rate (APR):', `${apr.toFixed(2)}% p.a.`);
+            doc.fontSize(8).fillColor('#94A3B8')
+                .text('APR reflects the all-in effective cost of the loan, including upfront charges.', { indent: 10 });
+            doc.moveDown(0.7);
+
+            doc.fontSize(11).fillColor('#0F2C4F').text('C. Itemised Charges');
+            doc.moveDown(0.3);
+            addField(doc, 'Processing Fee:', inr(processingFee));
+            addField(doc, 'Processing Fee GST:', inr(processingFeeGst));
+            if (insuranceAmount > 0) addField(doc, 'Insurance Premium:', inr(insuranceAmount));
+            if (stampDuty > 0) addField(doc, 'Stamp Duty:', inr(stampDuty));
+            if (documentationFee > 0) addField(doc, 'Documentation Fee:', inr(documentationFee));
+            if (appraiserFee > 0) addField(doc, 'Appraiser Fee:', inr(appraiserFee));
+            if (incidentalCharges > 0) addField(doc, 'Incidental Charges:', inr(incidentalCharges));
+            doc.moveDown(0.3);
+            addField(doc, 'Total Upfront Charges:', inr(totalUpfrontCharges));
+            addField(doc, 'Net Amount Disbursed:', inr(netDisbursedAmount));
+            doc.moveDown(0.7);
+
+            doc.fontSize(11).fillColor('#0F2C4F').text('D. Repayment');
+            doc.moveDown(0.3);
+            addField(doc, 'Monthly Instalment (EMI):', inr(monthlyEmi));
+            addField(doc, 'Total Interest Payable:', inr(totalInterest));
+            addField(doc, 'Total Amount Repayable:', inr(totalRepayable));
+            addField(doc, 'Repayment Mode:', 'Auto-debit (eNACH / UPI Autopay)');
+            doc.moveDown(0.7);
+
+            doc.fontSize(11).fillColor('#0F2C4F').text('E. Cooling-off Period');
+            doc.moveDown(0.3);
+            doc.fontSize(10).fillColor('#1E293B').text(
+                `The borrower may exercise the right to exit this loan by repaying the principal and proportionate ` +
+                `interest, without any penalty, within ${COOLING_OFF_PERIOD_DAYS} days of loan disbursement.`,
+                { align: 'justify' },
+            );
+            doc.moveDown(0.7);
+
+            doc.fontSize(11).fillColor('#0F2C4F').text('F. Recovery Mechanism & Grievance Redressal');
+            doc.moveDown(0.3);
+            addField(doc, 'Late Payment / Penal Charges:', 'As per Loan Agreement (see Clause on Charges)');
+            addField(doc, 'Grievance Officer:', NBFC_IDENTITY.grievanceOfficer.name);
+            addField(doc, 'Grievance Contact (Email):', NBFC_IDENTITY.grievanceOfficer.email);
+            addField(doc, 'Grievance Contact (Phone):', NBFC_IDENTITY.grievanceOfficer.phone);
+            doc.moveDown(0.7);
+
+            doc.fontSize(11).fillColor('#0F2C4F').text('G. Lender Details');
+            doc.moveDown(0.3);
+            addField(doc, 'Lender Name:', NBFC_IDENTITY.legalName);
+            addField(doc, 'NBFC Registration No.:', NBFC_IDENTITY.registrationNumber);
+            addField(doc, 'RBI CoR No.:', NBFC_IDENTITY.rbiCorNumber);
+            addField(doc, 'Registered Address:', NBFC_IDENTITY.registeredAddress);
+
+            doc.moveDown(1);
+            doc.fontSize(8).fillColor('#94A3B8').text(
+                'This Key Fact Statement is a summary for the borrower\'s reference. In the event of any variance between this document and the Loan Agreement, the terms of the Loan Agreement shall prevail.',
+                { align: 'justify' },
+            );
 
             addFooter(doc);
             doc.end();

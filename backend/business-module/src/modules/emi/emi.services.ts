@@ -274,6 +274,7 @@ export const emiService = {
 
     async getForeclosureQuote(
         loanAccountId: string,
+        annualRatePct: number,
     ): Promise<ReturnType<typeof computeForeclosureAmount>> {
         const summary = await emiRepository.getSummary(loanAccountId);
         const nextDue = await emiRepository.findNextDueEmi(loanAccountId);
@@ -290,7 +291,7 @@ export const emiService = {
 
         return computeForeclosureAmount({
             outstandingPrincipal: summary.totalOutstanding,
-            annualRatePct: 0, // Fetched from loan account in controller
+            annualRatePct,
             lastEmiDate: lastPaidDate,
             settlementDate: new Date(),
             foreclosureFeePct: 5,   // 5% per client requirements (principal outstanding + GST)

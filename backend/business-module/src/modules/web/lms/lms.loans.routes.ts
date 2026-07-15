@@ -7,6 +7,9 @@ import type { AuthRequest } from '@/types/express';
 import { loansRepository } from '@/modules/loans/loans.repository';
 import { emiService } from '@/modules/emi';
 import { paymentsService } from '@/modules/payments';
+import { isWithinCoolingOffPeriod, computeCoolingOffPayoff } from '@/modules/emi/emi.calculator';
+import { COOLING_OFF_PERIOD_DAYS } from '@/config/nbfc.constants';
+import { DomainError } from '@/errors';
 
 const router = Router();
 
@@ -74,7 +77,8 @@ router.get('/:id/payments', requireAuth(), allowRoles(...LMS_ROLES), async (req:
 // GET /lms/loans/:id/foreclosure-quote
 router.get('/:id/foreclosure-quote', requireAuth(), allowRoles(...LMS_ROLES), async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-        const result = await emiService.getForeclosureQuote(req.params.id as string);
+        const account = await loansRepository.findAccountByIdOrThrow(req.params.id as string);
+        const result = await emiService.getForeclosureQuote(req.params.id as string, account.interestRate);
         res.status(HTTP.OK).json({ success: true, data: result });
     } catch (err) { next(err); }
 });
@@ -84,6 +88,43 @@ router.get('/:id/mandate', requireAuth(), allowRoles(...LMS_ROLES), async (req: 
     try {
         const result = await paymentsService.getMandateForAccount(req.params.id as string);
         res.status(HTTP.OK).json({ success: true, data: result });
+    } catch (err) { next(err); }
+});
+
+// GET /lms/loans/:id/cooling-off-quote
+router.get('/:id/cooling-off-quote', requireAuth(), allowRoles(...LMS_ROLES), async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const account = await loansRepository.findAccountByIdOrThrow(req.params.id as string);
+
+        if (!account.disbursedAt) {
+            throw new DomainError(
+                'Loan has not been disbursed yet — cooling-off period not applicable',
+                'NOT_DISBURSED',
+            );
+        }
+
+        const now = new Date();
+        const eligible = isWithinCoolingOffPeriod(account.disbursedAt, now, COOLING_OFF_PERIOD_DAYS);
+
+        if (!eligible) {
+            res.status(HTTP.OK).json({
+                success: true,
+                data: { eligible: false, coolingOffPeriodDays: COOLING_OFF_PERIOD_DAYS, disbursedAt: account.disbursedAt },
+            });
+            return;
+        }
+
+        const quote = computeCoolingOffPayoff({
+            outstandingPrincipal: account.outstandingBalance,
+            annualRatePct: account.interestRate,
+            disbursedAt: account.disbursedAt,
+            exitDate: now,
+        });
+
+        res.status(HTTP.OK).json({
+            success: true,
+            data: { eligible: true, coolingOffPeriodDays: COOLING_OFF_PERIOD_DAYS, disbursedAt: account.disbursedAt, ...quote },
+        });
     } catch (err) { next(err); }
 });
 
