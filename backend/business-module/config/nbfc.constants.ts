@@ -40,3 +40,34 @@ export const INTEREST_METHOD_LABEL = 'Reducing Balance Method' as const;
 // against the client's compliance policy before go-live — flagged here so it's not
 // silently hardcoded and forgotten.
 export const COOLING_OFF_PERIOD_DAYS = 3 as const; // ⚠️ confirm with client compliance team
+
+// Grievance Redressal — RBI Fair Practices Code requires a defined resolution
+// timeline. 30 days is the standard RBI Integrated Ombudsman Scheme benchmark.
+// ⚠️ Confirm against client's Grievance Redressal Policy (pending item #55).
+export const GRIEVANCE_SLA_DAYS = 30 as const;
+
+export const GRIEVANCE_CATEGORY = {
+    LOAN_PROCESSING: 'LOAN_PROCESSING',
+    DISBURSEMENT: 'DISBURSEMENT',
+    COLLECTIONS_CONDUCT: 'COLLECTIONS_CONDUCT',
+    CHARGES_DISPUTE: 'CHARGES_DISPUTE',
+    KYC_ISSUE: 'KYC_ISSUE',
+    TECHNICAL_ISSUE: 'TECHNICAL_ISSUE',
+    SERVICE_QUALITY: 'SERVICE_QUALITY',
+    OTHER: 'OTHER',
+} as const;
+
+export const GRIEVANCE_STATUS = {
+    OPEN: 'OPEN',
+    IN_PROGRESS: 'IN_PROGRESS',
+    RESOLVED: 'RESOLVED',
+    ESCALATED: 'ESCALATED',
+    CLOSED: 'CLOSED',
+} as const;
+
+export const GRIEVANCE_PRIORITY = {
+    LOW: 'LOW',
+    NORMAL: 'NORMAL',
+    HIGH: 'HIGH',
+    CRITICAL: 'CRITICAL',
+} as const;
