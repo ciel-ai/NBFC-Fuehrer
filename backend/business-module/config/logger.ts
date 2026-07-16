@@ -10,7 +10,7 @@ import { env } from './env';
 // RBI requires that audit logs do not contain raw PII.
 
 const SENSITIVE_KEYS = [
-    'aadhaar', 'aadhaarNumber', 'aadhaar_number',
+    'aadhaar', 'aadhaarNumber', 'aadhaar_number', 'aadhaarNo',
     'pan', 'panNumber', 'pan_number',
     'phone', 'mobile', 'phoneNumber', 'phone_number',
     'password', 'passwordHash', 'password_hash',
@@ -19,6 +19,14 @@ const SENSITIVE_KEYS = [
     'cvv', 'cardNumber', 'card_number',
     'accountNumber', 'account_number',
     'ifsc',
+    // Derived PII returned by KYC vendors (Perfios name/DOB on Aadhaar/PAN
+    // verification responses). Note: full customer 'address' is deliberately
+    // NOT added as a generic substring here — it would also catch ipAddress,
+    // which audit logging depends on for security forensics. The real fix
+    // for raw vendor response dumps is at the call site (kycVerify/live.ts),
+    // not broader masking rules.
+    'nameOnAadhaar', 'nameOnPan',
+    'dob', 'dateOfBirth', 'date_of_birth',
 ];
 
 function maskValue(key: string, value: any): any {
@@ -37,6 +45,13 @@ function maskValue(key: string, value: any): any {
         }
         if (key.toLowerCase().includes('account_number') || key.toLowerCase().includes('accountnumber')) {
             return `XXXXXX${value.slice(-4)}`;
+        }
+        // Derived PII from KYC vendor responses — exact-key match only
+        // (not a substring match) to avoid collaterally redacting harmless
+        // fields like roleName, fileName, errorName, or ipAddress.
+        const exactKey = key.toLowerCase();
+        if (['nameonaadhaar', 'nameonpan', 'dob', 'dateofbirth', 'date_of_birth'].includes(exactKey)) {
+            return '[REDACTED]';
         }
     }
     return value;

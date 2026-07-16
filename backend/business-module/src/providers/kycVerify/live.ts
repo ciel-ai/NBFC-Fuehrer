@@ -3,6 +3,9 @@ import type { AxiosInstance } from 'axios';
 import FormData from 'form-data';
 import { createHttpClient, vendorCall } from '../_base/provider.utils';
 import { KYC_VENDOR_ERRORS } from '@/errors';
+import { createModuleLogger } from '@/config/logger';
+
+const log = createModuleLogger('kycVerify:perfios');
 import type {
     IKycVerifyProvider,
     AadhaarVerifyResult,
@@ -85,12 +88,12 @@ export class PerfiosKycProvider implements IKycVerifyProvider {
                         clientData: { caseId: `fhr-${Date.now()}` },
                     });
                     const d = res.data;
-                    console.log('PERFIOS_CONSENT_RESPONSE:', JSON.stringify(d));
+                    log.debug('Perfios CONSENT response received', { statusCode: d?.['status-code'], hasResult: !!d?.result });
                     const accessKey = d.result?.accessKey ?? null;
                     return { requestId: accessKey, rawResponse: d };
                 } catch (err) {
                     const axErr = err as any;
-                    console.error('PERFIOS_ERROR:', JSON.stringify(axErr?.response?.data));
+                    log.error('Perfios ERROR', { statusCode: axErr?.response?.status });
                     throw KYC_VENDOR_ERRORS.aadhaarVerifyFailed(err);
                 }
             },
@@ -115,7 +118,7 @@ export class PerfiosKycProvider implements IKycVerifyProvider {
                         clientData: { caseId: `fhr-${Date.now()}` },
                     });
                     const d = res.data;
-                    console.log('PERFIOS_AADHAAR_VERIFY_RESPONSE:', JSON.stringify(d));
+                    log.debug('Perfios AADHAAR_VERIFY response received', { statusCode: d?.['status-code'], hasResult: !!d?.result });
                     return {
                         verified: d['status-code'] === '101',
                         nameOnAadhaar: d.result?.name ?? null,
@@ -126,7 +129,7 @@ export class PerfiosKycProvider implements IKycVerifyProvider {
                     };
                 } catch (err) {
                     const axErr = err as any;
-                    console.error('PERFIOS_AADHAAR_VERIFY_ERROR:', JSON.stringify(axErr?.response?.data));
+                    log.error('Perfios AADHAAR_VERIFY_ERROR', { statusCode: axErr?.response?.status });
                     throw KYC_VENDOR_ERRORS.aadhaarVerifyFailed(err);
                 }
             },
@@ -151,7 +154,7 @@ export class PerfiosKycProvider implements IKycVerifyProvider {
                     return { linked: isSuccess(d.statusCode), rawResponse: d };
                 } catch (err) {
                     const axErr = err as any;
-                    console.error('PERFIOS_403_BODY:', JSON.stringify(axErr?.response?.data));
+                    log.error('Perfios 403_BODY', { statusCode: axErr?.response?.status });
                     throw KYC_VENDOR_ERRORS.aadhaarVerifyFailed(err);
                 }
             },
@@ -166,7 +169,7 @@ export class PerfiosKycProvider implements IKycVerifyProvider {
                 try {
                     const res = await this.kycClient.post('v2/pan', { pan: panNumber, name: fullName, dob, consent: 'Y' });
                     const d = res.data;
-                    console.log('PERFIOS_PAN_RESPONSE:', JSON.stringify(d));
+                    log.debug('Perfios PAN response received', { statusCode: d?.['status-code'], hasResult: !!d?.result });
                     return { verified: isSuccess(d.statusCode), nameOnPan: d.data?.name ?? null, status: d.data?.status ?? 'UNKNOWN', rawResponse: d };
                 } catch (err) {
                     throw KYC_VENDOR_ERRORS.panVerifyFailed(err);
@@ -215,7 +218,7 @@ export class PerfiosKycProvider implements IKycVerifyProvider {
                 try {
                     const res = await this.kycClient.post('v3/liveness-detection', { url: imageBase64 });
                     const d = res.data;
-                    console.log('PERFIOS_LIVENESS_RESPONSE:', JSON.stringify(d));
+                    log.debug('Perfios LIVENESS response received', { statusCode: d?.['status-code'], hasResult: !!d?.result });
                     return { passed: d.result?.isLive === true, score: d.result?.livenessScore ?? 0, rawResponse: d };
                 } catch (err) {
                     throw KYC_VENDOR_ERRORS.livenessFailed(err);
@@ -232,7 +235,7 @@ export class PerfiosKycProvider implements IKycVerifyProvider {
                 try {
                     const res = await this.kycClient.post('v3/facesimilarity', { url1: selfieBase64, url2: idPhotoBase64 });
                     const d = res.data;
-                    console.log('PERFIOS_FACE_MATCH_RESPONSE:', JSON.stringify(d));
+                    log.debug('Perfios FACE_MATCH response received', { statusCode: d?.['status-code'], hasResult: !!d?.result });
                     return { matched: d.result?.match === 'yes', confidence: d.result?.matchScore ?? 0, rawResponse: d };
                 } catch (err) {
                     throw KYC_VENDOR_ERRORS.faceMatchFailed(err);
@@ -249,7 +252,7 @@ export class PerfiosKycProvider implements IKycVerifyProvider {
                 try {
                     const res = await this.kycClient.post('v3/name', { name1, name2, type: 'individual' });
                     const d = res.data;
-                    console.log('PERFIOS_NAME_SIMILARITY_RESPONSE:', JSON.stringify(d));
+                    log.debug('Perfios NAME_SIMILARITY response received', { statusCode: d?.['status-code'], hasResult: !!d?.result });
                     return { similar: d.result?.result === true, score: d.result?.score ?? 0, rawResponse: d };
                 } catch (err) {
                     throw KYC_VENDOR_ERRORS.timeout('NAME_SIMILARITY');
@@ -266,7 +269,7 @@ export class PerfiosKycProvider implements IKycVerifyProvider {
                 try {
                     const res = await this.kycClient.post('v2/bankacc', { accountNumber, ifsc, consent: 'Y' });
                     const d = res.data;
-                    console.log('PERFIOS_BANK_RESPONSE:', JSON.stringify(d));
+                    log.debug('Perfios BANK response received', { statusCode: d?.['status-code'], hasResult: !!d?.result });
                     return { valid: d.result?.bankTxnStatus === true, nameAtBank: d.result?.accountName ?? null, rawResponse: d };
                 } catch (err) {
                     throw KYC_VENDOR_ERRORS.timeout('BANK_VERIFY');
@@ -283,7 +286,7 @@ export class PerfiosKycProvider implements IKycVerifyProvider {
                 try {
                     const res = await this.kycClient.post('v3/bankacc-verification', { accountNumber, ifsc, consent: 'Y', useCombinedSolution: 'Y' });
                     const d = res.data;
-                    console.log('PERFIOS_BANK_ADV_RESPONSE:', JSON.stringify(d));
+                    log.debug('Perfios BANK_ADV response received', { statusCode: d?.['status-code'], hasResult: !!d?.result });
                     const source = d.result?.data?.source?.[0];
                     return { valid: source?.data?.bankTxnStatus === true, nameAtBank: source?.data?.accountName ?? null, rawResponse: d };
                 } catch (err) {
@@ -301,7 +304,7 @@ export class PerfiosKycProvider implements IKycVerifyProvider {
                 try {
                     const res = await this.kycClient.post('v3/bankaccverification-non-penny', { accountNumber, ifsc, consent: 'Y' });
                     const d = res.data;
-                    console.log('PERFIOS_SILENT_BANK_RESPONSE:', JSON.stringify(d));
+                    log.debug('Perfios SILENT_BANK response received', { statusCode: d?.['status-code'], hasResult: !!d?.result });
                     const source = d.result?.data?.source?.[0];
                     return { valid: source?.data?.bankTxnStatus === true, nameAtBank: source?.data?.accountName ?? null, rawResponse: d };
                 } catch (err) {
@@ -319,7 +322,7 @@ export class PerfiosKycProvider implements IKycVerifyProvider {
                 try {
                     const res = await this.gstClient.post('v2/gstdetailedadditional', { gstin, consent: 'Y' });
                     const d = res.data;
-                    console.log('PERFIOS_GST_RESPONSE:', JSON.stringify(d));
+                    log.debug('Perfios GST response received', { statusCode: d?.['status-code'], hasResult: !!d?.result });
                     return { valid: isSuccess(d.statusCode), businessName: d.result?.lgnm ?? null, status: d.result?.sts ?? 'UNKNOWN', rawResponse: d };
                 } catch (err) {
                     throw KYC_VENDOR_ERRORS.timeout('GST_VERIFY');
@@ -336,7 +339,7 @@ export class PerfiosKycProvider implements IKycVerifyProvider {
                 try {
                     const res = await this.kscanClient.post('v3.2/search/aml', { name: fullName, ...(dob ? { dob } : {}), consent: 'Y' });
                     const d = res.data;
-                    console.log('PERFIOS_AML_RESPONSE:', JSON.stringify(d));
+                    log.debug('Perfios AML response received', { statusCode: d?.['status-code'], hasResult: !!d?.result });
                     return { flagged: (d.result?.totalHits ?? 0) > 0, matches: d.result?.hits ?? [], rawResponse: d };
                 } catch (err) {
                     throw KYC_VENDOR_ERRORS.timeout('AML_SCREENING');
@@ -353,7 +356,7 @@ export class PerfiosKycProvider implements IKycVerifyProvider {
                 try {
                     const res = await this.kscanClient.post('v3/pep/details', { name: fullName, consent: 'Y' });
                     const d = res.data;
-                    console.log('PERFIOS_PEP_RESPONSE:', JSON.stringify(d));
+                    log.debug('Perfios PEP response received', { statusCode: d?.['status-code'], hasResult: !!d?.result });
                     return { isPep: (d.result?.totalHits ?? 0) > 0, matches: d.result?.hits ?? [], rawResponse: d };
                 } catch (err) {
                     throw KYC_VENDOR_ERRORS.timeout('PEP_CHECK');
@@ -370,7 +373,7 @@ export class PerfiosKycProvider implements IKycVerifyProvider {
                 try {
                     const res = await this.kscanClient.post('v3/alerts', { name: fullName, consent: 'Y' });
                     const d = res.data;
-                    console.log('PERFIOS_ALERTS_RESPONSE:', JSON.stringify(d));
+                    log.debug('Perfios ALERTS response received', { statusCode: d?.['status-code'], hasResult: !!d?.result });
                     return { flagged: (d.result?.totalHits ?? 0) > 0, alerts: d.result?.hits ?? [], rawResponse: d };
                 } catch (err) {
                     throw KYC_VENDOR_ERRORS.timeout('ALERTS_CHECK');
@@ -387,7 +390,7 @@ export class PerfiosKycProvider implements IKycVerifyProvider {
                 try {
                     const res = await this.kscanClient.post('v3/bank-defaulter', { pan: panNumber, consent: 'Y' });
                     const d = res.data;
-                    console.log('PERFIOS_BANK_DEFAULTER_RESPONSE:', JSON.stringify(d));
+                    log.debug('Perfios BANK_DEFAULTER response received', { statusCode: d?.['status-code'], hasResult: !!d?.result });
                     return { isDefaulter: (d.result?.totalHits ?? 0) > 0, records: d.result?.hits ?? [], rawResponse: d };
                 } catch (err) {
                     throw KYC_VENDOR_ERRORS.timeout('BANK_DEFAULTERS');
@@ -404,7 +407,7 @@ export class PerfiosKycProvider implements IKycVerifyProvider {
                 try {
                     const res = await this.kycClient.post('v2/employment-verification-advanced', { pan: panNumber, consent: 'Y' });
                     const d = res.data;
-                    console.log('PERFIOS_EMPLOYMENT_RESPONSE:', JSON.stringify(d));
+                    log.debug('Perfios EMPLOYMENT response received', { statusCode: d?.['status-code'], hasResult: !!d?.result });
                     return { verified: isSuccess(d.statusCode), employerName: d.result?.employerName ?? null, employmentType: d.result?.employmentType ?? null, rawResponse: d };
                 } catch (err) {
                     throw KYC_VENDOR_ERRORS.timeout('EMPLOYMENT_VERIFY');
@@ -484,7 +487,7 @@ export class PerfiosKycProvider implements IKycVerifyProvider {
                 try {
                     const res = await this.itrClient.post('v1/itr-return-salaried', { pan: panNumber, assessmentYear, consent: 'Y' });
                     const d = res.data;
-                    console.log('PERFIOS_ITR_SALARIED_RESPONSE:', JSON.stringify(d));
+                    log.debug('Perfios ITR_SALARIED response received', { statusCode: d?.['status-code'], hasResult: !!d?.result });
                     return { verified: isSuccess(d.statusCode), income: d.result?.grossIncome ?? null, taxPaid: d.result?.taxPaid ?? null, rawResponse: d };
                 } catch (err) {
                     throw KYC_VENDOR_ERRORS.timeout('ITR_SALARIED');
@@ -501,7 +504,7 @@ export class PerfiosKycProvider implements IKycVerifyProvider {
                 try {
                     const res = await this.itrClient.post('v1/itr-return-forms', { pan: panNumber, assessmentYear, consent: 'Y' });
                     const d = res.data;
-                    console.log('PERFIOS_ITR_BUSINESS_RESPONSE:', JSON.stringify(d));
+                    log.debug('Perfios ITR_BUSINESS response received', { statusCode: d?.['status-code'], hasResult: !!d?.result });
                     return { verified: isSuccess(d.statusCode), income: d.result?.grossIncome ?? null, taxPaid: d.result?.taxPaid ?? null, rawResponse: d };
                 } catch (err) {
                     throw KYC_VENDOR_ERRORS.timeout('ITR_BUSINESS');
