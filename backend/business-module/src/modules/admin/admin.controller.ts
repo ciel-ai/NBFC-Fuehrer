@@ -6,6 +6,7 @@ import {
     successResponse,
     paginatedResponse,
 } from '@/types/common.types';
+import { UnauthorizedError } from '@/errors';
 import {
     getValidatedBody,
     getValidatedParams,
@@ -193,19 +194,16 @@ async getLoanDetail(req: AuthRequest, res: Response, next: NextFunction) {
             });
 
             if (!user || !user.password_hash) {
-                res.status(HTTP.UNAUTHORIZED).json({ success: false, message: 'Invalid email or password' });
-                return;
+                throw new UnauthorizedError('Invalid email or password');
             }
 
             if (user.is_active === false) {
-                res.status(HTTP.UNAUTHORIZED).json({ success: false, message: 'Account is deactivated. Contact administrator.' });
-                return;
+                throw new UnauthorizedError('Account is deactivated. Contact administrator.');
             }
 
             const valid = await bcrypt.compare(password, user.password_hash);
             if (!valid) {
-                res.status(HTTP.UNAUTHORIZED).json({ success: false, message: 'Invalid email or password' });
-                return;
+                throw new UnauthorizedError('Invalid email or password');
             }
 
             // Update last login
@@ -262,8 +260,7 @@ async getLoanDetail(req: AuthRequest, res: Response, next: NextFunction) {
             });
 
             if (!adminUser || !adminUser.is_active) {
-                res.status(HTTP.UNAUTHORIZED).json({ success: false, message: 'Account not found or deactivated' });
-                return;
+                throw new UnauthorizedError('Account not found or deactivated');
             }
 
             res.status(HTTP.OK).json({
