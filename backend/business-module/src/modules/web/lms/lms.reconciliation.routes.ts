@@ -5,6 +5,7 @@ import { requireAuth, allowRoles } from '@/middlewares';
 import { ROLE, HTTP } from '@/config/constants';
 import type { AuthRequest } from '@/types/express';
 import { reconciliationService } from '@/modules/reconciliation/reconciliation.service';
+import { NotFoundError } from '@/errors';
 
 const router = Router();
 
@@ -32,8 +33,7 @@ router.get('/:id', requireAuth(), allowRoles(...FINANCE_ROLES), async (req: Auth
     try {
         const result = await reconciliationService.getReport(req.params.id as string);
         if (!result) {
-            res.status(HTTP.NOT_FOUND).json({ success: false, message: 'Report not found' });
-            return;
+            throw new NotFoundError('Reconciliation report', req.params.id as string);
         }
         res.status(HTTP.OK).json({ success: true, data: result });
     } catch (err) { next(err); }

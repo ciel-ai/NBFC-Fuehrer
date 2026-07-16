@@ -23,6 +23,7 @@ import { webhooksService } from './webhooks.service';
 import { HTTP } from '@/config/constants';
 import { createModuleLogger } from '@/config/logger';
 import type { RazorpayWebhookHeaders } from './webhooks.types';
+import { UnauthorizedError, AppError } from '@/errors';
 
 const log = createModuleLogger('webhooks.controller');
 
@@ -72,10 +73,11 @@ export const webhooksController = {
     async razorpay(req: Request, res: Response, next: NextFunction) {
         try {
             if (!req.rawBody) {
-                log.error('rawBody missing on Razorpay webhook — rawBodyCapture not applied');
-                return res.status(HTTP.INTERNAL_ERROR).json({
-                    success: false,
+                throw new AppError({
                     message: 'Raw body capture configuration error',
+                    statusCode: HTTP.INTERNAL_ERROR,
+                    errorCode: 'RAW_BODY_MISSING',
+                    isOperational: false,
                 });
             }
 
@@ -98,10 +100,7 @@ export const webhooksController = {
                 message.includes('signature') ||
                 message.includes('PAYMENT_VENDOR_ERROR')
             ) {
-                return res.status(HTTP.UNAUTHORIZED).json({
-                    success: false,
-                    message: 'Signature verification failed',
-                });
+                return next(new UnauthorizedError('Signature verification failed'));
             }
 
             // All other errors → 500 so Razorpay retries
@@ -117,10 +116,7 @@ export const webhooksController = {
         } catch (err: unknown) {
             const message = (err as Error).message ?? '';
             if (message.includes('signature') || message.includes('timestamp')) {
-                return res.status(HTTP.UNAUTHORIZED).json({
-                    success: false,
-                    message: 'Callback verification failed',
-                });
+                return next(new UnauthorizedError('Callback verification failed'));
             }
             next(err);
         }
@@ -134,10 +130,7 @@ export const webhooksController = {
         } catch (err: unknown) {
             const message = (err as Error).message ?? '';
             if (message.includes('signature') || message.includes('timestamp')) {
-                return res.status(HTTP.UNAUTHORIZED).json({
-                    success: false,
-                    message: 'Callback verification failed',
-                });
+                return next(new UnauthorizedError('Callback verification failed'));
             }
             next(err);
         }

@@ -10,6 +10,7 @@ import {
 } from '@/types/express';
 import type { AuthRequest } from '@/types/express';
 import type { InitiateDisbursementInput } from './disbursement.types';
+import { NotFoundError } from '@/errors';
 import { DISBURSEMENT_MODE } from '@/config/constants';
 
 export const disbursementController = {
@@ -76,12 +77,7 @@ export const disbursementController = {
             const result = await disbursementService.getDisbursementByLoan(loanId);
 
             if (!result) {
-                res.status(HTTP.NOT_FOUND).json({
-                    success: false,
-                    errorCode: 'NOT_FOUND',
-                    message: 'No disbursement found for this loan',
-                });
-                return;
+                throw new NotFoundError('Disbursement for loan', loanId);
             }
 
             res.status(HTTP.OK).json(successResponse(result));

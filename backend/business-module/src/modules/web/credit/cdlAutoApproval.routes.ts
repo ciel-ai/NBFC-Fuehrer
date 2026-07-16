@@ -5,6 +5,7 @@ import { requireAuth, allowRoles } from '@/middlewares';
 import { ROLE, HTTP } from '@/config/constants';
 import type { AuthRequest } from '@/types/express';
 import { cdlAutoApprovalService } from '@/modules/cdlLoans/cdlAutoApproval.service';
+import { ValidationError } from '@/errors';
 
 const router = Router();
 
@@ -66,8 +67,7 @@ router.get('/processing-fee', requireAuth(), allowRoles(...CREDIT_ROLES), async 
     try {
         const amount = parseFloat(req.query.amount as string);
         if (isNaN(amount)) {
-            res.status(HTTP.BAD_REQUEST).json({ success: false, message: 'Invalid amount' });
-            return;
+            throw ValidationError.field('amount', 'Invalid amount');
         }
         const fee = cdlAutoApprovalService.getProcessingFee(amount);
         res.status(HTTP.OK).json({ success: true, data: { loanAmountRupees: amount, processingFeeRupees: fee } });
