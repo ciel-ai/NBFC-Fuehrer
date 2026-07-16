@@ -1,6 +1,7 @@
 // src/modules/collections/collections.controller.ts
 import type { Response, NextFunction } from 'express';
 import { collectionsService } from './collections.service';
+import { NotFoundError } from '@/errors';
 import { HTTP } from '@/config/constants';
 import {
     successResponse,
@@ -63,11 +64,7 @@ export const collectionsController = {
                 getValidatedParams<{ loanAccountId: string }>(req);
             const result = await collectionsService.getCaseByLoanAccount(loanAccountId);
             if (!result) {
-                return res.status(HTTP.NOT_FOUND).json({
-                    success: false,
-                    errorCode: 'NOT_FOUND',
-                    message: 'No open collection case for this loan account',
-                });
+                throw new NotFoundError('Collection case for loan account', loanAccountId);
             }
             res.status(HTTP.OK).json(successResponse(result));
         } catch (err) { next(err); }
