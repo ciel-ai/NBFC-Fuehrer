@@ -2,6 +2,7 @@
 import { Router } from 'express';
 import Joi from 'joi';
 import { agentsController } from './agents.controller';
+import { NotFound } from '@/errors';
 import {
     requireAuth,
     allowRoles,
@@ -69,7 +70,7 @@ router.patch(
         try {
             const user = getAuthUser(req);
             const agent = await agentsService.getAgentByUserId(user.id);
-            if (!agent) return res.status(404).json({ success: false, message: 'Agent not found' });
+            if (!agent) throw NotFound.agentNotFound(user.id);
             req.params.agentId = agent.id;
             agentsController.update(req as any, res, next);
         } catch (err) { next(err); }

@@ -6,6 +6,7 @@ import {
     successResponse,
     paginatedResponse,
 } from '@/types/common.types';
+import { NotFound } from '@/errors';
 import {
     getValidatedBody,
     getValidatedParams,
@@ -44,11 +45,7 @@ export const agentsController = {
             const user = getAuthUser(req);
             const result = await agentsService.getAgentByUserId(user.id);
             if (!result) {
-                return res.status(HTTP.NOT_FOUND).json({
-                    success: false,
-                    errorCode: 'AGENT_NOT_FOUND',
-                    message: 'No agent profile found for this user',
-                });
+                throw NotFound.agentNotFound(user.id);
             }
             res.status(HTTP.OK).json(successResponse(result));
         } catch (err) { next(err); }
@@ -60,11 +57,7 @@ export const agentsController = {
             const user = getAuthUser(req);
             const agent = await agentsService.getAgentByUserId(user.id);
             if (!agent) {
-                return res.status(HTTP.NOT_FOUND).json({
-                    success: false,
-                    errorCode: 'AGENT_NOT_FOUND',
-                    message: 'No agent profile found for this user',
-                });
+                throw NotFound.agentNotFound(user.id);
             }
             const result = await agentsService.getDashboard(
                 agent.id, user.id, user.role,
