@@ -6,6 +6,7 @@ import {
     successResponse,
     paginatedResponse,
 } from '@/types/common.types';
+import { ValidationError } from '@/errors';
 import {
     getValidatedBody,
     getValidatedQuery,
@@ -227,7 +228,7 @@ export const loansController = {
         try {
             const user = getAuthUser(req);
             const { loanAccountId } = req.query as Record<string, string | undefined>;
-if (!loanAccountId) { res.status(400).json({ success: false, message: 'loanAccountId is required' }); return; }
+if (!loanAccountId) { throw ValidationError.field('loanAccountId', 'loanAccountId is required'); }
 
             const account = await loansService.getLoanAccount(
                 loanAccountId, user.id, user.role,
