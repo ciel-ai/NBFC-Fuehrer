@@ -10,6 +10,7 @@ import {
     COMMISSION_STATUS,
     AUDIT_ACTION,
     BUSINESS_RULES,
+    ROLE,
 } from '@/config/constants';
 import { roundRupees, toNumber } from '@/types/common.types';
 import { createModuleLogger } from '@/config/logger';
@@ -331,7 +332,7 @@ export const agentsService = {
     ): Promise<AgentProfileResponse> {
         const agent = await agentsRepository.findByIdOrThrow(agentId);
 
-        const staffRoles = new Set(['OPS_EXECUTIVE', 'SUPER_ADMIN']);
+        const staffRoles = new Set<string>([ROLE.OPS_EXECUTIVE, ROLE.SUPER_ADMIN]);
         if (!staffRoles.has(role) && agent.userId !== userId) {
             throw new ForbiddenError('You can only update your own profile');
         }
@@ -356,8 +357,8 @@ export const agentsService = {
     ): Promise<AgentProfileResponse> {
         const agent = await agentsRepository.findByIdOrThrow(agentId);
 
-        const staffRoles = new Set([
-            'OPS_EXECUTIVE', 'CREDIT_MANAGER', 'FINANCE', 'SUPER_ADMIN',
+        const staffRoles = new Set<string>([
+            ROLE.OPS_EXECUTIVE, ROLE.CREDIT_MANAGER, ROLE.FINANCE, ROLE.SUPER_ADMIN,
         ]);
         if (!staffRoles.has(role) && agent.userId !== userId) {
             throw new ForbiddenError('You can only view your own agent profile');
@@ -392,7 +393,7 @@ export const agentsService = {
     ): Promise<AgentDashboard> {
         const agent = await agentsRepository.findByIdOrThrow(agentId);
 
-        const staffRoles = new Set(['OPS_EXECUTIVE', 'SUPER_ADMIN', 'FINANCE']);
+        const staffRoles = new Set<string>([ROLE.OPS_EXECUTIVE, ROLE.SUPER_ADMIN, ROLE.FINANCE]);
         if (!staffRoles.has(role) && agent.userId !== userId) {
             throw new ForbiddenError('You can only view your own dashboard');
         }
@@ -465,7 +466,7 @@ export const agentsService = {
         userId: string,
         role: string,
     ) {
-        const staffRoles = new Set(['FINANCE', 'SUPER_ADMIN', 'OPS_EXECUTIVE']);
+        const staffRoles = new Set<string>([ROLE.FINANCE, ROLE.SUPER_ADMIN, ROLE.OPS_EXECUTIVE]);
         if (!staffRoles.has(role)) {
             const agent = await agentsRepository.findByUserId(userId);
             if (!agent) throw new NotFoundError('Agent profile', userId);

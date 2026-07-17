@@ -16,6 +16,7 @@ import {
     LOAN_STATUS,
     AUDIT_ACTION,
     BUSINESS_RULES,
+    ROLE,
 } from '@/config/constants';
 import {
     roundRupees,
@@ -387,8 +388,8 @@ export const underwritingService = {
         userId: string,
         role: string,
     ): Promise<UnderwritingReportResponse> {
-        const staffRoles = new Set([
-            'OPS_EXECUTIVE', 'CREDIT_MANAGER', 'FINANCE', 'SUPER_ADMIN',
+        const staffRoles = new Set<string>([
+            ROLE.OPS_EXECUTIVE, ROLE.CREDIT_MANAGER, ROLE.FINANCE, ROLE.SUPER_ADMIN,
         ]);
 
         const report = await underwritingRepository.findLatestByLoanIdOrThrow(loanId);
@@ -409,8 +410,8 @@ export const underwritingService = {
         reportId: string,
         role: string,
     ): Promise<UnderwritingReportResponse> {
-        const staffRoles = new Set([
-            'OPS_EXECUTIVE', 'CREDIT_MANAGER', 'FINANCE', 'SUPER_ADMIN',
+        const staffRoles = new Set<string>([
+            ROLE.OPS_EXECUTIVE, ROLE.CREDIT_MANAGER, ROLE.FINANCE, ROLE.SUPER_ADMIN,
         ]);
 
         if (!staffRoles.has(role)) {
