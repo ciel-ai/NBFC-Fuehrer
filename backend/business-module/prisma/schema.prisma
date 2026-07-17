@@ -118,12 +118,14 @@ model loan_applications {
   user_id              String                 @db.Uuid
   agent_id             String?                @db.Uuid
   status               String                 @default("DRAFT") @db.VarChar(30)
+  /// DB CHECK: amount_requested >= 0
   amount_requested     Decimal                @db.Decimal(15, 2)
   tenure_months        Int
   product_type         String                 @db.VarChar(50)
   purpose              String                 @db.VarChar(200)
   store_name           String                 @db.VarChar(100)
   store_city           String                 @db.VarChar(100)
+  /// DB CHECK: approved_amount IS NULL OR approved_amount >= 0
   approved_amount      Decimal?               @db.Decimal(15, 2)
   interest_rate        Decimal?               @db.Decimal(6, 2)
   processing_fee       Decimal?               @db.Decimal(15, 2)
@@ -178,6 +180,7 @@ model loan_accounts {
   application_id      String              @unique @db.Uuid
   user_id             String              @db.Uuid
   account_number      String              @unique @db.VarChar(20)
+  /// DB CHECK: principal_amount >= 0
   principal_amount    Decimal             @db.Decimal(15, 2)
   interest_rate       Decimal             @db.Decimal(6, 2)
   tenure_months       Int
@@ -227,9 +230,11 @@ model underwriting_reports {
   passed_rules           Int
   failed_rules           Int
   hard_fail_rules        String[]          @default([])
+  /// DB CHECK: recommended_amount IS NULL OR recommended_amount >= 0
   recommended_amount     Decimal?          @db.Decimal(15, 2)
   recommended_rate       Decimal?          @db.Decimal(6, 2)
   recommended_tenure     Int?
+  /// DB CHECK: max_eligible_amount IS NULL OR max_eligible_amount >= 0
   max_eligible_amount    Decimal?          @db.Decimal(15, 2)
   rejection_reasons      String[]          @default([])
   referral_reasons       String[]          @default([])
@@ -249,11 +254,13 @@ model emi_schedule {
   loan_account_id     String        @db.Uuid
   emi_number          Int
   due_date            DateTime      @db.Date
+  /// DB CHECK: emi_amount >= 0
   emi_amount          Decimal       @db.Decimal(15, 2)
   principal_component Decimal       @db.Decimal(15, 2)
   interest_component  Decimal       @db.Decimal(15, 2)
   outstanding_after   Decimal       @db.Decimal(15, 2)
   status              String        @default("PENDING") @db.VarChar(20)
+  /// DB CHECK: penalty_amount >= 0
   penalty_amount      Decimal       @default(0) @db.Decimal(15, 2)
   last_penalty_applied_date DateTime? @db.Date
   bounce_count        Int           @default(0)
@@ -284,9 +291,11 @@ model disbursements {
   account_number       String         @db.VarChar(30)
   ifsc                 String         @db.VarChar(11)
   mode                 String         @db.VarChar(20)
+  /// DB CHECK: principal_amount >= 0
   principal_amount     Decimal        @db.Decimal(15, 2)
   processing_fee       Decimal        @db.Decimal(15, 2)
   processing_fee_gst   Decimal        @db.Decimal(15, 2)
+  /// DB CHECK: net_disbursed_amount >= 0
   net_disbursed_amount Decimal        @db.Decimal(15, 2)
   razorpay_payout_id   String?        @db.VarChar(100)
   utr_number           String?        @db.VarChar(50)
@@ -312,7 +321,9 @@ model payments {
   user_id          String        @db.Uuid
   emi_id           String?       @db.Uuid
   payment_type     String        @db.VarChar(20)
+  /// DB CHECK: amount >= 0
   amount           Decimal       @db.Decimal(15, 2)
+  /// DB CHECK: penalty_amount >= 0
   penalty_amount   Decimal       @default(0) @db.Decimal(15, 2)
   total_collected  Decimal       @db.Decimal(15, 2)
   channel          String        @db.VarChar(20)
@@ -750,7 +761,9 @@ model gold_auctions {
   reserve_price       Decimal?      @db.Decimal(15, 2)
   actual_sale_price   Decimal?      @db.Decimal(15, 2)
   outstanding_dues    Decimal?      @db.Decimal(15, 2)
+  /// DB CHECK: surplus_amount IS NULL OR surplus_amount >= 0
   surplus_amount      Decimal?      @db.Decimal(15, 2)
+  /// DB CHECK: deficit_amount IS NULL OR deficit_amount >= 0
   deficit_amount      Decimal?      @db.Decimal(15, 2)
   auctioned_by        String?       @db.VarChar(100)
   completed_at        DateTime?     @db.Timestamptz(6)
