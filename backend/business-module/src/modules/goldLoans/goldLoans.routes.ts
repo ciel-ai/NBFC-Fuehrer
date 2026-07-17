@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { goldLoansController } from './goldLoans.controller';
 import { requireAuth, allowRoles } from '@/middlewares';
 import { ROLE } from '@/config/constants';
+import { stubGuard } from '@/middlewares/stubGuard.middleware';
 
 const router = Router();
 
@@ -53,6 +54,7 @@ router.post(
     '/applications/:id/accept-final-amount',
     requireAuth(),
     allowRoles(ROLE.CUSTOMER),
+    stubGuard(),
     goldLoansController.acceptFinalAmount,
 );
 
@@ -61,6 +63,7 @@ router.post(
     '/applications/:id/agreement',
     requireAuth(),
     allowRoles(ROLE.CUSTOMER),
+    stubGuard(),
     goldLoansController.generateAgreement,
 );
 
@@ -69,6 +72,7 @@ router.post(
     '/applications/:id/esign',
     requireAuth(),
     allowRoles(ROLE.CUSTOMER),
+    stubGuard(),
     goldLoansController.completeESign,
 );
 
@@ -77,6 +81,7 @@ router.post(
     '/applications/:id/nach',
     requireAuth(),
     allowRoles(ROLE.CUSTOMER),
+    stubGuard(),
     goldLoansController.initiateNach,
 );
 
@@ -85,6 +90,7 @@ router.get(
     '/applications/:id/disbursal',
     requireAuth(),
     allowRoles(ROLE.CUSTOMER, ROLE.FINANCE, ROLE.SUPER_ADMIN),
+    stubGuard(),
     goldLoansController.getDisbursalStatus,
 );
 
@@ -93,6 +99,7 @@ router.post(
     '/applications/:id/compliance',
     requireAuth(),
     allowRoles(ROLE.CUSTOMER),
+    stubGuard(),
     goldLoansController.runCompliance,
 );
 
@@ -121,6 +128,7 @@ router.get(
     '/:id/monitoring',
     requireAuth(),
     allowRoles(ROLE.CUSTOMER, ROLE.CREDIT_MANAGER, ROLE.SUPER_ADMIN),
+    stubGuard(),
     goldLoansController.getMonitoring,
 );
 
@@ -129,6 +137,7 @@ router.get(
     '/:id/closure-quote',
     requireAuth(),
     allowRoles(ROLE.CUSTOMER),
+    stubGuard(),
     goldLoansController.getClosureQuote,
 );
 

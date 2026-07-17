@@ -360,6 +360,17 @@ export const env = {
             .map((o: string) => o.trim())
             .filter(Boolean),
     },
+
+    features: {
+        // Gold/Housing loan downstream stages (agreement, eSign, NACH,
+        // disbursal, EMI schedule, closure) are currently hardcoded stubs —
+        // no DB writes, fake data. Disabled by default so nobody can
+        // mistake a fake "success" response for a real one. Flip to true
+        // only once these are wired to the real loans/disbursement/emi
+        // pipeline (see Phase 3 of the audit).
+        enableUnwiredLoanStubs: value.ENABLE_UNWIRED_LOAN_STUBS === 'true',
+    },
+    
 } as const;
 
 export type Env = typeof env;

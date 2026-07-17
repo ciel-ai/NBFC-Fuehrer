@@ -19,6 +19,9 @@ import { prisma } from '@/config/database';
 import { STAFF_ROLE, type StaffRole } from '@/constants/staffRoles.constants';
 
 const ADMIN_PASSWORD = 'admin@123'; // demo only — change in production
+// NOTE: must_change_password already defaults to true on admin_users
+// (see schema.prisma), so this seeded password can never be used to log
+// in directly — the login route above forces a reset first.
 
 interface SeedStaff {
     full_name: string;

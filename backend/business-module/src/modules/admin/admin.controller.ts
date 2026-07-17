@@ -206,6 +206,16 @@ async getLoanDetail(req: AuthRequest, res: Response, next: NextFunction) {
                 throw new UnauthorizedError('Invalid email or password');
             }
 
+            // Force a password reset before issuing a session token for any
+            // account still on its seeded/demo password.
+            if (user.must_change_password) {
+                res.status(HTTP.OK).json({
+                    success: true,
+                    data: { mustChangePassword: true, userId: user.id },
+                });
+                return;
+            }
+
             // Update last login
             await prisma.admin_users.update({
                 where: { id: user.id },

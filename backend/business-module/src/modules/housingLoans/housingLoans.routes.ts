@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { housingLoansController } from './housingLoans.controller';
 import { requireAuth, allowRoles } from '@/middlewares';
 import { ROLE } from '@/config/constants';
+import { stubGuard } from '@/middlewares/stubGuard.middleware';
 
 const router = Router();
 const CUSTOMER = ROLE.CUSTOMER;
@@ -19,16 +20,16 @@ router.post('/applications/:id/credit-assessment', requireAuth(), allowRoles(CUS
 router.post('/applications/:id/property-assessment', requireAuth(), allowRoles(CUSTOMER, CREDIT), housingLoansController.runPropertyAssessment);
 router.post('/applications/:id/submit-review', requireAuth(), allowRoles(CUSTOMER), housingLoansController.submitForReview);
 router.get('/applications/:id/decision', requireAuth(), allowRoles(CUSTOMER, CREDIT), housingLoansController.getCommitteeDecision);
-router.post('/applications/:id/agreement', requireAuth(), allowRoles(CUSTOMER), housingLoansController.generateAgreement);
-router.post('/applications/:id/esign', requireAuth(), allowRoles(CUSTOMER), housingLoansController.eSign);
-router.post('/applications/:id/nach', requireAuth(), allowRoles(CUSTOMER), housingLoansController.registerNach);
-router.post('/applications/:id/pmay-subsidy', requireAuth(), allowRoles(CUSTOMER), housingLoansController.applyPmaySubsidy);
-router.post('/applications/:id/disburse', requireAuth(), allowRoles(FINANCE, ADMIN), housingLoansController.disburseToBuilder);
-router.get('/loans/:id/emi-schedule', requireAuth(), allowRoles(CUSTOMER), housingLoansController.getEmiSchedule);
-router.get('/loans/:id/prepayment-quote', requireAuth(), allowRoles(CUSTOMER), housingLoansController.getPrepaymentQuote);
-router.post('/loans/:id/prepayment', requireAuth(), allowRoles(CUSTOMER), housingLoansController.processPrepayment);
-router.get('/loans/:id/overdue', requireAuth(), allowRoles(CUSTOMER, FINANCE), housingLoansController.getOverdueStatus);
-router.post('/loans/:id/close', requireAuth(), allowRoles(CUSTOMER, FINANCE), housingLoansController.closeLoan);
-router.post('/loans/:id/noc', requireAuth(), allowRoles(CUSTOMER), housingLoansController.generateNoc);
+router.post('/applications/:id/agreement', requireAuth(), allowRoles(CUSTOMER), stubGuard(), housingLoansController.generateAgreement);
+router.post('/applications/:id/esign', requireAuth(), allowRoles(CUSTOMER), stubGuard(), housingLoansController.eSign);
+router.post('/applications/:id/nach', requireAuth(), allowRoles(CUSTOMER), stubGuard(), housingLoansController.registerNach);
+router.post('/applications/:id/pmay-subsidy', requireAuth(), allowRoles(CUSTOMER), stubGuard(), housingLoansController.applyPmaySubsidy);
+router.post('/applications/:id/disburse', requireAuth(), allowRoles(FINANCE, ADMIN), stubGuard(), housingLoansController.disburseToBuilder);
+router.get('/loans/:id/emi-schedule', requireAuth(), allowRoles(CUSTOMER), stubGuard(), housingLoansController.getEmiSchedule);
+router.get('/loans/:id/prepayment-quote', requireAuth(), allowRoles(CUSTOMER), stubGuard(), housingLoansController.getPrepaymentQuote);
+router.post('/loans/:id/prepayment', requireAuth(), allowRoles(CUSTOMER), stubGuard(), housingLoansController.processPrepayment);
+router.get('/loans/:id/overdue', requireAuth(), allowRoles(CUSTOMER, FINANCE), stubGuard(), housingLoansController.getOverdueStatus);
+router.post('/loans/:id/close', requireAuth(), allowRoles(CUSTOMER, FINANCE), stubGuard(), housingLoansController.closeLoan);
+router.post('/loans/:id/noc', requireAuth(), allowRoles(CUSTOMER), stubGuard(), housingLoansController.generateNoc);
 
 export { router as housingLoansRouter };
