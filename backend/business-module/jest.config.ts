@@ -12,7 +12,7 @@ const config: Config = {
     moduleNameMapper: {
         '^@/(.*)$': '<rootDir>/src/$1',
     },
-    setupFilesAfterFramework: ['<rootDir>/tests/fixtures/setup.ts'],
+    setupFilesAfterEnv: ['<rootDir>/tests/fixtures/setup.ts'],
     collectCoverageFrom: [
         'src/**/*.ts',
         '!src/**/*.d.ts',
