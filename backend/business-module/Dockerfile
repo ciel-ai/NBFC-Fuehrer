@@ -40,6 +40,10 @@ COPY --from=builder /app/dist ./dist
 # Copy config files needed at runtime
 COPY tsconfig.json ./
 
+# Copy entrypoint (runs migrations before starting the server)
+COPY docker-entrypoint.sh ./
+RUN chmod +x docker-entrypoint.sh
+
 # Non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nodeuser -u 1001
@@ -51,6 +55,6 @@ EXPOSE 3000
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD wget -qO- http://localhost:3000/health || exit 1
-
-# Start server
-CMD ["node", "-r", "tsconfig-paths/register", "dist/server.js"]
+    
+# Start server (runs migrations first)
+ENTRYPOINT ["./docker-entrypoint.sh"]

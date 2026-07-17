@@ -1,161 +1,106 @@
-// src/jobs/emiReminder.job.ts
+// src/jobs/nachDebit.job.ts
+//
+// Daily eNACH auto-debit collection. Finds EMIs due today with an active
+// mandate, and initiates the debit via the payment provider. (This file
+// previously contained an accidental duplicate of emiReminder.job.ts —
+// no real auto-debit job existed until now.)
+
 import cron from 'node-cron';
-import { emiService } from '@/modules/emi';
-import { notificationsService } from '@/modules/notifications';
-import { createModuleLogger } from '@/config/logger';
-import { CRON_SCHEDULE } from '@/config/constants';
 import { prisma } from '@/config/database';
+import { paymentsService } from '@/modules/payments';
+import { createModuleLogger } from '@/config/logger';
+import { CRON_SCHEDULE, EMI_STATUS } from '@/config/constants';
 import { toNumber } from '@/types/common.types';
 
-const log = createModuleLogger('job:emiReminder');
+const log = createModuleLogger('job:nachDebit');
 
-// ─── Job logic ─────────────────────────────────────────────────────────────────
-
-export async function runEmiReminderJob(): Promise<void> {
+export async function runNachDebitJob(): Promise<void> {
     const jobStart = Date.now();
-    log.info('EMI reminder job started');
+    log.info('NACH debit job started');
 
-    let sent3Day = 0;
-    let sent1Day = 0;
-    let sentToday = 0;
-    let errors = 0;
+    let attempted = 0;
+    let succeeded = 0;
+    let failed = 0;
 
     try {
         const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
 
-        // Fetch all three reminder buckets concurrently
-        const [targets3Day, targets1Day, targetsDueToday] = await Promise.all([
-            emiService.getReminders(today, 3),
-            emiService.getReminders(today, 1),
-            emiService.getReminders(today, 0),
-        ]);
+        // EMIs due today, not yet attempted
+        const dueEmis = await prisma.emi_schedule.findMany({
+            where: {
+                status: EMI_STATUS.PENDING,
+                due_date: { gte: today, lt: tomorrow },
+            },
+            include: {
+                loan_account: {
+                    select: {
+                        id: true,
+                        user_id: true,
+                        razorpay_mandate_id: true,
+                        status: true,
+                    },
+                },
+            },
+            take: 500,
+        });
 
-        // ── 3-day reminders ──────────────────────────────────────────────────────
-        for (const target of targets3Day) {
-            // Skip if also in the 1-day bucket — avoid double notification
-            const isAlso1Day = targets1Day.some((t) => t.emiId === target.emiId);
-            if (isAlso1Day) continue;
+        log.info(`NACH debit: ${dueEmis.length} EMIs due today`);
+
+        for (const emi of dueEmis) {
+            const account = emi.loan_account;
+
+            if (!account || !['ACTIVE', 'DISBURSED'].includes(account.status as string)) {
+                continue;
+            }
+
+            if (!account.razorpay_mandate_id) {
+                log.warn('Debit skipped — no active mandate', { emiId: emi.id, loanAccountId: account?.id });
+                continue;
+            }
+
+            attempted++;
 
             try {
-                const recipient = await notificationsService.resolveRecipient(
-                    target.userId,
+                const fakeReq = {
+                    requestId: `job:nach:${emi.id}`,
+                    requestLogger: log,
+                    user: null,
+                    auditContext: {},
+                } as unknown as import('express').Request;
+
+                await paymentsService.processNachDebit(
+                    {
+                        emiId: emi.id,
+                        loanAccountId: account.id as string,
+                        mandateId: account.razorpay_mandate_id as string,
+                        amount: toNumber(emi.emi_amount as unknown as number),
+                        penaltyAmount: toNumber(emi.penalty_amount as unknown as number),
+                        description: `Auto-debit EMI #${emi.emi_number}`,
+                    },
+                    fakeReq,
                 );
 
-                // Fetch account number for the SMS template
-                const account = await prisma.loan_accounts.findUnique({
-                    where: { id: target.loanAccountId },
-                    select: { account_number: true },
-                });
+                succeeded++;
+                log.info('NACH debit initiated', { emiId: emi.id, emiNumber: emi.emi_number, loanAccount: account.id });
 
-                await notificationsService.dispatch({
-                    template: 'EMI_REMINDER_3_DAYS',
-                    variables: {
-                        customerName: recipient.phone ?? 'Customer',
-                        emiAmount: target.emiAmount,
-                        dueDate: target.dueDate.toLocaleDateString('en-IN'),
-                        accountNumber: (account?.account_number as string) ?? '',
-                    },
-                    channels: ['SMS', 'PUSH'],
-                    recipient,
-                    // Deduplication: one 3-day reminder per EMI per day
-                    dedupeKey: `emi_reminder_3d:${target.emiId}:${today.toDateString()}`,
-                    dedupeTtl: 86400,
-                });
-
-                sent3Day++;
             } catch (err) {
-                errors++;
-                log.error('3-day reminder failed', {
-                    emiId: target.emiId,
-                    userId: target.userId,
-                    error: (err as Error).message,
-                });
+                failed++;
+                log.error('NACH debit failed', { emiId: emi.id, error: (err as Error).message });
             }
+
+            await sleep(150);
         }
 
-        // ── 1-day reminders ──────────────────────────────────────────────────────
-        for (const target of targets1Day) {
-            const isAlsoToday = targetsDueToday.some((t) => t.emiId === target.emiId);
-            if (isAlsoToday) continue;
-
-            try {
-                const recipient = await notificationsService.resolveRecipient(
-                    target.userId,
-                );
-                const account = await prisma.loan_accounts.findUnique({
-                    where: { id: target.loanAccountId },
-                    select: { account_number: true },
-                });
-
-                await notificationsService.dispatch({
-                    template: 'EMI_REMINDER_1_DAY',
-                    variables: {
-                        customerName: recipient.phone ?? 'Customer',
-                        emiAmount: target.emiAmount,
-                        dueDate: target.dueDate.toLocaleDateString('en-IN'),
-                        accountNumber: (account?.account_number as string) ?? '',
-                    },
-                    channels: ['SMS', 'PUSH'],
-                    recipient,
-                    dedupeKey: `emi_reminder_1d:${target.emiId}:${today.toDateString()}`,
-                    dedupeTtl: 86400,
-                });
-
-                sent1Day++;
-            } catch (err) {
-                errors++;
-                log.error('1-day reminder failed', {
-                    emiId: target.emiId,
-                    error: (err as Error).message,
-                });
-            }
-        }
-
-        // ── Due today ─────────────────────────────────────────────────────────────
-        for (const target of targetsDueToday) {
-            try {
-                const recipient = await notificationsService.resolveRecipient(
-                    target.userId,
-                );
-                const account = await prisma.loan_accounts.findUnique({
-                    where: { id: target.loanAccountId },
-                    select: { account_number: true },
-                });
-
-                await notificationsService.dispatch({
-                    template: 'EMI_DUE_TODAY',
-                    variables: {
-                        customerName: recipient.phone ?? 'Customer',
-                        emiAmount: target.emiAmount,
-                        accountNumber: (account?.account_number as string) ?? '',
-                    },
-                    channels: ['SMS', 'PUSH'],
-                    recipient,
-                    dedupeKey: `emi_due_today:${target.emiId}:${today.toDateString()}`,
-                    dedupeTtl: 86400,
-                });
-
-                sentToday++;
-            } catch (err) {
-                errors++;
-                log.error('Due today reminder failed', {
-                    emiId: target.emiId,
-                    error: (err as Error).message,
-                });
-            }
-        }
-
-        const durationMs = Date.now() - jobStart;
-        log.info('EMI reminder job completed', {
-            sent3Day,
-            sent1Day,
-            sentToday,
-            errors,
-            durationMs,
+        log.info('NACH debit job completed', {
+            attempted, succeeded, failed,
+            durationMs: Date.now() - jobStart,
         });
 
     } catch (err) {
-        log.error('EMI reminder job crashed', {
+        log.error('NACH debit job crashed', {
             error: (err as Error).message,
             stack: (err as Error).stack,
             durationMs: Date.now() - jobStart,
@@ -163,14 +108,13 @@ export async function runEmiReminderJob(): Promise<void> {
     }
 }
 
-// ─── Scheduler ────────────────────────────────────────────────────────────────
-
-export function scheduleEmiReminderJob(): cron.ScheduledTask {
-    log.info('EMI reminder job scheduled', {
-        schedule: CRON_SCHEDULE.EMI_REMINDER,
-    });
-
-    return cron.schedule(CRON_SCHEDULE.EMI_REMINDER, runEmiReminderJob, {
+export function scheduleNachDebitJob(): cron.ScheduledTask {
+    log.info('NACH debit job scheduled', { schedule: CRON_SCHEDULE.NACH_DEBIT });
+    return cron.schedule(CRON_SCHEDULE.NACH_DEBIT, runNachDebitJob, {
         timezone: 'Asia/Kolkata',
     });
+}
+
+function sleep(ms: number): Promise<void> {
+    return new Promise((r) => setTimeout(r, ms));
 }

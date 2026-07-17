@@ -4,6 +4,10 @@ import { createModuleLogger } from '@/config/logger';
 import { scheduleNpaWatchJob }       from '@/jobs/npaWatch.job';
 import { scheduleReconciliationJob } from '@/jobs/reconciliation.job';
 import { scheduleBureauReportingJob } from '@/jobs/bureauReporting.job';
+import { scheduleEmiReminderJob }    from '@/jobs/emiReminder.job';
+import { scheduleNachDebitJob }      from '@/jobs/nachDebit.job';
+import { scheduleDebitRetryJob }     from '@/jobs/debitRetry.job';
+import { scheduleSettlementJob }     from '@/jobs/settlement.job';
 
 const log = createModuleLogger('server');
 
@@ -21,7 +25,11 @@ const server = app.listen(env.port, () => {
     scheduleNpaWatchJob();
     scheduleReconciliationJob();
     scheduleBureauReportingJob();
-    log.info('NPA watch job started and scheduled');
+    scheduleEmiReminderJob();
+    scheduleNachDebitJob();
+    scheduleDebitRetryJob();
+    scheduleSettlementJob();
+    log.info('All jobs started and scheduled');
 });
 
 // ─── Graceful shutdown ────────────────────────────────────────────────────────
