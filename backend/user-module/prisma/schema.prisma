@@ -135,6 +135,7 @@ model OtpVerification {
   otp       String
   expiresAt DateTime
   isUsed    Boolean  @default(false)
+  attempts  Int      @default(0)
   createdAt DateTime @default(now())
 
   @@index([phone, createdAt])

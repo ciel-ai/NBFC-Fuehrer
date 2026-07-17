@@ -11,7 +11,7 @@ const {
 
 // Public auth endpoints consumed by the mobile app.
 router.post('/send-otp', otpRateLimiter, validateRequest(sendOtpValidation), userController.sendOtp);
-router.post('/verify-otp', validateRequest(verifyOtpValidation), userController.verifyOtp);
+router.post('/verify-otp', otpRateLimiter, validateRequest(verifyOtpValidation), userController.verifyOtp);
 router.post('/refresh', userController.refreshToken);
 
 // Protected endpoints (require a valid Bearer access token).

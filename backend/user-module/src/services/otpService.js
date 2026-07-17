@@ -82,6 +82,8 @@ const issueOtp = async (phone) => {
 
 // ─── Consume OTP ──────────────────────────────────────────────────────────────
 
+const MAX_OTP_ATTEMPTS = 3;
+
 const consumeOtp = async (phone, plainOtp) => {
     const otpRecord = await prisma.otpVerification.findFirst({
         where:   { phone, isUsed: false },
@@ -100,9 +102,24 @@ const consumeOtp = async (phone, plainOtp) => {
         throw new AppError('OTP has expired. Please request a new OTP.', 400);
     }
 
+    // Lock out after too many wrong guesses against this specific OTP —
+    // forces the user to request a fresh one rather than allowing
+    // unlimited brute-force attempts against the same code.
+    if (otpRecord.attempts >= MAX_OTP_ATTEMPTS) {
+        await prisma.otpVerification.update({
+            where: { id: otpRecord.id },
+            data:  { isUsed: true },
+        });
+        throw new AppError('Too many incorrect attempts. Please request a new OTP.', 429);
+    }
+
     const isMatch = await bcrypt.compare(String(plainOtp), otpRecord.otp);
 
     if (!isMatch) {
+        await prisma.otpVerification.update({
+            where: { id: otpRecord.id },
+            data:  { attempts: { increment: 1 } },
+        });
         throw new AppError('Invalid OTP.', 400);
     }
 
