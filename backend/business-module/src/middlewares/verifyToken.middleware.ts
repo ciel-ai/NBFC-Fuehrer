@@ -9,6 +9,9 @@ import {
 } from '@/errors';
 import type { AuthenticatedUser } from '@/types/express';
 import { isStaffRole } from '@/constants/staffRoles.constants';
+import { createModuleLogger } from '@/config/logger';
+
+const log = createModuleLogger('verifyToken');
 
 // ─── Token extraction ──────────────────────────────────────────────────────────
 // Accept: "Bearer <token>" in Authorization header only.
@@ -81,10 +84,21 @@ async function isTokenDenylisted(jti: string, isStaff: boolean): Promise<boolean
             : RedisKeys.tokenDenylist(jti);
         const result = await redis.get(key);
         return result !== null;
-    } catch {
-        // Redis is unavailable — fail open (allow the request)
-        // Logging happens in redis.ts error handler already
-        // In production, a Redis outage should not lock out all users
+    } catch (err) {
+        // Redis is unavailable — fail open (allow the request through).
+        // This is a deliberate availability-over-strictness trade-off: a full
+        // Redis outage should not lock out every user. The risk window is
+        // bounded by the access token TTL (15 min), not indefinite.
+        //
+        // This is logged explicitly (not just relying on the Redis client's
+        // own connection-error logs) so an outage during which denylist
+        // checks are silently bypassed is actually visible/alertable in
+        // production monitoring, rather than a silent gap nobody notices.
+        log.error('Denylist check failed — failing open (request allowed)', {
+            jti,
+            isStaff,
+            error: (err as Error).message,
+        });
         return false;
     }
 }
