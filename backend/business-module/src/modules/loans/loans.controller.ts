@@ -157,6 +157,18 @@ export const loansController = {
         } catch (err) { next(err); }
     },
 
+    // GET /loans/:id/emi (alias) and /loans/:id/emi-schedule (canonical)
+    async emiSchedule(req: AuthRequest, res: Response, next: NextFunction) {
+        try {
+            const user = getAuthUser(req);
+            const { id } = getValidatedParams<{ id: string }>(req);
+            await loansService.getLoanAccount(id, user.id, user.role); // ownership check
+            const { emiService } = await import('@/modules/emi');
+            const entries = await emiService.getSchedule({ loanAccountId: id });
+            res.status(HTTP.OK).json(successResponse(entries));
+        } catch (err) { next(err); }
+    },
+
     // GET /loans/my-accounts
     async myAccounts(req: AuthRequest, res: Response, next: NextFunction) {
         try {

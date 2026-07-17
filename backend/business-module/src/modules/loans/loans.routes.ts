@@ -104,7 +104,7 @@ router.get(
     '/:id/emi',
     requireAuth(),
     validateParams(loanIdParamSchema),
-    loansController.getAccount, // TODO: replace with loansController.emiSchedule
+    loansController.emiSchedule,
 );
 
 // GET /loans/:id/emi-schedule → canonical EMI schedule route (matches API docs)
@@ -112,7 +112,7 @@ router.get(
     '/:id/emi-schedule',
     requireAuth(),
     validateParams(loanIdParamSchema),
-    loansController.getAccount, // TODO: replace with loansController.emiSchedule
+    loansController.emiSchedule,
 );
 
 // ─── Shared read routes ───────────────────────────────────────────────────────

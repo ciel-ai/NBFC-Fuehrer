@@ -192,7 +192,7 @@ router.post(
     allowRoles(ROLE.CUSTOMER),
     kycLimiter,
     validateBody(initiateKycSchema),
-    kycController.initiate, // TODO: replace with kycController.verifyPan
+    kycController.verifyPan,
 );
 
 // POST /kyc/complete → called by frontend submitKYCCompletion()

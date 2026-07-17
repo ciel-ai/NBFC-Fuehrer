@@ -366,9 +366,10 @@ export const collectionEfficiencyService = {
         const { fromDate, toDate, agentId } = input;
 
         // Raw SQL keeps this efficient — Prisma can't do date-truncation groupings.
-        const agentClause = agentId
-            ? `AND cc.assigned_to = '${agentId}'::uuid`
-            : '';
+        // agentId is now a proper positional parameter ($3), never string-interpolated.
+        // The IS NULL check lets one query handle both "filtered by agent" and
+        // "no agent filter" cases without conditionally changing the param count.
+        const agentClause = 'AND ($3::uuid IS NULL OR cc.assigned_to = $3::uuid)';
 
         const rows = await prisma.$queryRawUnsafe<
             Array<{
@@ -401,7 +402,7 @@ export const collectionEfficiencyService = {
             ON cl.contacted_at::date = days.day
           GROUP BY days.day
           ORDER BY days.day ASC
-        `, fromDate, toDate);
+        `, fromDate, toDate, agentId ?? null);
 
         return rows.map((r) => ({
             date: r.day.toISOString().slice(0, 10),
