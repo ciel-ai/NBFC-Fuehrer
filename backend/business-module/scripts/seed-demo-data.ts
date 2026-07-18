@@ -57,8 +57,10 @@ const CUSTOMERS = [
 ];
 
 // status, requested, tenure, product, [disbursed config]
+import type { LoanStatus } from '@/config/constants';
+
 const APPS: Array<{
-    cust: number; status: string; amount: number; tenure: number; purpose: string;
+    cust: number; status: LoanStatus; amount: number; tenure: number; purpose: string;
     approved?: { amount: number; rate: number };
     account?: { paid: number; overdueFrom?: number; npa?: boolean; monthsBack: number };
 }> = [

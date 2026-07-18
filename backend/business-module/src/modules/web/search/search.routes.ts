@@ -2,16 +2,20 @@
 //
 // Global search across applications and loan accounts, per frontend
 // spec section 5.8. Searches by customer name/phone and returns the
-// real, stored reference_number (atomic sequence, same value shown on
-// KFS/application detail/everywhere else) — no longer computed locally.
+// real, stored reference_number. Status search matches on exact enum
+// value (case-insensitive) since status is now a true Postgres enum,
+// not a free-text field — partial/substring matching is no longer
+// possible at the DB level.
 
 import { Router } from 'express';
 import type { Response, NextFunction } from 'express';
 import { requireAuth } from '@/middlewares';
-import { HTTP } from '@/config/constants';
+import { HTTP, LOAN_STATUS } from '@/config/constants';
 import type { AuthRequest } from '@/types/express';
 
 const router = Router();
+
+const VALID_LOAN_STATUSES = new Set<string>(Object.values(LOAN_STATUS));
 
 // GET /search?q=
 router.get('/', requireAuth(), async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -23,13 +27,18 @@ router.get('/', requireAuth(), async (req: AuthRequest, res: Response, next: Nex
             return res.status(HTTP.OK).json({ applications: [], loans: [] });
         }
 
+        // Status is now a real enum — only usable as an exact-match filter,
+        // and only if the search term is actually a valid status value.
+        const qUpper = q.toUpperCase();
+        const statusMatch = VALID_LOAN_STATUSES.has(qUpper) ? qUpper : null;
+
         const [applications, loanAccounts] = await Promise.all([
             prisma.loan_applications.findMany({
                 where: {
                     OR: [
                         { user: { full_name: { contains: q, mode: 'insensitive' } } },
                         { user: { phone: { contains: q } } },
-                        { status: { contains: q.toUpperCase() } },
+                        ...(statusMatch ? [{ status: statusMatch as any }] : []),
                     ],
                 },
                 take: 8,
@@ -45,7 +54,7 @@ router.get('/', requireAuth(), async (req: AuthRequest, res: Response, next: Nex
                 where: {
                     OR: [
                         { account_number: { contains: q } },
-                        { status: { contains: q.toUpperCase() } },
+                        ...(statusMatch ? [{ status: statusMatch as any }] : []),
                     ],
                 },
                 take: 8,

@@ -113,11 +113,30 @@ model customers {
   @@index([user_id])
 }
 
+enum loan_status {
+    DRAFT
+    KYC_PENDING
+    KYC_REJECTED
+    UNDERWRITING
+    APPOINTMENT_BOOKED
+    APPRAISAL_PENDING
+    PROPERTY_ASSESSMENT
+    PENDING_APPROVAL
+    APPROVED
+    REJECTED
+    ESIGN_PENDING
+    DISBURSED
+    ACTIVE
+    CLOSED
+    NPA
+    WRITTEN_OFF
+}
+
 model loan_applications {
   id                   String                 @id @default(uuid()) @db.Uuid
   user_id              String                 @db.Uuid
   agent_id             String?                @db.Uuid
-  status               String                 @default("DRAFT") @db.VarChar(30)
+  status               loan_status            @default(DRAFT)
   /// DB CHECK: amount_requested >= 0
   amount_requested     Decimal                @db.Decimal(15, 2)
   tenure_months        Int
