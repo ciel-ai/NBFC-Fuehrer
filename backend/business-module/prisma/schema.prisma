@@ -113,8 +113,6 @@ model customers {
   @@index([user_id])
 }
 
-
-
 enum loan_status {
     DRAFT
     KYC_PENDING
@@ -149,6 +147,22 @@ enum payment_status {
     FAILED
     REFUNDED
     PENDING
+}
+
+enum disbursement_status {
+    PENDING
+    INITIATED
+    IN_TRANSIT
+    COMPLETED
+    FAILED
+    REVERSED
+}
+
+enum collection_case_status {
+    OPEN
+    RESOLVED
+    CLOSED
+    ESCALATED
 }
 
 model loan_applications {
@@ -337,7 +351,7 @@ model disbursements {
   net_disbursed_amount Decimal        @db.Decimal(15, 2)
   razorpay_payout_id   String?        @db.VarChar(100)
   utr_number           String?        @db.VarChar(50)
-  status               String         @default("PENDING") @db.VarChar(20)
+  status               disbursement_status @default(PENDING)
   failure_reason       String?
   initiated_by         String         @db.Uuid
   initiated_at         DateTime       @db.Timestamptz(6)
@@ -462,7 +476,7 @@ model collection_cases {
   overdue_amount    Decimal        @db.Decimal(15, 2)
   penalty_amount    Decimal        @default(0) @db.Decimal(15, 2)
   total_due         Decimal        @db.Decimal(15, 2)
-  status            String         @default("OPEN") @db.VarChar(20)
+  status            collection_case_status @default(OPEN)
   ptp_date          DateTime?      @db.Date
   ptp_amount        Decimal?       @db.Decimal(15, 2)
   ptp_broken        Boolean        @default(false)
