@@ -6,6 +6,7 @@ import { LOAN_STATUS } from '@/config/constants';
 import { NotFoundError, LoanStateError } from '@/errors';
 import { prisma } from '@/config/database';
 import { emiService } from '@/modules/emi';
+import { disbursementService } from '@/modules/disbursement';
 import type {
     GoldRate,
     GoldEligibilityRequest,
@@ -397,17 +398,51 @@ export const goldLoansService = {
         };
     },
 
+    // Real: reads the actual disbursement record. Note the parameter here
+    // is genuinely an applicationId (unlike getClosureQuote/getMonitoring
+    // above, which take an account id) — disbursement records are keyed by
+    // loan_id = loan_applications.id, since a disbursement can be initiated
+    // before the loan_accounts row even exists.
     async getDisbursalStatus(applicationId: string): Promise<GoldLoanDisbursalStatus> {
+        const record = await disbursementService.getDisbursementByLoan(applicationId);
+
+        if (!record) {
+            return {
+                applicationId,
+                disbursalId: '',
+                amount:      0,
+                mode:        'IMPS',
+                status:      'PENDING',
+                utrNumber:   null,
+                disbursedAt: null,
+                bankAccount: '',
+                note:        'Disbursement has not been initiated yet.',
+            };
+        }
+
+        const statusMap: Record<string, GoldLoanDisbursalStatus['status']> = {
+            PENDING: 'PENDING',
+            INITIATED: 'PROCESSING',
+            IN_TRANSIT: 'PROCESSING',
+            COMPLETED: 'COMPLETED',
+            FAILED: 'FAILED',
+            REVERSED: 'FAILED',
+        };
+
         return {
             applicationId,
-            disbursalId: `disb_gl_${Date.now()}`,
-            amount:      135000,
-            mode:        'IMPS',
-            status:      'COMPLETED',
-            utrNumber:   `UTR${Date.now()}`,
-            disbursedAt: new Date().toISOString(),
-            bankAccount: 'XXXX1234',
-            note:        'Loan disbursed to your registered bank account.',
+            disbursalId: record.id,
+            amount:      record.netDisbursedAmount,
+            mode:        record.mode,
+            status:      statusMap[record.status] ?? 'PENDING',
+            utrNumber:   record.utrNumber,
+            disbursedAt: record.completedAt?.toISOString() ?? null,
+            bankAccount: '', // Not stored on the disbursement record — bank details live on the customer/mandate, not surfaced here today.
+            note: record.status === 'COMPLETED'
+                ? 'Loan disbursed to your registered bank account.'
+                : record.status === 'FAILED'
+                    ? `Disbursement failed: ${record.failureReason ?? 'unknown reason'}`
+                    : 'Disbursement is being processed.',
         };
     },
 
