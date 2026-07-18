@@ -5,6 +5,7 @@ import { loansRepository } from '@/modules/loans/loans.repository';
 import { LOAN_STATUS } from '@/config/constants';
 import { NotFoundError, LoanStateError } from '@/errors';
 import { prisma } from '@/config/database';
+import { emiService } from '@/modules/emi';
 import type {
     GoldRate,
     GoldEligibilityRequest,
@@ -427,16 +428,37 @@ export const goldLoansService = {
         };
     },
 
+    // Real: reuses the same foreclosure calculation already fixed and
+    // tested for CDL (emiService.getForeclosureQuote — see the earlier fix
+    // where this used to silently charge 0% interest). `loanId` here is a
+    // loan_accounts.id; gold collateral is looked up via the account's
+    // application_id, since collateral_gold.loan_id actually references
+    // loan_applications.id, not loan_accounts.id.
     async getClosureQuote(loanId: string): Promise<GoldLoanClosureQuote> {
+        const account = await loansRepository.findAccountByIdOrThrow(loanId);
+
+        const quote = await emiService.getForeclosureQuote(loanId, account.interestRate);
+
+        const collateral = await prisma.collateral_gold.findUnique({
+            where: { loan_id: account.applicationId },
+            select: { custody_status: true, vault_location: true },
+        });
+
+        const goldReleaseNote = collateral?.custody_status === 'IN_CUSTODY'
+            ? `Gold will be released from ${collateral.vault_location ?? 'the branch vault'} within 2 working hours of payment confirmation.`
+            : 'Gold custody status unavailable — contact your branch for release details.';
+
+        const validUntil = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+
         return {
             loanId,
-            principalOutstanding: 120000,
-            interestOutstanding:  3200,
-            penaltyCharges:       0,
-            processingFee:        0,
-            totalClosureAmount:   123200,
-            validUntil:           new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-            goldReleaseNote:      'Gold will be released at branch within 2 working hours of payment confirmation.',
+            principalOutstanding: quote.outstandingPrincipal,
+            interestOutstanding:  quote.accruedInterest,
+            penaltyCharges:       quote.penalty,
+            processingFee:        quote.foreclosureFee,
+            totalClosureAmount:   quote.total,
+            validUntil:           validUntil.toISOString(),
+            goldReleaseNote,
         };
     },
 
