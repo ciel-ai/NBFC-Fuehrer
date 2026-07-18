@@ -222,9 +222,19 @@ export const reportsService = {
         const asOf = filters.asOfDate ?? new Date();
 
         const loans = await prisma.loan_accounts.findMany({
-            where: { status: { in: ['ACTIVE', 'OVERDUE', 'NPA'] } },
+            // 'OVERDUE' was never a valid loan_accounts.status value — that
+            // state lives on individual EMIs (emi_schedule.status), not the
+            // account. An account with overdue EMIs is typically still
+            // ACTIVE at the account level. Fetching overdue EMIs separately
+            // below gives the correct portfolio-at-risk figure instead of
+            // a comparison that could never match.
+            where: { status: { in: ['ACTIVE', 'NPA'] } },
             include: {
                 application: { select: { product_type: true } },
+                emi_schedule: {
+                    where: { status: 'OVERDUE' },
+                    select: { emi_amount: true },
+                },
             },
         });
 
@@ -249,8 +259,12 @@ export const reportsService = {
 
             const principal   = Number(loan.principal_amount   ?? 0);
             const outstanding = Number(loan.outstanding_balance ?? 0);
-            const overdue     = loan.status === 'OVERDUE' ? outstanding : 0;
-            const npa         = loan.status === 'NPA'     ? outstanding : 0;
+            // Sum of actual overdue EMI amounts — portfolio at risk — rather
+            // than the old (never-true) loan.status === 'OVERDUE' check.
+            const overdue     = loan.emi_schedule.reduce(
+                (sum, e) => sum + Number(e.emi_amount), 0,
+            );
+            const npa         = loan.status === 'NPA' ? outstanding : 0;
 
             byProduct[product].count++;
             byProduct[product].disbursed    += principal;

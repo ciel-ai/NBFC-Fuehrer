@@ -10,6 +10,7 @@
 // Run: DATABASE_URL=... npx tsx scripts/seed-demo-data.ts
 
 import { PrismaClient } from '@prisma/client';
+import type { LoanStatus } from '@/config/constants';
 
 const prisma = new PrismaClient();
 
@@ -57,7 +58,6 @@ const CUSTOMERS = [
 ];
 
 // status, requested, tenure, product, [disbursed config]
-import type { LoanStatus } from '@/config/constants';
 
 const APPS: Array<{
     cust: number; status: LoanStatus; amount: number; tenure: number; purpose: string;
@@ -145,7 +145,7 @@ async function main(): Promise<void> {
                 monthly_emi: emi,
                 outstanding_balance: outstanding,
                 total_interest: totalInterest,
-                status: a.account.npa ? 'NPA' : 'ACTIVE',
+                status: (a.account.npa ? 'NPA' : 'ACTIVE') as LoanStatus,
                 disbursed_at: disbursedAt,
             };
             const account = existing

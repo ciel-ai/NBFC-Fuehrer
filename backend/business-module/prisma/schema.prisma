@@ -113,6 +113,8 @@ model customers {
   @@index([user_id])
 }
 
+
+
 enum loan_status {
     DRAFT
     KYC_PENDING
@@ -130,6 +132,23 @@ enum loan_status {
     CLOSED
     NPA
     WRITTEN_OFF
+}
+
+enum emi_status {
+    PENDING
+    PAID
+    OVERDUE
+    WAIVED
+    BOUNCED
+    PARTIAL
+}
+
+enum payment_status {
+    INITIATED
+    SUCCESS
+    FAILED
+    REFUNDED
+    PENDING
 }
 
 model loan_applications {
@@ -206,7 +225,7 @@ model loan_accounts {
   monthly_emi         Decimal             @db.Decimal(15, 2)
   outstanding_balance Decimal             @db.Decimal(15, 2)
   total_interest      Decimal             @db.Decimal(15, 2)
-  status              String              @default("DISBURSED") @db.VarChar(20)
+  status              loan_status         @default(DISBURSED)
   repayment_mode      String              @default("IMPS") @db.VarChar(20)
   razorpay_mandate_id String?             @db.VarChar(100)
   disbursed_at        DateTime?           @db.Timestamptz(6)
@@ -278,7 +297,7 @@ model emi_schedule {
   principal_component Decimal       @db.Decimal(15, 2)
   interest_component  Decimal       @db.Decimal(15, 2)
   outstanding_after   Decimal       @db.Decimal(15, 2)
-  status              String        @default("PENDING") @db.VarChar(20)
+  status              emi_status    @default(PENDING)
   /// DB CHECK: penalty_amount >= 0
   penalty_amount      Decimal       @default(0) @db.Decimal(15, 2)
   last_penalty_applied_date DateTime? @db.Date
@@ -349,7 +368,7 @@ model payments {
   gateway          String        @db.VarChar(30)
   gateway_txn_id   String?       @db.VarChar(100)
   utr_number       String?       @db.VarChar(50)
-  status           String        @default("PENDING") @db.VarChar(20)
+  status           payment_status @default(PENDING)
   failure_reason   String?
   failure_code     String?       @db.VarChar(50)
   mandate_id       String?       @db.VarChar(100)
