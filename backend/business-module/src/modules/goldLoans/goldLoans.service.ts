@@ -411,20 +411,51 @@ export const goldLoansService = {
         };
     },
 
+    // Real: outstanding balance, next EMI, overdue amount, and gold custody
+    // status all come from the actual DB. currentGoldValue/currentLtv are
+    // NOT live-tracked — no live gold rate feed exists anywhere in this
+    // codebase (a genuinely separate, unbuilt feature). Rather than fake a
+    // "current" value that could mislead on actual LTV risk, this uses the
+    // valuation captured at loan origination, clearly labeled as such.
     async getMonitoring(loanId: string): Promise<GoldLoanMonitoring> {
+        const account = await loansRepository.findAccountByIdOrThrow(loanId);
+        const summary = await emiService.getSummary(loanId);
+
+        const overdueAgg = await prisma.emi_schedule.aggregate({
+            where: { loan_account_id: loanId, status: 'OVERDUE' },
+            _sum: { emi_amount: true },
+        });
+        const overdueAmount = Number(overdueAgg._sum.emi_amount ?? 0);
+
+        const collateral = await prisma.collateral_gold.findUnique({
+            where: { loan_id: account.applicationId },
+            select: { valuation: true, ltv_pct: true, custody_status: true },
+        });
+
+        const originGoldValue = collateral ? Number(collateral.valuation) : null;
+        const originLtv = collateral ? Number(collateral.ltv_pct) : null;
+        const maxLtv = 75; // per client requirement — gold loan max LTV
+
+        const auctionRisk: GoldLoanMonitoring['auctionRisk'] =
+            overdueAmount > 0 ? 'MEDIUM' : 'LOW';
+
         return {
             loanId,
-            currentGoldValue:  185000,
-            currentLtv:        73,
-            maxLtv:            75,
+            currentGoldValue:  originGoldValue ?? 0,
+            currentLtv:        originLtv ?? 0,
+            maxLtv,
+            // Cannot be accurately determined without a live rate feed —
+            // conservatively false rather than guessing.
             ltvBreached:       false,
-            outstandingAmount: 130000,
-            overdueAmount:     0,
-            nextEmiDate:       new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
-            nextEmiAmount:     12500,
-            goldStorageStatus: 'SAFE_IN_VAULT',
-            auctionRisk:       'LOW',
-            note:              'Gold is safe. LTV within limit.',
+            outstandingAmount: summary.totalOutstanding,
+            overdueAmount,
+            nextEmiDate:       summary.nextDueDate?.toISOString() ?? null,
+            nextEmiAmount:     summary.nextEmiAmount,
+            goldStorageStatus: collateral?.custody_status ?? 'UNKNOWN',
+            auctionRisk,
+            note: originGoldValue
+                ? 'Gold value shown reflects valuation at loan origination — live market-rate tracking is not yet available.'
+                : 'Gold valuation record not found for this loan.',
         };
     },
 
