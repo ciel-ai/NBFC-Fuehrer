@@ -469,6 +469,24 @@ export const disbursementService = {
                 updatedAt: accountRow.updated_at as Date,
             };
 
+            // Link any pre-disbursement NACH mandate (Gold Loan flow) to the
+            // account that now exists. No-op if no such mandate was created
+            // (e.g. CDL, which sets up NACH after activation instead).
+            const preMandate = await tx.enach_mandates.findFirst({
+                where: { application_id: loan.id, loan_account_id: null },
+            });
+            if (preMandate) {
+                await tx.enach_mandates.update({
+                    where: { id: preMandate.id },
+                    data: { loan_account_id: accountRow.id },
+                });
+                await tx.loan_accounts.update({
+                    where: { id: accountRow.id },
+                    data: { razorpay_mandate_id: preMandate.razorpay_mandate_id },
+                });
+                loanAccount.razorpayMandateId = preMandate.razorpay_mandate_id;
+            }
+
             // 2. Update loan application status to DISBURSED
             await tx.loan_applications.update({
                 where: { id: loan.id },

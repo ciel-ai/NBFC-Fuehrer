@@ -12,6 +12,7 @@ import { pdfService } from '@/modules/documents/pdf.service';
 import { getDocStorageProvider } from '@/providers/docStorage';
 import { getEncryptionProvider } from '@/providers/encryption';
 import { getESignProvider } from '@/providers/esign';
+import { paymentsService } from '@/modules/payments';
 import type {
     GoldRate,
     GoldEligibilityRequest,
@@ -536,18 +537,46 @@ export const goldLoansService = {
         };
     },
 
-    async initiateNach(applicationId: string): Promise<GoldLoanNachResult> {
+    // Real: creates a real NACH mandate against the application (before the
+    // loan account exists — see disbursementService, which links this to
+    // the real account once disbursement happens).
+    async initiateNach(
+        applicationId: string,
+        input: { bankAccount: string; ifsc: string },
+    ): Promise<GoldLoanNachResult> {
         log.info('Initiating NACH for gold loan', { applicationId });
+
+        const application = await prisma.loan_applications.findUniqueOrThrow({
+            where: { id: applicationId },
+            include: { user: { select: { full_name: true, phone: true } } },
+        });
+
+        const principal = Number(application.approved_amount ?? application.amount_requested);
+        // Max debit ceiling — same logic as CDL's post-activation mandate.
+        const estimatedMonthlyEmi = principal / application.tenure_months;
+        const maxAmount = Math.round(estimatedMonthlyEmi * 1.5);
+
+        const mandate = await paymentsService.createMandateForApplication({
+            applicationId,
+            userId: application.user_id,
+            customerName: application.user?.full_name ?? '',
+            customerEmail: '',
+            customerPhone: application.user?.phone ?? '',
+            bankAccount: input.bankAccount,
+            ifsc: input.ifsc,
+            maxAmount,
+        }, {} as any);
+
         return {
             applicationId,
-            mandateId:        `mandate_gl_${Date.now()}`,
-            mandateType:      'E_NACH',
-            bankAccount:      'XXXX1234',
-            maxAmount:        50000,
-            frequency:        'MONTHLY',
-            status:           'PENDING_REGISTRATION',
-            razorpayMandateId: null,
-            note:             'NACH mandate registration initiated via Razorpay.',
+            mandateId: mandate.id,
+            mandateType: 'E_NACH',
+            bankAccount: mandate.bankAccount,
+            maxAmount,
+            frequency: 'MONTHLY',
+            status: 'PENDING_REGISTRATION',
+            razorpayMandateId: mandate.razorpayMandateId,
+            note: 'NACH mandate registration initiated via Razorpay.',
         };
     },
 

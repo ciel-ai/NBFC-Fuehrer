@@ -16,6 +16,7 @@ import {
     BUSINESS_RULES,
     LOAN_STATUS,
 } from '@/config/constants';
+import type { Rupees } from '@/types/common.types';
 import {
     roundRupees,
     toNumber,
@@ -82,6 +83,63 @@ function toMandateResponse(m: MandateRecord): MandateResponse {
 // ─── Service ───────────────────────────────────────────────────────────────────
 
 export const paymentsService = {
+
+    // ── Pre-disbursement mandate creation (Gold Loan) ──────────────────────────
+    // Creates a real NACH mandate against the application, before the loan
+    // account exists — needed because Gold Loan's business flow requires
+    // NACH setup before disbursement, unlike CDL (which sets it up after
+    // activation, see createMandate below). At disbursement time,
+    // disbursementService links this mandate to the newly created account.
+
+    async createMandateForApplication(input: {
+        applicationId: string;
+        userId: string;
+        customerName: string;
+        customerEmail: string;
+        customerPhone: string;
+        bankAccount: string;
+        ifsc: string;
+        maxAmount: Rupees;
+    }, req: Request): Promise<MandateResponse> {
+        const existing = await paymentsRepository.findMandateByApplicationId(input.applicationId);
+        if (existing) {
+            throw CONFLICT_ERRORS.mandateAlreadyActive(input.applicationId);
+        }
+
+        const provider = getPaymentProvider();
+
+        const result = await provider.createMandate({
+            customerId: input.userId,
+            customerName: input.customerName,
+            customerEmail: input.customerEmail,
+            customerPhone: input.customerPhone,
+            bankAccount: input.bankAccount,
+            ifsc: input.ifsc,
+            maxAmount: input.maxAmount,
+            loanAccountId: input.applicationId, // Reference label only — Razorpay doesn't validate this against our DB.
+        });
+
+        const maskedAccount = input.bankAccount.slice(-4).padStart(
+            input.bankAccount.length, 'X',
+        );
+
+        const mandate = await paymentsRepository.createMandateForApplication({
+            applicationId: input.applicationId,
+            userId: input.userId,
+            razorpayMandateId: result.mandateId,
+            bankAccount: maskedAccount,
+            ifsc: input.ifsc,
+            maxAmount: input.maxAmount,
+        });
+
+        setAuditContext(req, {
+            action: 'MANDATE_CREATED',
+            entityType: 'enach_mandates',
+            entityId: mandate.id,
+        });
+
+        return mandate as unknown as MandateResponse;
+    },
 
     // ── 1. Create eNACH mandate ────────────────────────────────────────────────
     // Called after loan is activated (DISBURSED → ACTIVE).

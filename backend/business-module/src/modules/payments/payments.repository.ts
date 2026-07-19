@@ -222,6 +222,50 @@ export const paymentsRepository = {
         return mapMandate(row as unknown as Record<string, unknown>);
     },
 
+    // ── Pre-disbursement mandate creation ──────────────────────────────────────
+    // For products (Gold Loan) where NACH is set up before the loan account
+    // exists. Referenced by application_id until disbursement, at which
+    // point linkMandateToAccount attaches the real loan_account_id.
+
+    async createMandateForApplication(data: {
+        applicationId: string;
+        userId: string;
+        razorpayMandateId: string;
+        bankAccount: string;
+        ifsc: string;
+        maxAmount: Rupees;
+    }): Promise<MandateRecord> {
+        const row = await prisma.enach_mandates.create({
+            data: {
+                application_id: data.applicationId,
+                user_id: data.userId,
+                razorpay_mandate_id: data.razorpayMandateId,
+                bank_account: data.bankAccount,
+                ifsc: data.ifsc,
+                max_amount: data.maxAmount,
+                status: 'CREATED',
+                created_at: new Date(),
+                updated_at: new Date(),
+            },
+        });
+        return mapMandate(row as unknown as Record<string, unknown>);
+    },
+
+    async findMandateByApplicationId(applicationId: string): Promise<MandateRecord | null> {
+        const row = await prisma.enach_mandates.findFirst({
+            where: { application_id: applicationId },
+            orderBy: { created_at: 'desc' },
+        });
+        return row ? mapMandate(row as unknown as Record<string, unknown>) : null;
+    },
+
+    async linkMandateToAccount(applicationId: string, loanAccountId: string): Promise<void> {
+        await prisma.enach_mandates.updateMany({
+            where: { application_id: applicationId, loan_account_id: null },
+            data: { loan_account_id: loanAccountId, updated_at: new Date() },
+        });
+    },
+    
     async findMandateByLoanAccountId(
         loanAccountId: string,
     ): Promise<MandateRecord | null> {

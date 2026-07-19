@@ -149,7 +149,8 @@ export const goldLoansController = {
     // POST /gold-loans/applications/:id/nach
     async initiateNach(req: Request, res: Response, next: NextFunction) {
         try {
-            const result = await goldLoansService.initiateNach(req.params.id!);
+            const { bankAccount, ifsc } = req.body;
+            const result = await goldLoansService.initiateNach(req.params.id!, { bankAccount, ifsc });
             res.json({ success: true, data: result });
         } catch (err) {
             next(err);
