@@ -528,16 +528,69 @@ export const goldLoansService = {
         };
     },
 
+    // Real, with an honest limitation: AML checks genuinely run during KYC
+    // (kyc.service.ts runRiskChecks) and a failure hard-rejects with a
+    // stored reason — so amlStatus below is inferred from that outcome.
+    // PEP status, however, is computed by the AML provider but never
+    // persisted or acted on anywhere in the codebase today — reporting a
+    // fake PASSED here would be a false compliance signal, so it's marked
+    // NOT_TRACKED rather than guessed.
     async runCompliance(applicationId: string): Promise<GoldLoanComplianceResult> {
         log.info('Running compliance for gold loan', { applicationId });
+
+        const application = await prisma.loan_applications.findUniqueOrThrow({
+            where: { id: applicationId },
+            select: { user_id: true },
+        });
+
+        const kyc = await prisma.kyc_documents.findUnique({
+            where: { user_id: application.user_id },
+            select: {
+                overall_status: true,
+                rejection_reason: true,
+                failed_checks: true,
+            },
+        });
+
+        if (!kyc) {
+            return {
+                applicationId,
+                kycStatus: 'NOT_STARTED',
+                amlStatus: 'PENDING',
+                pepStatus: 'NOT_TRACKED',
+                overallStatus: 'REVIEW',
+                flags: ['KYC_NOT_STARTED'],
+                note: 'KYC has not been initiated for this applicant.',
+            };
+        }
+
+        const wasAmlRejected =
+            kyc.overall_status === 'REJECTED' &&
+            (kyc.rejection_reason?.toUpperCase().includes('AML') ?? false);
+
+        const amlStatus = wasAmlRejected
+            ? 'FAILED'
+            : kyc.overall_status === 'COMPLETE'
+                ? 'PASSED' // Inferred: a failed AML check would have blocked KYC completion.
+                : 'PENDING';
+
+        const overallStatus: GoldLoanComplianceResult['overallStatus'] =
+            wasAmlRejected || kyc.overall_status === 'REJECTED'
+                ? 'FAILED'
+                : kyc.overall_status === 'COMPLETE'
+                    ? 'PASSED'
+                    : 'REVIEW';
+
         return {
             applicationId,
-            kycStatus:     'PASSED',
-            amlStatus:     'PASSED',
-            pepStatus:     'PASSED',
-            overallStatus: 'PASSED',
-            flags:         [],
-            note:          'All compliance checks passed.',
+            kycStatus: kyc.overall_status,
+            amlStatus,
+            pepStatus: 'NOT_TRACKED',
+            overallStatus,
+            flags: kyc.failed_checks,
+            note: wasAmlRejected
+                ? `AML check flagged this application: ${kyc.rejection_reason}`
+                : 'PEP screening is not currently tracked by this system — AML status is inferred from overall KYC outcome.',
         };
     },
 };
