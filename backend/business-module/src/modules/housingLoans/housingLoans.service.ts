@@ -3,7 +3,16 @@ import { createModuleLogger } from '@/config/logger';
 import { housingLoansRepository } from './housingLoans.repository';
 import { loansRepository } from '@/modules/loans/loans.repository';
 import { LOAN_STATUS, PRODUCT_TYPE } from '@/config/constants';
-import { NotFoundError, LoanStateError } from '@/errors';
+import { NotFoundError, LoanStateError, ValidationError } from '@/errors';
+import { prisma } from '@/config/database';
+import { emiService } from '@/modules/emi';
+import { assertTransition } from '@/utils/loanStateMachine.util';
+import { pdfService } from '@/modules/documents/pdf.service';
+import { getDocStorageProvider } from '@/providers/docStorage';
+import { getEncryptionProvider } from '@/providers/encryption';
+import { getESignProvider } from '@/providers/esign';
+import { paymentsService } from '@/modules/payments';
+import { disbursementService } from '@/modules/disbursement';
 import type {
     HousingApplicationInput,
     HousingApplicationResult,
@@ -416,42 +425,92 @@ export const housingLoansService = {
         }));
     },
 
-    getPrepaymentQuote(loanId: string, prepaymentAmount: number): HousingPrepaymentQuote {
+    // Real: outstanding principal and new EMI now derive from the actual
+    // loan account and real EMI math — the old version used a hardcoded
+    // ₹24,00,000 principal for every single loan, regardless of what the
+    // customer actually borrowed.
+    async getPrepaymentQuote(loanId: string, prepaymentAmount: number): Promise<HousingPrepaymentQuote> {
+        const account = await loansRepository.findAccountByIdOrThrow(loanId);
+        const summary = await emiService.getSummary(loanId);
+
+        if (prepaymentAmount <= 0 || prepaymentAmount > summary.totalOutstanding) {
+            throw new ValidationError('prepaymentAmount', 'Prepayment amount must be positive and not exceed outstanding principal');
+        }
+
+        const remainingPrincipal = summary.totalOutstanding - prepaymentAmount;
+        const remainingMonths = Math.max(
+            1,
+            account.tenureMonths - Math.round((account.tenureMonths * summary.paidEmis) / summary.totalEmis),
+        );
+        const newEmi = remainingPrincipal > 0
+            ? Math.round((remainingPrincipal * (account.interestRate / 1200)) /
+                (1 - Math.pow(1 + account.interestRate / 1200, -remainingMonths)))
+            : 0;
+
         return {
             loanId,
-            principalOutstanding: 2400000,
+            principalOutstanding: summary.totalOutstanding,
             prepaymentAmount,
-            prepaymentCharges:    0,
-            totalPayable:         prepaymentAmount,
-            newTenureMonths:      160,
-            newEmi:               calcEmi(2400000 - prepaymentAmount, HOUSING_INTEREST_RATE, 160),
-            validUntil:           new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+            prepaymentCharges: 0, // No prepayment penalty on floating-rate housing loans per RBI direction
+            totalPayable: prepaymentAmount,
+            newTenureMonths: remainingMonths,
+            newEmi,
+            validUntil: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
         };
     },
 
-    processPrepayment(loanId: string, input: { amount: number }): HousingPrepaymentResult {
+    // Real: records the actual prepayment against the loan account and
+    // recalculates outstanding balance from real data.
+    async processPrepayment(loanId: string, input: { amount: number }): Promise<HousingPrepaymentResult> {
+        const quote = await this.getPrepaymentQuote(loanId, input.amount);
+
+        await prisma.loan_accounts.update({
+            where: { id: loanId },
+            data: {
+                outstanding_balance: quote.principalOutstanding - input.amount,
+                updated_at: new Date(),
+            },
+        });
+
+        log.info('Housing loan prepayment processed', { loanId, amount: input.amount });
+
         return {
             loanId,
-            prepaymentId:   `prep_${Date.now()}`,
-            amountPaid:     input.amount,
-            newOutstanding: 2400000 - input.amount,
-            newEmi:         calcEmi(2400000 - input.amount, HOUSING_INTEREST_RATE, 160),
-            newTenure:      160,
-            status:         'COMPLETED',
-            note:           'Prepayment processed successfully.',
+            prepaymentId: `prep_${Date.now()}`,
+            amountPaid: input.amount,
+            newOutstanding: quote.principalOutstanding - input.amount,
+            newEmi: quote.newEmi,
+            newTenure: quote.newTenureMonths,
+            status: 'COMPLETED',
+            note: 'Prepayment processed successfully.',
         };
     },
 
-    getOverdueStatus(loanId: string): HousingOverdueStatus {
+    // Real: reads actual overdue EMI data — the old version always
+    // reported zero overdue, for every loan, permanently.
+    async getOverdueStatus(loanId: string): Promise<HousingOverdueStatus> {
+        const summary = await emiService.getSummary(loanId);
+
+        const overdueAgg = await prisma.emi_schedule.aggregate({
+            where: { loan_account_id: loanId, status: 'OVERDUE' },
+            _sum: { emi_amount: true },
+        });
+        const overdueAmount = Number(overdueAgg._sum.emi_amount ?? 0);
+
+        const status: HousingOverdueStatus['status'] =
+            summary.overdueEmis === 0 ? 'CURRENT' : summary.overdueEmis <= 3 ? 'OVERDUE' : 'NPA';
+
         return {
             loanId,
-            overdueAmount:  0,
-            overdueDays:    0,
-            overdueEmis:    0,
-            penaltyCharges: 0,
-            totalDue:       0,
-            status:         'CURRENT',
-            note:           'No overdue amount.',
+            overdueAmount,
+            overdueDays: summary.nextDueDate
+                ? Math.max(0, Math.floor((Date.now() - summary.nextDueDate.getTime()) / (1000 * 60 * 60 * 24)))
+                : 0,
+            overdueEmis: summary.overdueEmis,
+            penaltyCharges: summary.totalPenalty,
+            totalDue: overdueAmount + summary.totalPenalty,
+            status,
+            note: status === 'CURRENT' ? 'No overdue amount.' : `${summary.overdueEmis} EMI(s) overdue.`,
         };
     },
 
