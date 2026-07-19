@@ -453,19 +453,86 @@ export const goldLoansService = {
         };
     },
 
+    // Real: OTP verification actually happens on the vendor's signing page
+    // (the customer visits the signingUrl from generateAgreement and enters
+    // OTP there) — not on our API. This function polls the real signing
+    // status, and if complete, applies the legal e-stamp and stores the
+    // final signed+stamped document. The `otp` parameter is accepted for
+    // route-signature compatibility but isn't used for verification, which
+    // is out of our hands by design.
     async completeESign(
         applicationId: string,
-        otp: string,
+        _otp: string,
     ): Promise<GoldLoanAgreementResult> {
-        log.info('Completing eSign for gold loan', { applicationId });
+        log.info('Checking eSign completion for gold loan', { applicationId });
+
+        const application = await prisma.loan_applications.findUniqueOrThrow({
+            where: { id: applicationId },
+        });
+
+        const kyc = await prisma.kyc_documents.findUniqueOrThrow({
+            where: { user_id: application.user_id },
+        });
+
+        if (!kyc.esign_request_id) {
+            throw new LoanStateError(applicationId, application.status, LOAN_STATUS.ESIGN_PENDING);
+        }
+
+        const esign = getESignProvider();
+        const signStatus = await esign.getSignStatus(kyc.esign_request_id);
+
+        if (signStatus.status !== 'SIGNED') {
+            return {
+                applicationId,
+                agreementId: `agreements/gold/${applicationId}.pdf`,
+                agreementUrl: '',
+                status: 'PENDING',
+                eSignRequestId: kyc.esign_request_id,
+                stampDutyAmount: 100,
+                note: `Signing not yet complete — current status: ${signStatus.status}.`,
+            };
+        }
+
+        const customer = await prisma.customers.findUnique({
+            where: { user_id: application.user_id },
+            select: { state: true },
+        });
+
+        const stampResult = await esign.applyEStamp({
+            requestId: kyc.esign_request_id,
+            loanAmountRupees: Number(application.approved_amount ?? application.amount_requested),
+            stateCode: customer?.state?.slice(0, 2).toUpperCase() ?? 'KA', // Placeholder mapping — pending a real state-name-to-code table
+        });
+
+        const signedDoc = await esign.getSignedDocument(kyc.esign_request_id);
+        const docStorage = getDocStorageProvider();
+        const signedS3Key = `agreements/gold/${applicationId}_signed.pdf`;
+        await docStorage.upload({
+            key: signedS3Key,
+            fileBuffer: Buffer.from(signedDoc.documentBase64, 'base64'),
+            contentType: 'application/pdf',
+        });
+        const { url: agreementUrl } = await docStorage.getSignedUrl(signedS3Key);
+
+        await prisma.kyc_documents.update({
+            where: { user_id: application.user_id },
+            data: {
+                esign_status: 'SIGNED',
+                signed_agreement_s3_key: signedS3Key,
+                updated_at: new Date(),
+            },
+        });
+
+        log.info('Gold loan agreement signed and stamped', { applicationId });
+
         return {
             applicationId,
-            agreementId:    `agr_gl_${applicationId}`,
-            agreementUrl:   `https://feuhrer-docs.s3.ap-south-1.amazonaws.com/agreements/${applicationId}_signed.pdf`,
-            status:         'SIGNED',
-            eSignRequestId: `esign_${Date.now()}`,
-            stampDutyAmount: 100,
-            note:           'Agreement signed & stored. Proceeding to NACH setup.',
+            agreementId: signedS3Key,
+            agreementUrl,
+            status: 'SIGNED',
+            eSignRequestId: kyc.esign_request_id,
+            stampDutyAmount: stampResult.stampDutyRupees ?? 100,
+            note: 'Agreement signed & stored. Proceeding to NACH setup.',
         };
     },
 
