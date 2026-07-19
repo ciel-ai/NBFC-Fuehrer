@@ -719,4 +719,94 @@ export const pdfService = {
             doc.end();
         });
     },
+
+    // ── 9. Gold Loan Agreement ────────────────────────────────────────────────
+    //
+    // ⚠️ Content is built to a general loan-agreement structure. Actual legal
+    // wording is pending client approval — see Consumer_Loan_Pending_Requirements_Document
+    // item #31 (Loan Agreement Template). Swap the clause text once confirmed;
+    // the data-assembly logic below should not need to change.
+
+    async generateGoldLoanAgreement(applicationId: string): Promise<Buffer> {
+        log.info('Generating Gold Loan agreement', { applicationId });
+
+        const application = await prisma.loan_applications.findUnique({
+            where: { id: applicationId },
+            include: { user: { select: { full_name: true, phone: true } } },
+        });
+
+        if (!application) throw new NotFoundError('Loan Application', applicationId);
+
+        const collateral = await prisma.collateral_gold.findUnique({
+            where: { loan_id: applicationId },
+        });
+
+        const principal = Number(application.approved_amount ?? application.amount_requested);
+        const annualRatePct = Number(application.interest_rate ?? 0);
+        const tenureMonths = application.tenure_months;
+
+        return new Promise((resolve, reject) => {
+            const doc = new PDFDocument({ margin: 50, size: 'A4' });
+            const chunks: Buffer[] = [];
+
+            doc.on('data', (chunk) => chunks.push(chunk));
+            doc.on('end', () => resolve(Buffer.concat(chunks)));
+            doc.on('error', reject);
+
+            addHeader(doc, 'GOLD LOAN AGREEMENT');
+
+            doc.fontSize(9).fillColor('#94A3B8')
+                .text('This agreement is executed between the Lender and the Borrower named below.', { align: 'center' });
+            doc.moveDown(1);
+
+            doc.fontSize(11).fillColor('#0F2C4F').text('A. Parties');
+            doc.moveDown(0.3);
+            addField(doc, 'Lender:', NBFC_IDENTITY.legalName);
+            addField(doc, 'Borrower Name:', application.user?.full_name ?? 'N/A');
+            addField(doc, 'Borrower Phone:', application.user?.phone ?? 'N/A');
+            addField(doc, 'Application Reference No.:', application.reference_number ?? application.id.slice(0, 8).toUpperCase());
+            addField(doc, 'Date:', formatDate(new Date()));
+            doc.moveDown(0.7);
+
+            doc.fontSize(11).fillColor('#0F2C4F').text('B. Loan Terms');
+            doc.moveDown(0.3);
+            addField(doc, 'Loan Amount:', inr(principal));
+            addField(doc, 'Tenure:', `${tenureMonths} months`);
+            addField(doc, 'Interest Rate:', `${annualRatePct.toFixed(2)}% p.a. (Reducing Balance)`);
+            doc.moveDown(0.7);
+
+            doc.fontSize(11).fillColor('#0F2C4F').text('C. Gold Collateral Pledged');
+            doc.moveDown(0.3);
+            if (collateral) {
+                addField(doc, 'Net Weight:', `${collateral.net_weight_grams} grams`);
+                addField(doc, 'Gross Weight:', `${collateral.gross_weight_grams} grams`);
+                addField(doc, 'Purity:', `${collateral.purity_karat} Karat`);
+                addField(doc, 'Appraised Value:', inr(Number(collateral.valuation)));
+            } else {
+                addField(doc, 'Gold Appraisal:', 'Not yet recorded');
+            }
+            doc.moveDown(0.7);
+
+            doc.fontSize(11).fillColor('#0F2C4F').text('D. Terms & Conditions');
+            doc.moveDown(0.3);
+            doc.fontSize(10).fillColor('#1E293B').text(
+                'The Borrower agrees to repay the loan as per the schedule provided separately. ' +
+                'The pledged gold shall remain in the custody of the Lender until full repayment. ' +
+                'In the event of default, the Lender reserves the right to auction the pledged gold ' +
+                'as per the applicable notice period and RBI guidelines, after adjusting for outstanding ' +
+                'dues, foreclosure charges, and applicable penalties. Full terms are set out in the ' +
+                'Key Fact Statement issued alongside this agreement.',
+                { align: 'justify' },
+            );
+            doc.moveDown(1);
+
+            doc.fontSize(8).fillColor('#94A3B8').text(
+                'This document requires digital signature (eSign) by the Borrower to be legally valid. An unsigned copy has no legal effect.',
+                { align: 'justify' },
+            );
+
+            addFooter(doc);
+            doc.end();
+        });
+    },
 };

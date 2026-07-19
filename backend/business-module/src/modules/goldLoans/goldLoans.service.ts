@@ -8,6 +8,10 @@ import { prisma } from '@/config/database';
 import { emiService } from '@/modules/emi';
 import { disbursementService } from '@/modules/disbursement';
 import { assertTransition } from '@/utils/loanStateMachine.util';
+import { pdfService } from '@/modules/documents/pdf.service';
+import { getDocStorageProvider } from '@/providers/docStorage';
+import { getEncryptionProvider } from '@/providers/encryption';
+import { getESignProvider } from '@/providers/esign';
 import type {
     GoldRate,
     GoldEligibilityRequest,
@@ -379,16 +383,73 @@ export const goldLoansService = {
         };
     },
 
+    // Real: generates the actual agreement PDF, uploads it to S3, decrypts
+    // the borrower's Aadhaar (necessary and legitimate here — eSign binding
+    // requires the full number, not just last 4), and creates a real
+    // signing request with the eSign provider. Previously returned a fake
+    // S3 URL that pointed to a file which never existed.
     async generateAgreement(applicationId: string): Promise<GoldLoanAgreementResult> {
         log.info('Generating gold loan agreement', { applicationId });
+
+        const application = await prisma.loan_applications.findUniqueOrThrow({
+            where: { id: applicationId },
+            include: { user: { select: { full_name: true, phone: true } } },
+        });
+
+        const kyc = await prisma.kyc_documents.findUnique({
+            where: { user_id: application.user_id },
+            select: { aadhaar_encrypted: true },
+        });
+
+        if (!kyc?.aadhaar_encrypted) {
+            throw new LoanStateError(
+                applicationId,
+                application.status,
+                LOAN_STATUS.ESIGN_PENDING,
+            );
+        }
+
+        const pdfBuffer = await pdfService.generateGoldLoanAgreement(applicationId);
+
+        const docStorage = getDocStorageProvider();
+        const s3Key = `agreements/gold/${applicationId}.pdf`;
+        await docStorage.upload({
+            key: s3Key,
+            fileBuffer: pdfBuffer,
+            contentType: 'application/pdf',
+        });
+        const { url: agreementUrl } = await docStorage.getSignedUrl(s3Key);
+
+        const encryption = getEncryptionProvider();
+        const aadhaarPlain = await encryption.decrypt(kyc.aadhaar_encrypted);
+
+        const esign = getESignProvider();
+        const signRequest = await esign.createSignRequest({
+            documentId: `loan-agreement-${applicationId}`,
+            documentBase64: pdfBuffer.toString('base64'),
+            signerName: application.user?.full_name ?? '',
+            signerPhone: application.user?.phone ?? '',
+            signerAadhaar: aadhaarPlain,
+            purpose: 'Gold Loan Agreement Signature',
+        });
+
+        await prisma.kyc_documents.update({
+            where: { user_id: application.user_id },
+            data: {
+                esign_request_id: signRequest.requestId,
+                esign_status: signRequest.status,
+                updated_at: new Date(),
+            },
+        });
+
         return {
             applicationId,
-            agreementId:    `agr_gl_${Date.now()}`,
-            agreementUrl:   `https://feuhrer-docs.s3.ap-south-1.amazonaws.com/agreements/${applicationId}.pdf`,
-            status:         'GENERATED',
-            eSignRequestId: null,
-            stampDutyAmount: 100,
-            note:           'Agreement generated. Please review and sign using OTP.',
+            agreementId: s3Key,
+            agreementUrl: signRequest.signingUrl || agreementUrl,
+            status: 'GENERATED',
+            eSignRequestId: signRequest.requestId,
+            stampDutyAmount: 100, // Placeholder — pending client confirmation of actual stamp duty rate
+            note: 'Agreement generated. Please review and sign using Aadhaar OTP.',
         };
     },
 
