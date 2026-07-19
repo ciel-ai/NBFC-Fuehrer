@@ -3,10 +3,11 @@ import { createModuleLogger } from '@/config/logger';
 import { goldLoansRepository } from './goldLoans.repository';
 import { loansRepository } from '@/modules/loans/loans.repository';
 import { LOAN_STATUS } from '@/config/constants';
-import { NotFoundError, LoanStateError } from '@/errors';
+import { NotFoundError, LoanStateError, ValidationError } from '@/errors';
 import { prisma } from '@/config/database';
 import { emiService } from '@/modules/emi';
 import { disbursementService } from '@/modules/disbursement';
+import { assertTransition } from '@/utils/loanStateMachine.util';
 import type {
     GoldRate,
     GoldEligibilityRequest,
@@ -343,11 +344,35 @@ export const goldLoansService = {
     // ── Downstream stubs — wired to real flow after PENDING_APPROVAL ──────────
     // These feed into the existing loans approval → eSign → disbursement pipeline
 
+    // Real: validates the state transition (PENDING_APPROVAL → APPROVED)
+    // and persists the accepted amount. Previously logged and returned
+    // success without writing anything — approved_amount never got
+    // recorded and the application never actually advanced state.
     async acceptFinalAmount(
         applicationId: string,
         amount: number,
     ): Promise<{ success: boolean; message: string }> {
+        const application = await prisma.loan_applications.findUniqueOrThrow({
+            where: { id: applicationId },
+        });
+
+        assertTransition(applicationId, application.status, LOAN_STATUS.APPROVED);
+
+        if (amount <= 0) {
+            throw new ValidationError('amount', 'Accepted amount must be greater than zero');
+        }
+
+        await prisma.loan_applications.update({
+            where: { id: applicationId },
+            data: {
+                approved_amount: amount,
+                status: LOAN_STATUS.APPROVED,
+                updated_at: new Date(),
+            },
+        });
+
         log.info('Customer accepted final gold loan amount', { applicationId, amount });
+
         return {
             success: true,
             message: `Loan amount of ₹${amount.toLocaleString('en-IN')} accepted. Proceeding to agreement.`,
