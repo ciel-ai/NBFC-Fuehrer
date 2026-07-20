@@ -14,14 +14,15 @@
 import { Router } from 'express';
 import type { Response, NextFunction } from 'express';
 import { loansService } from '@/modules/loans/loans.service';
-import { requireAuth } from '@/middlewares';
+import { requireAuth, allowRoles } from '@/middlewares';
+import { ROLE } from '@/constants/roles.constants';
 import { HTTP } from '@/config/constants';
 import type { AuthRequest } from '@/types/express';
 
 const router = Router();
 
 // GET /applications?status=&loanType=&from=&to=
-router.get('/', requireAuth(), async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/', requireAuth(), allowRoles(ROLE.OPS_EXECUTIVE, ROLE.CREDIT_MANAGER, ROLE.ADMIN, ROLE.SUPER_ADMIN), async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
         const { status, productType, page, limit, fromDate, toDate, sortBy, sortOrder } = req.query;
 
@@ -85,7 +86,7 @@ router.get('/', requireAuth(), async (req: AuthRequest, res: Response, next: Nex
 });
 
 // GET /applications/:id — full aggregate detail
-router.get('/:id', requireAuth(), async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/:id', requireAuth(), allowRoles(ROLE.OPS_EXECUTIVE, ROLE.CREDIT_MANAGER, ROLE.ADMIN, ROLE.SUPER_ADMIN), async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
         const { id } = req.params;
         const user = (req as any).user;
