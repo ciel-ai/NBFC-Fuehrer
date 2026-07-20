@@ -12,6 +12,7 @@ import type { AuthRequest } from '@/types/express';
 import { getAuthUser } from '@/types/express';
 import { grievancesService } from './grievances.service';
 import { parsePagination } from '@/types/common.types';
+import { assertOwnsResource } from '@/utils/ownership.util';
 
 const router = Router();
 
@@ -43,7 +44,9 @@ router.get('/', requireAuth(), async (req: AuthRequest, res: Response, next: Nex
 // GET /grievances/:id — view a specific grievance
 router.get('/:id', requireAuth(), async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
+        const user = getAuthUser(req);
         const grievance = await grievancesService.getById(req.params.id as string);
+        assertOwnsResource(user.id, grievance.userId, user.role, 'grievance');
         res.status(HTTP.OK).json({ success: true, data: grievance });
     } catch (err) { next(err); }
 });
