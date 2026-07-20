@@ -4,6 +4,8 @@ import type { AuthRequest } from '@/types/express';
 import { HTTP } from '@/config/constants';
 import { successResponse } from '@/types/common.types';
 import { housingLoansService } from './housingLoans.service';
+import { assertApplicationOwnership, assertAccountOwnership } from '@/utils/ownership.util';
+import { loansRepository } from '@/modules/loans/loans.repository';
 
 export const housingLoansController = {
 
@@ -20,6 +22,10 @@ export const housingLoansController = {
     async runKyc(req: AuthRequest, res: Response, next: NextFunction) {
         try {
             const id = req.params['id'] as string;
+            const user = req.user!;
+            const application = await loansRepository.findApplicationByIdOrThrow(id);
+            assertApplicationOwnership(user.id, application, user.role, 'housing loan application');
+
             const result = housingLoansService.runKyc(id, req.body.applicant);
             res.status(HTTP.OK).json(successResponse(result));
         } catch (err) { next(err); }
@@ -29,6 +35,10 @@ export const housingLoansController = {
     async runCompliance(req: AuthRequest, res: Response, next: NextFunction) {
         try {
             const id = req.params['id'] as string;
+            const user = req.user!;
+            const application = await loansRepository.findApplicationByIdOrThrow(id);
+            assertApplicationOwnership(user.id, application, user.role, 'housing loan application');
+
             const result = housingLoansService.runCompliance(id);
             res.status(HTTP.OK).json(successResponse(result));
         } catch (err) { next(err); }
@@ -38,6 +48,10 @@ export const housingLoansController = {
     async runIncomeAssessment(req: AuthRequest, res: Response, next: NextFunction) {
         try {
             const id = req.params['id'] as string;
+            const user = req.user!;
+            const application = await loansRepository.findApplicationByIdOrThrow(id);
+            assertApplicationOwnership(user.id, application, user.role, 'housing loan application');
+
             const result = housingLoansService.runIncomeAssessment(id, req.body);
             res.status(HTTP.OK).json(successResponse(result));
         } catch (err) { next(err); }
@@ -47,6 +61,10 @@ export const housingLoansController = {
     async runCreditAssessment(req: AuthRequest, res: Response, next: NextFunction) {
         try {
             const id = req.params['id'] as string;
+            const user = req.user!;
+            const application = await loansRepository.findApplicationByIdOrThrow(id);
+            assertApplicationOwnership(user.id, application, user.role, 'housing loan application');
+
             const result = housingLoansService.runCreditAssessment(id, req.body);
             res.status(HTTP.OK).json(successResponse(result));
         } catch (err) { next(err); }
@@ -56,6 +74,10 @@ export const housingLoansController = {
     async runPropertyAssessment(req: AuthRequest, res: Response, next: NextFunction) {
         try {
             const id = req.params['id'] as string;
+            const user = req.user!;
+            const application = await loansRepository.findApplicationByIdOrThrow(id);
+            assertApplicationOwnership(user.id, application, user.role, 'housing loan application');
+
             const result = await housingLoansService.runPropertyAssessment({
                 loanId:               id,
                 propertyType:         req.body.propertyType,
@@ -75,6 +97,10 @@ export const housingLoansController = {
     async submitForReview(req: AuthRequest, res: Response, next: NextFunction) {
         try {
             const id = req.params['id'] as string;
+            const user = req.user!;
+            const application = await loansRepository.findApplicationByIdOrThrow(id);
+            assertApplicationOwnership(user.id, application, user.role, 'housing loan application');
+
             const result = await housingLoansService.submitForReview(id);
             res.status(HTTP.OK).json(successResponse(result));
         } catch (err) { next(err); }
@@ -84,6 +110,10 @@ export const housingLoansController = {
     async getCommitteeDecision(req: AuthRequest, res: Response, next: NextFunction) {
         try {
             const id = req.params['id'] as string;
+            const user = req.user!;
+            const application = await loansRepository.findApplicationByIdOrThrow(id);
+            assertApplicationOwnership(user.id, application, user.role, 'housing loan application');
+
             const result = await housingLoansService.getCommitteeDecision(id);
             res.status(HTTP.OK).json(successResponse(result));
         } catch (err) { next(err); }
@@ -93,6 +123,10 @@ export const housingLoansController = {
     async generateAgreement(req: AuthRequest, res: Response, next: NextFunction) {
         try {
             const id = req.params['id'] as string;
+            const user = req.user!;
+            const application = await loansRepository.findApplicationByIdOrThrow(id);
+            assertApplicationOwnership(user.id, application, user.role, 'housing loan application');
+
             const result = housingLoansService.generateAgreement(id);
             res.status(HTTP.OK).json(successResponse(result, 'Agreement generated'));
         } catch (err) { next(err); }
@@ -102,6 +136,10 @@ export const housingLoansController = {
     async eSign(req: AuthRequest, res: Response, next: NextFunction) {
         try {
             const id = req.params['id'] as string;
+            const user = req.user!;
+            const application = await loansRepository.findApplicationByIdOrThrow(id);
+            assertApplicationOwnership(user.id, application, user.role, 'housing loan application');
+
             const result = housingLoansService.eSign(id);
             res.status(HTTP.OK).json(successResponse(result, 'Agreement signed'));
         } catch (err) { next(err); }
@@ -111,6 +149,10 @@ export const housingLoansController = {
     async registerNach(req: AuthRequest, res: Response, next: NextFunction) {
         try {
             const id = req.params['id'] as string;
+            const user = req.user!;
+            const application = await loansRepository.findApplicationByIdOrThrow(id);
+            assertApplicationOwnership(user.id, application, user.role, 'housing loan application');
+
             const result = housingLoansService.registerNach(id, req.body);
             res.status(HTTP.OK).json(successResponse(result, 'NACH initiated'));
         } catch (err) { next(err); }
@@ -120,6 +162,10 @@ export const housingLoansController = {
     async applyPmaySubsidy(req: AuthRequest, res: Response, next: NextFunction) {
         try {
             const id = req.params['id'] as string;
+            const user = req.user!;
+            const application = await loansRepository.findApplicationByIdOrThrow(id);
+            assertApplicationOwnership(user.id, application, user.role, 'housing loan application');
+
             const result = housingLoansService.applyPmaySubsidy(id, req.body);
             res.status(HTTP.OK).json(successResponse(result));
         } catch (err) { next(err); }
@@ -138,6 +184,10 @@ export const housingLoansController = {
     async getEmiSchedule(req: AuthRequest, res: Response, next: NextFunction) {
         try {
             const id = req.params['id'] as string;
+            const user = req.user!;
+            const account = await loansRepository.findAccountByIdOrThrow(id);
+            assertAccountOwnership(user.id, account, user.role, 'housing loan account');
+
             const result = housingLoansService.getEmiSchedule(id);
             res.status(HTTP.OK).json(successResponse(result));
         } catch (err) { next(err); }
@@ -147,6 +197,10 @@ export const housingLoansController = {
     async getPrepaymentQuote(req: AuthRequest, res: Response, next: NextFunction) {
         try {
             const id     = req.params['id'] as string;
+            const user = req.user!;
+            const account = await loansRepository.findAccountByIdOrThrow(id);
+            assertAccountOwnership(user.id, account, user.role, 'housing loan account');
+
             const amount = Number(req.query['amount'] ?? 0);
             const result = housingLoansService.getPrepaymentQuote(id, amount);
             res.status(HTTP.OK).json(successResponse(result));
@@ -157,6 +211,10 @@ export const housingLoansController = {
     async processPrepayment(req: AuthRequest, res: Response, next: NextFunction) {
         try {
             const id     = req.params['id'] as string;
+            const user = req.user!;
+            const account = await loansRepository.findAccountByIdOrThrow(id);
+            assertAccountOwnership(user.id, account, user.role, 'housing loan account');
+
             const result = housingLoansService.processPrepayment(id, req.body);
             res.status(HTTP.OK).json(successResponse(result));
         } catch (err) { next(err); }
@@ -166,6 +224,10 @@ export const housingLoansController = {
     async getOverdueStatus(req: AuthRequest, res: Response, next: NextFunction) {
         try {
             const id     = req.params['id'] as string;
+            const user = req.user!;
+            const account = await loansRepository.findAccountByIdOrThrow(id);
+            assertAccountOwnership(user.id, account, user.role, 'housing loan account');
+
             const result = housingLoansService.getOverdueStatus(id);
             res.status(HTTP.OK).json(successResponse(result));
         } catch (err) { next(err); }
@@ -175,6 +237,10 @@ export const housingLoansController = {
     async closeLoan(req: AuthRequest, res: Response, next: NextFunction) {
         try {
             const id     = req.params['id'] as string;
+            const user = req.user!;
+            const account = await loansRepository.findAccountByIdOrThrow(id);
+            assertAccountOwnership(user.id, account, user.role, 'housing loan account');
+
             const result = housingLoansService.closeLoan(id);
             res.status(HTTP.OK).json(successResponse(result, 'Loan closed'));
         } catch (err) { next(err); }
@@ -184,6 +250,10 @@ export const housingLoansController = {
     async generateNoc(req: AuthRequest, res: Response, next: NextFunction) {
         try {
             const id     = req.params['id'] as string;
+            const user = req.user!;
+            const account = await loansRepository.findAccountByIdOrThrow(id);
+            assertAccountOwnership(user.id, account, user.role, 'housing loan account');
+
             const result = housingLoansService.generateNoc(id);
             res.status(HTTP.OK).json(successResponse(result));
         } catch (err) { next(err); }
