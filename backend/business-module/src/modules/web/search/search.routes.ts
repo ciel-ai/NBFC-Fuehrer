@@ -9,7 +9,8 @@
 
 import { Router } from 'express';
 import type { Response, NextFunction } from 'express';
-import { requireAuth } from '@/middlewares';
+import { requireAuth, allowRoles } from '@/middlewares';
+import { ROLE } from '@/constants/roles.constants';
 import { HTTP, LOAN_STATUS } from '@/config/constants';
 import type { AuthRequest } from '@/types/express';
 
@@ -18,7 +19,7 @@ const router = Router();
 const VALID_LOAN_STATUSES = new Set<string>(Object.values(LOAN_STATUS));
 
 // GET /search?q=
-router.get('/', requireAuth(), async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/', requireAuth(), allowRoles(ROLE.OPS_EXECUTIVE, ROLE.CREDIT_MANAGER, ROLE.ADMIN, ROLE.SUPER_ADMIN), async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
         const { prisma } = await import('@/config/database');
         const q = (req.query.q as string)?.trim();
