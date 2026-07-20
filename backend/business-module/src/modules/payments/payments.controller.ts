@@ -2,6 +2,8 @@
 import type { Response, NextFunction } from 'express';
 import { paymentsService } from './payments.service';
 import { HTTP } from '@/config/constants';
+import { assertAccountOwnership } from '@/utils/ownership.util';
+import { loansRepository } from '@/modules/loans/loans.repository';
 import {
     successResponse,
     paginatedResponse,
@@ -107,6 +109,10 @@ export const paymentsController = {
         try {
             const { loanAccountId } =
                 getValidatedParams<{ loanAccountId: string }>(req);
+            const user = getAuthUser(req);
+            const account = await loansRepository.findAccountByIdOrThrow(loanAccountId);
+            assertAccountOwnership(user.id, account, user.role, 'payment history');
+
             const query = getValidatedQuery<{ status?: string; page?: number; limit?: number }>(req);
             const pagination = parsePagination(query);
 
@@ -122,11 +128,14 @@ export const paymentsController = {
         } catch (err) { next(err); }
     },
 
-    // GET /payments/record/:paymentId
+    // GET /payments/record/:paymentId (staff) and /payments/:paymentId/status (customer alias)
     async getOne(req: AuthRequest, res: Response, next: NextFunction) {
         try {
             const { paymentId } = getValidatedParams<{ paymentId: string }>(req);
             const result = await paymentsService.getPayment(paymentId);
+            const user = getAuthUser(req);
+            const account = await loansRepository.findAccountByIdOrThrow(result.loanAccountId);
+            assertAccountOwnership(user.id, account, user.role, 'payment record');
             res.status(HTTP.OK).json(successResponse(result));
         } catch (err) { next(err); }
     },
@@ -136,6 +145,10 @@ export const paymentsController = {
         try {
             const { loanAccountId } =
                 getValidatedParams<{ loanAccountId: string }>(req);
+            const user = getAuthUser(req);
+            const account = await loansRepository.findAccountByIdOrThrow(loanAccountId);
+            assertAccountOwnership(user.id, account, user.role, 'eNACH mandate');
+
             const result = await paymentsService.getMandateForAccount(loanAccountId);
             res.status(HTTP.OK).json(successResponse(result));
         } catch (err) { next(err); }
