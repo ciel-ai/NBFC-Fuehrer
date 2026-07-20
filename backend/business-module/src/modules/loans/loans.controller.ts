@@ -2,6 +2,7 @@
 import type { Response, NextFunction } from 'express';
 import { loansService } from './loans.service';
 import { HTTP, ROLE } from '@/config/constants';
+import { isStaffRole } from '@/constants/roles.constants';
 import {
     successResponse,
     paginatedResponse,
@@ -81,10 +82,20 @@ export const loansController = {
             const user = getAuthUser(req);
             const query = getValidatedQuery<ListLoansInput>(req);
 
-            const filters: ListLoansInput = {
-                ...query,
-                userId: user.role === ROLE.CUSTOMER ? user.id : query.userId,
-            };
+            const filters: ListLoansInput = { ...query };
+
+            if (user.role === ROLE.CUSTOMER) {
+                filters.userId = user.id;
+                filters.agentId = undefined;
+            } else if (user.role === ROLE.AGENT) {
+                filters.agentId = user.agentId;
+                filters.userId = undefined;
+            } else if (!isStaffRole(user.role as never)) {
+                // Any other non-staff role — deny an unscoped fallback entirely.
+                filters.userId = user.id;
+                filters.agentId = undefined;
+            }
+            // Staff roles: filters pass through as given (query.userId/agentId, if any).
 
             const result = await loansService.listApplications(filters);
             res.status(HTTP.OK).json(paginatedResponse(result));
