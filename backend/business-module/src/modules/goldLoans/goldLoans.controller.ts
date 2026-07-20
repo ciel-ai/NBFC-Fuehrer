@@ -1,6 +1,9 @@
 ﻿// src/modules/goldLoans/goldLoans.controller.ts
 import type { Request, Response, NextFunction } from 'express';
 import { goldLoansService } from './goldLoans.service';
+import { getAuthUser } from '@/types/express';
+import { assertApplicationOwnership, assertAccountOwnership } from '@/utils/ownership.util';
+import { loansRepository } from '@/modules/loans/loans.repository';
 
 export const goldLoansController = {
 
@@ -113,6 +116,10 @@ export const goldLoansController = {
     // POST /gold-loans/applications/:id/accept-final-amount
     async acceptFinalAmount(req: Request, res: Response, next: NextFunction) {
         try {
+            const user = getAuthUser(req);
+            const application = await loansRepository.findApplicationByIdOrThrow(req.params.id!);
+            assertApplicationOwnership(user.id, application, user.role, 'gold loan application');
+
             const result = await goldLoansService.acceptFinalAmount(
                 req.params.id!,
                 req.body.amount,
@@ -126,6 +133,10 @@ export const goldLoansController = {
     // POST /gold-loans/applications/:id/agreement
     async generateAgreement(req: Request, res: Response, next: NextFunction) {
         try {
+            const user = getAuthUser(req);
+            const application = await loansRepository.findApplicationByIdOrThrow(req.params.id!);
+            assertApplicationOwnership(user.id, application, user.role, 'gold loan application');
+
             const result = await goldLoansService.generateAgreement(req.params.id!);
             res.json({ success: true, data: result });
         } catch (err) {
@@ -136,6 +147,10 @@ export const goldLoansController = {
     // POST /gold-loans/applications/:id/esign
     async completeESign(req: Request, res: Response, next: NextFunction) {
         try {
+            const user = getAuthUser(req);
+            const application = await loansRepository.findApplicationByIdOrThrow(req.params.id!);
+            assertApplicationOwnership(user.id, application, user.role, 'gold loan application');
+
             const result = await goldLoansService.completeESign(
                 req.params.id!,
                 req.body.otp,
@@ -149,6 +164,10 @@ export const goldLoansController = {
     // POST /gold-loans/applications/:id/nach
     async initiateNach(req: Request, res: Response, next: NextFunction) {
         try {
+            const user = getAuthUser(req);
+            const application = await loansRepository.findApplicationByIdOrThrow(req.params.id!);
+            assertApplicationOwnership(user.id, application, user.role, 'gold loan application');
+
             const { bankAccount, ifsc } = req.body;
             const result = await goldLoansService.initiateNach(req.params.id!, { bankAccount, ifsc });
             res.json({ success: true, data: result });
@@ -160,6 +179,10 @@ export const goldLoansController = {
     // GET /gold-loans/applications/:id/disbursal
     async getDisbursalStatus(req: Request, res: Response, next: NextFunction) {
         try {
+            const user = getAuthUser(req);
+            const application = await loansRepository.findApplicationByIdOrThrow(req.params.id!);
+            assertApplicationOwnership(user.id, application, user.role, 'gold loan application');
+
             const result = await goldLoansService.getDisbursalStatus(req.params.id!);
             res.json({ success: true, data: result });
         } catch (err) {
@@ -170,6 +193,10 @@ export const goldLoansController = {
     // GET /gold-loans/:id/monitoring
     async getMonitoring(req: Request, res: Response, next: NextFunction) {
         try {
+            const user = getAuthUser(req);
+            const account = await loansRepository.findAccountByIdOrThrow(req.params.id!);
+            assertAccountOwnership(user.id, account, user.role, 'gold loan account');
+
             const result = await goldLoansService.getMonitoring(req.params.id!);
             res.json({ success: true, data: result });
         } catch (err) {
@@ -180,6 +207,10 @@ export const goldLoansController = {
     // GET /gold-loans/:id/closure-quote
     async getClosureQuote(req: Request, res: Response, next: NextFunction) {
         try {
+            const user = getAuthUser(req);
+            const account = await loansRepository.findAccountByIdOrThrow(req.params.id!);
+            assertAccountOwnership(user.id, account, user.role, 'gold loan account');
+
             const result = await goldLoansService.getClosureQuote(req.params.id!);
             res.json({ success: true, data: result });
         } catch (err) {
@@ -190,6 +221,10 @@ export const goldLoansController = {
     // POST /gold-loans/applications/:id/compliance
     async runCompliance(req: Request, res: Response, next: NextFunction) {
         try {
+            const user = getAuthUser(req);
+            const application = await loansRepository.findApplicationByIdOrThrow(req.params.id!);
+            assertApplicationOwnership(user.id, application, user.role, 'gold loan application');
+
             const result = await goldLoansService.runCompliance(req.params.id!);
             res.json({ success: true, data: result });
         } catch (err) {
