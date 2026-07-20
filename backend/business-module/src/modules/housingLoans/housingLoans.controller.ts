@@ -193,7 +193,7 @@ export const housingLoansController = {
     activateLoan: async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const userId = req.user!.id;
-            const result = housingLoansService.activateLoan(userId, req.body);
+            const result = await housingLoansService.activateLoan(req.body);
             res.status(HTTP.OK).json({ success: true, data: result });
         } catch (err) { next(err); }
     },

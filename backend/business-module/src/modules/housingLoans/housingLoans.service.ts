@@ -669,12 +669,31 @@ export const housingLoansService = {
         };
     },
 
-    activateLoan(userId: string, input: Record<string, unknown>) {
+    // Real: confirms the builder received disbursed funds and formally
+    // activates the loan (DISBURSED → ACTIVE). Called after disburseToBuilder
+    // — that step creates the account and sends money; this step confirms
+    // receipt and starts real loan servicing.
+    async activateLoan(input: {
+        loanAccountId: string;
+        amount: number;
+        tenure: number;
+        builderName: string;
+    }) {
+        const account = await loansRepository.findAccountByIdOrThrow(input.loanAccountId);
+
+        assertTransition(input.loanAccountId, account.status, LOAN_STATUS.ACTIVE);
+
+        const updated = await prisma.loan_accounts.update({
+            where: { id: input.loanAccountId },
+            data: { status: LOAN_STATUS.ACTIVE, updated_at: new Date() },
+        });
+
+        log.info('Housing loan activated', { loanAccountId: input.loanAccountId, builderName: input.builderName });
+
         return {
-            loanId:      `ahl_loan_${Date.now()}`,
-            status:      'ACTIVE',
-            activatedAt: new Date().toISOString(),
-            ...input,
+            id: updated.id,
+            status: updated.status,
+            activatedAt: updated.updated_at.toISOString(),
         };
     },
 };
