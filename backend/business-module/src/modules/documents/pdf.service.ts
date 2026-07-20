@@ -809,4 +809,67 @@ export const pdfService = {
             doc.end();
         });
     },
+
+    // ── 10. Housing Loan Agreement ────────────────────────────────────────────
+    // ⚠️ Content pending client-approved legal wording, same as Gold Loan agreement.
+
+    async generateHousingLoanAgreement(applicationId: string): Promise<Buffer> {
+        log.info('Generating Housing Loan agreement', { applicationId });
+
+        const application = await prisma.loan_applications.findUnique({
+            where: { id: applicationId },
+            include: { user: { select: { full_name: true, phone: true } } },
+        });
+        if (!application) throw new NotFoundError('Loan Application', applicationId);
+
+        const property = await prisma.collateral_property.findUnique({ where: { loan_id: applicationId } });
+
+        const principal = Number(application.approved_amount ?? application.amount_requested);
+        const annualRatePct = Number(application.interest_rate ?? 0);
+
+        return new Promise((resolve, reject) => {
+            const doc = new PDFDocument({ margin: 50, size: 'A4' });
+            const chunks: Buffer[] = [];
+            doc.on('data', (c) => chunks.push(c));
+            doc.on('end', () => resolve(Buffer.concat(chunks)));
+            doc.on('error', reject);
+
+            addHeader(doc, 'HOUSING LOAN AGREEMENT');
+            doc.moveDown(1);
+
+            doc.fontSize(11).fillColor('#0F2C4F').text('A. Parties');
+            doc.moveDown(0.3);
+            addField(doc, 'Lender:', NBFC_IDENTITY.legalName);
+            addField(doc, 'Borrower Name:', application.user?.full_name ?? 'N/A');
+            addField(doc, 'Application Reference No.:', application.reference_number ?? application.id.slice(0, 8).toUpperCase());
+            addField(doc, 'Date:', formatDate(new Date()));
+            doc.moveDown(0.7);
+
+            doc.fontSize(11).fillColor('#0F2C4F').text('B. Loan Terms');
+            doc.moveDown(0.3);
+            addField(doc, 'Loan Amount:', inr(principal));
+            addField(doc, 'Tenure:', `${application.tenure_months} months`);
+            addField(doc, 'Interest Rate:', `${annualRatePct.toFixed(2)}% p.a. (Reducing Balance)`);
+            doc.moveDown(0.7);
+
+            doc.fontSize(11).fillColor('#0F2C4F').text('C. Property Mortgaged');
+            doc.moveDown(0.3);
+            if (property) {
+                addField(doc, 'Property Type:', property.property_type);
+                addField(doc, 'Address:', property.address);
+                addField(doc, 'Market Value:', inr(Number(property.market_value)));
+            } else {
+                addField(doc, 'Property Details:', 'Not yet recorded');
+            }
+            doc.moveDown(0.7);
+
+            doc.fontSize(10).fillColor('#1E293B').text(
+                'The Borrower mortgages the above property as security for this loan. Full terms are set out in the Key Fact Statement issued alongside this agreement.',
+                { align: 'justify' },
+            );
+
+            addFooter(doc);
+            doc.end();
+        });
+    },
 };
