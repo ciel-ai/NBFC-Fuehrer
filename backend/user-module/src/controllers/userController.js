@@ -1,6 +1,7 @@
 const userService = require('../services/userService');
 const asyncHandler = require('../utils/asyncHandler');
 const { sendSuccess } = require('../utils/response');
+const AppError = require('../utils/appError');
 
 const register = asyncHandler(async (req, res) => {
   const { phone, role } = req.body;
@@ -86,7 +87,13 @@ const updateProfile = asyncHandler(async (req, res) => {
 });
 
 const getUserById = asyncHandler(async (req, res) => {
-  const result = await userService.getUserById(req.params.userId);
+  const { userId } = req.params;
+
+  if (req.user.userId !== userId) {
+    throw new AppError('You can only view your own profile.', 403);
+  }
+
+  const result = await userService.getUserById(userId);
 
   sendSuccess(res, {
     message: 'User fetched successfully.',
