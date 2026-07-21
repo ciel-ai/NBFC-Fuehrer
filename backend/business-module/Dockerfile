@@ -52,9 +52,18 @@ USER nodeuser
 # Expose port
 EXPOSE 3000
 
-# Health check
+# Health check — uses /health/live (pure liveness, no DB/Redis dependency
+# check) instead of the previous /health (full diagnostics endpoint, which
+# checks DB+Redis and returns 503 on failure). Using the full-diagnostics
+# endpoint here conflated liveness with readiness: a brief downstream DB or
+# Redis blip would get a perfectly healthy Node process restarted by the
+# orchestrator, which is the worst possible response to a transient
+# dependency issue. Also switched from wget to Node's built-in http module —
+# wget's presence on this base image depends on Alpine's busybox applet set,
+# which is an unnecessary point of fragility when Node itself is already
+# guaranteed present.
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD wget -qO- http://localhost:3000/health || exit 1
+    CMD node -e "require('http').get('http://localhost:3000/health/live', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"
     
 # Start server (runs migrations first)
 ENTRYPOINT ["./docker-entrypoint.sh"]
