@@ -64,9 +64,11 @@ export const kycController = {
     // POST /kyc/aadhaar/otp-verify
     async verifyAadhaarOtp(req: AuthRequest, res: Response, next: NextFunction) {
         try {
-           const input: AadhaarOtpVerifyInput = {
-    userId: req.user.id,
-};
+            const body = getValidatedBody<{ otp: string }>(req);
+            const input: AadhaarOtpVerifyInput = {
+                userId: req.user.id,
+                otp: body.otp,
+            };
             const result = await kycService.verifyAadhaarOtp(input, req);
             res.status(HTTP.OK).json(successResponse(result, 'Aadhaar verified'));
         } catch (err) { next(err); }

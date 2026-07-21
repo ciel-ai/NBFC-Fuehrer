@@ -104,7 +104,7 @@ export class PerfiosKycProvider implements IKycVerifyProvider {
     async verifyAadhaar(
         aadhaarNumber: string,
         accessKey: string,
-        _shareCode: string,
+        otp: string,
     ): Promise<AadhaarVerifyResult> {
         return vendorCall({
             vendor: 'perfios',
@@ -114,6 +114,7 @@ export class PerfiosKycProvider implements IKycVerifyProvider {
                         aadhaarNo: aadhaarNumber,
                         checkValidation: true,
                         accessKey,
+                        otp,
                         consent: 'Y',
                         clientData: { caseId: `fhr-${Date.now()}` },
                     });

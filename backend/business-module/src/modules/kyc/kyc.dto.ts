@@ -54,9 +54,14 @@ export const aadhaarOtpRequestSchema = Joi.object({
 
 // ─── Aadhaar OTP verify ────────────────────────────────────────────────────────
 
-// Perfios Aadhaar Number Verification does not require OTP or shareCode.
-// The accessKey from consent step is stored in Redis and used automatically.
-export const aadhaarOtpVerifySchema = Joi.object({});
+// Perfios's aadhaar-verification step requires the OTP sent to the customer's
+// Aadhaar-linked mobile during the consent step. This was previously an empty
+// schema — the OTP was never collected, validated, or forwarded to Perfios,
+// making Aadhaar verification a no-op. Confirmed against real Perfios testing.
+export const aadhaarOtpVerifySchema = Joi.object({
+    otp: Joi.string().trim().length(6).pattern(/^\d{6}$/).required()
+        .messages({ 'string.pattern.base': 'OTP must be a 6-digit number.' }),
+});
 
 // ─── Document upload ───────────────────────────────────────────────────────────
 

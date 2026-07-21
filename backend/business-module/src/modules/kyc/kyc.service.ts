@@ -197,7 +197,7 @@ export const kycService = {
     input: AadhaarOtpVerifyInput,
     req: Request,
 ): Promise<KycStatusResponse> {
-    const { userId } = input;
+    const { userId, otp } = input;
     const doc = await kycRepository.findByUserIdOrThrow(userId);
 
     if (!doc.aadhaarEncrypted) {
@@ -216,7 +216,10 @@ export const kycService = {
     const aadhaarPlain = await enc.decrypt(doc.aadhaarEncrypted);
     const kycProvider = getKycVerifyProvider();
 
-    const result = await kycProvider.verifyAadhaar(aadhaarPlain, accessKey, '');
+    // NOTE: 'otp' is passed as the third parameter (previously always '').
+    // Confirm this matches Perfios's actual documented field name for this
+    // endpoint before relying on it in production — see /providers/kycVerify/live.ts.
+    const result = await kycProvider.verifyAadhaar(aadhaarPlain, accessKey, otp);
 
     // Clean up accessKey after use
     await redis.del(`kyc:aadhaar:accessKey:${userId}`);
