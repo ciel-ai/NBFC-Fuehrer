@@ -163,6 +163,16 @@ export const paymentsService = {
 
         const provider = getPaymentProvider();
 
+        // Max debit = EMI + max possible penalty (3 bounces at the configured
+        // rate). Previously this was computed twice with two different
+        // formulas — once here for the provider call, and again with an
+        // unrelated `monthlyEmi * 2` when storing the mandate — meaning our
+        // own DB record of the mandate's ceiling never matched what was
+        // actually registered with Razorpay. Compute once, reuse both places.
+        const mandateMaxAmount = roundRupees(
+            account.monthlyEmi * (1 + BUSINESS_RULES.EMI_BOUNCE_PENALTY_RATE * 3),
+        );
+
         const result = await provider.createMandate({
             customerId: userId,
             customerName: input.customerName,
@@ -170,10 +180,7 @@ export const paymentsService = {
             customerPhone: input.customerPhone,
             bankAccount: input.bankAccount,
             ifsc: input.ifsc,
-            // Max debit = EMI + max possible penalty
-            maxAmount: roundRupees(
-                account.monthlyEmi * (1 + BUSINESS_RULES.EMI_BOUNCE_PENALTY_RATE * 3),
-            ),
+            maxAmount: mandateMaxAmount,
             loanAccountId,
         });
 
@@ -188,7 +195,7 @@ export const paymentsService = {
             razorpayMandateId: result.mandateId,
             bankAccount: maskedAccount,
             ifsc: input.ifsc,
-            maxAmount: account.monthlyEmi * 2,
+            maxAmount: mandateMaxAmount,
         });
 
         // Update loan account with mandate ID
