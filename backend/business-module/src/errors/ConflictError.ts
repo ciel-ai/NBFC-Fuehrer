@@ -22,6 +22,12 @@ export const CONFLICT_ERRORS = {
             { userId },
         ),
 
+    duplicateIdentityDocument: (documentType: 'PAN' | 'Aadhaar') =>
+        new ConflictError(
+            `This ${documentType} number is already registered against a different account. Please contact support if you believe this is an error.`,
+            { documentType },
+        ),
+
     duplicatePayment: (gatewayTxnId: string) =>
         new ConflictError('This payment has already been processed', {
             gatewayTxnId,

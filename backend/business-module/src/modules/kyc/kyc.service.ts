@@ -2,6 +2,8 @@
 import { getRedisClient } from '@/config/redis';
 import { randomUUID } from 'crypto';
 import type { Request } from 'express';
+import { Prisma } from '@prisma/client';
+import { sha256Fingerprint } from '@/utils/encryption.util';
 import { kycRepository } from './kyc.repository';
 import { kycEvents } from './kyc.events';
 import {
@@ -131,7 +133,15 @@ export const kycService = {
         const enc = getEncryptionProvider();
         const panEnc = await enc.encrypt(pan);
         const panMask = maskPan(pan);
-        await kycRepository.saveEncryptedPan(userId, panEnc, panMask);
+        const panHash = sha256Fingerprint(pan);
+        try {
+            await kycRepository.saveEncryptedPan(userId, panEnc, panMask, panHash);
+        } catch (err) {
+            if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+                throw CONFLICT_ERRORS.duplicateIdentityDocument('PAN');
+            }
+            throw err;
+        }
 
         // Transition to IN_PROGRESS
         const updated = await kycRepository.updateStatus(userId, KYC_STATUS.IN_PROGRESS);
@@ -164,8 +174,15 @@ export const kycService = {
     const enc = getEncryptionProvider();
     const aadhaarEncrypted = await enc.encrypt(aadhaarNumber);
     const last4 = aadhaarLast4(aadhaarNumber);
-
-    await kycRepository.saveEncryptedAadhaar(userId, aadhaarEncrypted, last4);
+    const aadhaarHash = sha256Fingerprint(aadhaarNumber);
+    try {
+        await kycRepository.saveEncryptedAadhaar(userId, aadhaarEncrypted, last4, aadhaarHash);
+    } catch (err) {
+        if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+            throw CONFLICT_ERRORS.duplicateIdentityDocument('Aadhaar');
+        }
+        throw err;
+    }
 
     // Call Perfios consent API — sends OTP to Aadhaar-linked mobile
     const kycProvider = getKycVerifyProvider();

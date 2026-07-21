@@ -36,6 +36,18 @@ model kyc_documents {
   pan_encrypted           String?
   aadhaar_last4           String?   @db.VarChar(4)
   pan_masked              String?   @db.VarChar(10)
+  // Deterministic SHA-256 fingerprints of the plaintext PAN/Aadhaar
+  // (sha256Fingerprint() in encryption.util.ts — already existed, was
+  // never wired in). aadhaar_encrypted/pan_encrypted use AES-256-GCM with
+  // a random IV per encryption, so the same real value produces different
+  // ciphertext every time and cannot itself be used to detect duplicate
+  // identity registrations. These hash columns are one-way (cannot be
+  // reversed to recover the plaintext) but deterministic, so a unique
+  // constraint on them genuinely prevents the same PAN/Aadhaar being
+  // registered against two different user_ids — a real KYC-integrity
+  // requirement, not just data hygiene.
+  aadhaar_hash            String?   @unique @db.VarChar(64)
+  pan_hash                String?   @unique @db.VarChar(64)
   selfie_s3_key           String?   @db.VarChar(500)
   aadhaar_front_s3_key    String?   @db.VarChar(500)
   aadhaar_back_s3_key     String?   @db.VarChar(500)

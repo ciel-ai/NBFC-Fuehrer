@@ -166,12 +166,14 @@ export const kycRepository = {
         userId: string,
         aadhaarEncrypted: string,
         aadhaarLast4: string,
+        aadhaarHash: string,
     ): Promise<void> {
         await prisma.kyc_documents.update({
             where: { user_id: userId },
             data: {
                 aadhaar_encrypted: aadhaarEncrypted,
                 aadhaar_last4: aadhaarLast4,
+                aadhaar_hash: aadhaarHash,
                 updated_at: new Date(),
             },
         });
@@ -181,12 +183,14 @@ export const kycRepository = {
         userId: string,
         panEncrypted: string,
         panMasked: string,
+        panHash: string,
     ): Promise<void> {
         await prisma.kyc_documents.update({
             where: { user_id: userId },
             data: {
                 pan_encrypted: panEncrypted,
                 pan_masked: panMasked,
+                pan_hash: panHash,
                 updated_at: new Date(),
             },
         });
