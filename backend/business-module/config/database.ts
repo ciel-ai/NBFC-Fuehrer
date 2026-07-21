@@ -12,10 +12,25 @@ declare global {
     var __prisma: PrismaClient | undefined;
 }
 
+// Prisma only supports a single connection_limit setting — there's no
+// native equivalent for a separate minimum pool size, so DATABASE_POOL_MIN
+// is parsed and validated by env.ts but genuinely cannot be applied here;
+// only poolMax has a real effect. Previously neither was ever appended to
+// the datasource URL at all — Prisma silently fell back to its own
+// undocumented default (num_cpus * 2 + 1), which could be far too small or
+// too large relative to Postgres's max_connections at real scale, with no
+// visibility into what the real limit was until connections were exhausted
+// under load.
+function buildDatabaseUrl(): string {
+    const url = new URL(env.db.url);
+    url.searchParams.set('connection_limit', String(env.db.poolMax));
+    return url.toString();
+}
+
 function createPrismaClient(): PrismaClient {
     const client = new PrismaClient({
         datasources: {
-            db: { url: env.db.url },
+            db: { url: buildDatabaseUrl() },
         },
 
         log: env.isProd
