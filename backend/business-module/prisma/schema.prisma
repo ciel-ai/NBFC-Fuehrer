@@ -931,13 +931,20 @@ model admin_refresh_tokens {
 
 model idempotency_keys {
   id           String   @id @default(uuid()) @db.Uuid
-  key          String   @unique @db.VarChar(255)
+  key          String   @db.VarChar(255)
   request_path String   @db.VarChar(200)
   response     Json?
   status_code  Int?
   expires_at   DateTime @db.Timestamptz(6)
   created_at   DateTime @default(now()) @db.Timestamptz(6)
 
+  // Previously `key` alone was globally unique — meaning two different
+  // callers (or the same caller against two different endpoints) reusing
+  // the same key string would collide, and the second caller would receive
+  // the first caller's cached response, including transaction amounts and
+  // account details. Scoped to (key, request_path) so a key only has
+  // meaning within the endpoint it was actually used against.
+  @@unique([key, request_path])
   @@index([key])
   @@index([expires_at])
 }

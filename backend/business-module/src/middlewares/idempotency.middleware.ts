@@ -60,9 +60,14 @@ export function idempotency() {
 
         } catch (err) {
             if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
-                // Key already exists — either completed (replay it) or still
-                // in-flight from a concurrent request (reject, don't guess).
-                const existing = await prisma.idempotency_keys.findUnique({ where: { key } });
+                // Key already exists for this exact (key, request_path) pair —
+                // either completed (replay it) or still in-flight from a
+                // concurrent request (reject, don't guess). Scoped by path so
+                // the same key value reused against a different endpoint is
+                // treated as a distinct reservation, not a collision.
+                const existing = await prisma.idempotency_keys.findUnique({
+                    where: { key_request_path: { key, request_path: req.path } },
+                });
 
                 if (existing?.status_code != null) {
                     log.info('Idempotent replay', { key, path: req.path });
@@ -96,7 +101,7 @@ export function idempotency() {
 
         res.json = (body: any) => {
             prisma.idempotency_keys.update({
-                where: { key },
+                where: { key_request_path: { key, request_path: req.path } },
                 data: {
                     response:    body,
                     status_code: statusCode,
