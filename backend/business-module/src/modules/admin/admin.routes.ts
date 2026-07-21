@@ -25,21 +25,15 @@ const router = Router();
 const SUPER_ADMIN_ONLY = [ROLE.SUPER_ADMIN];
 
 // ─── Admin auth ───────────────────────────────────────────────────────────────
-
-router.post(
-    '/auth/login',
-    validateBody(Joi.object({
-        email:    Joi.string().email().required(),
-        password: Joi.string().required(),
-    })),
-    adminController.login,
-);
-
-router.get(
-    '/auth/me',
-    requireAuth(),
-    adminController.me,
-);
+// The ad-hoc /auth/login and /auth/me routes that used to live here have been
+// removed. They minted JWTs with no `jti` (so staffAuth.service.logout's
+// denylist could never revoke them), used a 12-hour TTL instead of the
+// 15-minute standard, and checked `is_active` — a field staff deactivation
+// never actually writes to (it writes `status` instead) — so a deactivated
+// admin could keep authenticating through this path indefinitely.
+// All admin/staff auth now goes exclusively through staffAuth.routes.ts
+// (/staff/auth/login), which the actual frontend (Login.tsx, authStore.ts)
+// already exclusively uses — this ad-hoc path had zero real callers.
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 router.get(
@@ -129,8 +123,6 @@ router.post(
 router.get('/branches', requireAuth(), allowRoles(...SUPER_ADMIN_ONLY), adminController.listBranches);
 router.post('/branches', requireAuth(), allowRoles(...SUPER_ADMIN_ONLY), validateBody(Joi.object({ name: Joi.string().required(), address: Joi.string().required(), city: Joi.string().required(), state: Joi.string().required(), pincode: Joi.string().required(), phone: Joi.string().optional() })), adminController.createBranch);
 router.patch('/branches/:branchId', requireAuth(), allowRoles(...SUPER_ADMIN_ONLY), adminController.updateBranch);
-router.get('/loans', requireAuth(), allowRoles(...SUPER_ADMIN_ONLY), adminController.listAllLoans);
-router.get('/loans/:loanId', requireAuth(), allowRoles(...SUPER_ADMIN_ONLY), adminController.getLoanDetail);
 router.get('/loans', requireAuth(), allowRoles(...SUPER_ADMIN_ONLY), adminController.listAllLoans);
 router.get('/loans/:loanId', requireAuth(), allowRoles(...SUPER_ADMIN_ONLY), adminController.getLoanDetail);
 
