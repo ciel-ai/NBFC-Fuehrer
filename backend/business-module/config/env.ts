@@ -55,16 +55,17 @@ const schema = Joi.object({
 
     // ── AWS Core ──────────────────────────────────────────────────────────────
     AWS_REGION: Joi.string().default('ap-south-1'),
-    AWS_ACCESS_KEY_ID: Joi.string().when('NODE_ENV', {
-        is: Joi.valid('production', 'staging'),
-        then: Joi.string().required(),
-        otherwise: Joi.string().optional(),
-    }),
-    AWS_SECRET_ACCESS_KEY: Joi.string().when('NODE_ENV', {
-        is: Joi.valid('production', 'staging'),
-        then: Joi.string().required(),
-        otherwise: Joi.string().optional(),
-    }),
+    // Previously required in production/staging, which directly contradicted
+    // both this file's own AWS SDK usage (which falls back to the container's
+    // IAM role credentials via the default credential provider chain when no
+    // explicit keys are passed) and .env.example's own comment: "In prod,
+    // App Runner IAM role provides these." As written before this fix, a
+    // deployment following its own documented model (IAM role, no static
+    // keys set) would fail Joi validation and refuse to boot. Always optional
+    // now — set them explicitly only for local dev against a real AWS
+    // account without IAM role access (e.g. a developer's own AWS profile).
+    AWS_ACCESS_KEY_ID: Joi.string().optional(),
+    AWS_SECRET_ACCESS_KEY: Joi.string().optional(),
 
     // ── AWS KMS (PAN / Aadhaar encryption) ────────────────────────────────────
     AWS_KMS_KEY_ID: Joi.string().when('NODE_ENV', {
