@@ -226,6 +226,18 @@ PERFIOS_TIMEOUT_MS: Joi.number().integer().default(15000),
     CORS_ALLOWED_ORIGINS: Joi.string().default(''),
     // Comma-separated list e.g. "https://app.feuhrer.in,https://admin.feuhrer.in"
 
+    // ── Feature flags ─────────────────────────────────────────────────────────
+    // Previously read directly off the validated object without ever being
+    // declared here. In production, unknown keys are rejected (see
+    // .unknown(true) below only applies outside production) — so if this
+    // flag were ever set in a production environment (e.g. a copy-pasted
+    // staging .env), Joi would reject it as an unrecognized key and crash
+    // the boot entirely, rather than the intended behavior of simply gating
+    // stub logic off. Declaring it here fixes that; the boot-time hard
+    // assertion further down (after the schema validates) prevents it from
+    // ever actually being true in production.
+    ENABLE_UNWIRED_LOAN_STUBS: Joi.boolean().default(false),
+
 }).unknown(true); // Fail on any undeclared env var in production
 
 // ─── Validate ─────────────────────────────────────────────────────────────────
@@ -242,6 +254,16 @@ if (error) {
         console.error(`   • ${detail.message}`);
     });
     console.error('\n   Fix the above errors before starting the server.\n');
+    process.exit(1);
+}
+
+// Gold-loan and CDL-loan stub logic (fabricated data, no real persistence)
+// must never be reachable in production, regardless of how this flag ends
+// up set — e.g. a copy-pasted staging .env, a misconfigured deploy, etc.
+if (value.NODE_ENV === 'production' && value.ENABLE_UNWIRED_LOAN_STUBS === true) {
+    console.error(
+        '\n❌  FATAL: ENABLE_UNWIRED_LOAN_STUBS cannot be true in production.\n',
+    );
     process.exit(1);
 }
 
