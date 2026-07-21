@@ -51,8 +51,6 @@ export function allowRoles(...roles: Role[]) {
 
         const userRole = req.user.role;
 
-        console.log('[DEBUG allowRoles]', { userRole, requiredRoles: roles, path: req.path });
-
         // Super admin bypasses everything
         if (userRole === ROLE.SUPER_ADMIN) return next();
 
