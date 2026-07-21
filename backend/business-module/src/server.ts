@@ -1,6 +1,7 @@
 import { createApp } from './app';
 import { env } from '@/config/env';
 import { createModuleLogger } from '@/config/logger';
+import { loadSecrets } from '@/config/secrets';
 import { scheduleNpaWatchJob }       from '@/jobs/npaWatch.job';
 import { scheduleReconciliationJob } from '@/jobs/reconciliation.job';
 import { scheduleBureauReportingJob } from '@/jobs/bureauReporting.job';
@@ -11,26 +12,48 @@ import { scheduleSettlementJob }     from '@/jobs/settlement.job';
 
 const log = createModuleLogger('server');
 
-const app = createApp();
+let server: ReturnType<ReturnType<typeof createApp>['listen']>;
 
-const server = app.listen(env.port, () => {
-    log.info(`Server running on port ${env.port}`, {
-        env: env.nodeEnv,
-        port: env.port,
+async function start(): Promise<void> {
+    // Secrets must be loaded (or stubbed, in dev/test) BEFORE the server
+    // starts accepting traffic. Previously this was never called at all —
+    // the app would pass health checks and serve real requests, then fail
+    // unpredictably per-request the first time anything touched a vendor
+    // secret (SMS OTP, payments, KYC, email, credit bureau, webhook
+    // signature verification). A secrets-unavailable condition must be a
+    // boot failure, not a per-request surprise.
+    try {
+        await loadSecrets();
+    } catch (err) {
+        log.error('Fatal: failed to load secrets at startup — server will not start', {
+            error: err instanceof Error ? err.message : String(err),
+        });
+        process.exit(1);
+    }
+
+    const app = createApp();
+
+    server = app.listen(env.port, () => {
+        log.info(`Server running on port ${env.port}`, {
+            env: env.nodeEnv,
+            port: env.port,
+        });
+
+        // Daily DPD/NPA rollover — penalties, NPA marking, collection case
+        // auto-open, broken PTP detection, overdue reminders. Runs at
+        // CRON_SCHEDULE.NPA_WATCH (01:00 IST) per config/constants.ts.
+        scheduleNpaWatchJob();
+        scheduleReconciliationJob();
+        scheduleBureauReportingJob();
+        scheduleEmiReminderJob();
+        scheduleNachDebitJob();
+        scheduleDebitRetryJob();
+        scheduleSettlementJob();
+        log.info('All jobs started and scheduled');
     });
+}
 
-    // Daily DPD/NPA rollover — penalties, NPA marking, collection case
-    // auto-open, broken PTP detection, overdue reminders. Runs at
-    // CRON_SCHEDULE.NPA_WATCH (01:00 IST) per config/constants.ts.
-    scheduleNpaWatchJob();
-    scheduleReconciliationJob();
-    scheduleBureauReportingJob();
-    scheduleEmiReminderJob();
-    scheduleNachDebitJob();
-    scheduleDebitRetryJob();
-    scheduleSettlementJob();
-    log.info('All jobs started and scheduled');
-});
+start();
 
 // ─── Graceful shutdown ────────────────────────────────────────────────────────
 // Waits for in-flight requests to complete before shutting down.
@@ -40,6 +63,11 @@ const SHUTDOWN_TIMEOUT_MS = 10_000;
 
 function gracefulShutdown(signal: string): void {
     log.info(`${signal} received — starting graceful shutdown`);
+
+    if (!server) {
+        log.warn('Shutdown signal received before server finished starting — exiting immediately');
+        process.exit(0);
+    }
 
     server.close(async () => {
         log.info('HTTP server closed — no new connections accepted');
