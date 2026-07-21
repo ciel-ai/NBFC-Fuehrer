@@ -269,8 +269,19 @@ export const paymentsRepository = {
     async findMandateByLoanAccountId(
         loanAccountId: string,
     ): Promise<MandateRecord | null> {
+        // Previously only checked status: 'ACTIVE', but a newly created
+        // mandate defaults to status: 'CREATED' (the schema default) and
+        // only becomes 'ACTIVE' once NPCI/Razorpay confirms registration.
+        // That meant this duplicate check never actually caught a second
+        // mandate creation attempt while the first was still in CREATED
+        // state — a customer could accumulate multiple CREATED mandates
+        // for the same loan account. Excluding only genuinely terminal
+        // states (CANCELLED) instead of allow-listing just ACTIVE.
         const row = await prisma.enach_mandates.findFirst({
-            where: { loan_account_id: loanAccountId, status: 'ACTIVE' },
+            where: {
+                loan_account_id: loanAccountId,
+                status: { notIn: ['CANCELLED'] },
+            },
             orderBy: { created_at: 'desc' },
         });
         return row ? mapMandate(row as unknown as Record<string, unknown>) : null;

@@ -404,6 +404,17 @@ model payments {
   @@index([loan_account_id, status])
 }
 
+// A partial unique index (one non-cancelled mandate per loan_account_id)
+// exists on this table but cannot be expressed in Prisma's schema DSL —
+// Prisma does not support filtered/partial unique constraints. Applied
+// directly via SQL:
+//   CREATE UNIQUE INDEX one_non_cancelled_mandate_per_account
+//   ON enach_mandates (loan_account_id)
+//   WHERE status <> 'CANCELLED' AND loan_account_id IS NOT NULL;
+// This is real, live in the database, but not tracked by any Prisma
+// migration file — see the idempotency_keys fix for the same pattern and
+// the same follow-up note about generating a proper tracked migration once
+// full DB-owner permissions are available.
 model enach_mandates {
   id                  String        @id @default(uuid()) @db.Uuid
   // Nullable: a mandate is created against the application first (after
