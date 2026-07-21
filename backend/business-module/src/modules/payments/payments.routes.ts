@@ -94,12 +94,17 @@ router.get(
 
 // ─── Frontend alias routes ────────────────────────────────────────────────────
 
-// POST /payments/process → process EMI payment
+// POST /payments/process → process EMI payment (customer-facing alias of
+// createPaymentLink, same controller method as /link but for customer role
+// instead of staff). Previously had zero body validation at all — added the
+// same paymentLinkSchema already used by /link, since both routes hit the
+// identical controller method and expect the identical body shape.
 router.post(
     '/process',
     requireAuth(),
     allowRoles(ROLE.CUSTOMER),
     idempotency(),
+    validateBody(paymentLinkSchema),
     paymentsController.createPaymentLink,
 );
 
