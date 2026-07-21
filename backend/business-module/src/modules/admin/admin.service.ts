@@ -336,11 +336,40 @@ export const adminService = {
         return branch;
     },
 
-    async updateBranch(branchId: string, data: any, req: Request) {
+    async updateBranch(branchId: string, data: {
+        name?: string;
+        address?: string;
+        city?: string;
+        state?: string;
+        pincode?: string;
+        phone?: string;
+        manager_id?: string | null;
+        lat?: number;
+        lng?: number;
+        working_hours?: string;
+        is_active?: boolean;
+    }, req: Request) {
         const { prisma } = await import('@/config/database');
+        // Explicit field whitelist instead of spreading the raw request body —
+        // previously any client-supplied field passed straight through to
+        // Prisma's update(), a mass-assignment risk since validateBody() wasn't
+        // even applied to this route at all.
         const branch = await prisma.branches.update({
             where: { id: branchId },
-            data: { ...data, updated_at: new Date() },
+            data: {
+                ...(data.name !== undefined && { name: data.name }),
+                ...(data.address !== undefined && { address: data.address }),
+                ...(data.city !== undefined && { city: data.city }),
+                ...(data.state !== undefined && { state: data.state }),
+                ...(data.pincode !== undefined && { pincode: data.pincode }),
+                ...(data.phone !== undefined && { phone: data.phone }),
+                ...(data.manager_id !== undefined && { manager_id: data.manager_id }),
+                ...(data.lat !== undefined && { lat: data.lat }),
+                ...(data.lng !== undefined && { lng: data.lng }),
+                ...(data.working_hours !== undefined && { working_hours: data.working_hours }),
+                ...(data.is_active !== undefined && { is_active: data.is_active }),
+                updated_at: new Date(),
+            },
         });
         return branch;
     },

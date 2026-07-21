@@ -122,7 +122,28 @@ router.post(
 
 router.get('/branches', requireAuth(), allowRoles(...SUPER_ADMIN_ONLY), adminController.listBranches);
 router.post('/branches', requireAuth(), allowRoles(...SUPER_ADMIN_ONLY), validateBody(Joi.object({ name: Joi.string().required(), address: Joi.string().required(), city: Joi.string().required(), state: Joi.string().required(), pincode: Joi.string().required(), phone: Joi.string().optional() })), adminController.createBranch);
-router.patch('/branches/:branchId', requireAuth(), allowRoles(...SUPER_ADMIN_ONLY), adminController.updateBranch);
+router.patch(
+    '/branches/:branchId',
+    requireAuth(),
+    allowRoles(...SUPER_ADMIN_ONLY),
+    validateParams(Joi.object({
+        branchId: Joi.string().uuid({ version: 'uuidv4' }).required(),
+    })),
+    validateBody(Joi.object({
+        name: Joi.string().max(100).optional(),
+        address: Joi.string().max(300).optional(),
+        city: Joi.string().max(50).optional(),
+        state: Joi.string().max(50).optional(),
+        pincode: Joi.string().max(10).optional(),
+        phone: Joi.string().max(15).optional(),
+        manager_id: Joi.string().uuid({ version: 'uuidv4' }).allow(null).optional(),
+        lat: Joi.number().optional(),
+        lng: Joi.number().optional(),
+        working_hours: Joi.string().max(100).optional(),
+        is_active: Joi.boolean().optional(),
+    })),
+    adminController.updateBranch,
+);
 router.get('/loans', requireAuth(), allowRoles(...SUPER_ADMIN_ONLY), adminController.listAllLoans);
 router.get('/loans/:loanId', requireAuth(), allowRoles(...SUPER_ADMIN_ONLY), adminController.getLoanDetail);
 
