@@ -325,31 +325,61 @@ export const disbursementService = {
     // Razorpay sends a webhook when the payout reaches the beneficiary.
     // This is where the loan account and EMI schedule are created atomically.
 
-    async processPayoutWebhook(
+   async processPayoutWebhook(
         input: DisbursementWebhookInput,
         req: Request,
     ): Promise<void> {
-        const record = await disbursementRepository.findByPayoutId(
-            input.razorpayPayoutId,
+        // Lock by payoutId BEFORE doing any read — this is the natural
+        // idempotency key for a webhook delivery, and locking before the
+        // first read (rather than fetching a record, then locking, then
+        // reusing that same stale pre-lock snapshot) is what actually
+        // prevents a duplicate-delivery race. A prior version of this fix
+        // fetched the record once before locking and passed that same
+        // snapshot into the locked section — the second caller, once it
+        // acquired the lock after the first released it, still checked the
+        // stale status and proceeded into a real duplicate completion
+        // attempt, only caught by the DB's own unique constraint rather
+        // than this lock. Confirmed by a concurrency test before this fix.
+        const lockToken = randomUUID();
+        const lockKey = RedisKeys.webhookProcessed(input.razorpayPayoutId);
+        const lockAcquired = await acquireLock(
+            lockKey,
+            RedisTTL.DISBURSE_LOCK,
+            lockToken,
         );
 
-        if (!record) {
-            log.warn('Disbursement webhook for unknown payout', {
+        if (!lockAcquired) {
+            log.warn('Disbursement webhook arrived while another operation holds the lock — will be retried by gateway', {
                 payoutId: input.razorpayPayoutId,
             });
             return;
         }
 
-        // Idempotency — already processed
-        if (record.status === 'COMPLETED' || record.status === 'REVERSED') {
-            log.info('Disbursement webhook already processed', {
-                disbursementId: record.id,
-                status: record.status,
-            });
-            return;
-        }
+        try {
+            // Fresh read, taken only after acquiring the lock, so a second
+            // caller sees the real post-completion status, not a stale
+            // pre-lock snapshot.
+            const record = await disbursementRepository.findByPayoutId(
+                input.razorpayPayoutId,
+            );
 
-        const loan = await loansRepository.findApplicationByIdOrThrow(record.loanId);
+            if (!record) {
+                log.warn('Disbursement webhook for unknown payout', {
+                    payoutId: input.razorpayPayoutId,
+                });
+                return;
+            }
+
+            // Idempotency — already processed
+            if (record.status === 'COMPLETED' || record.status === 'REVERSED') {
+                log.info('Disbursement webhook already processed', {
+                    disbursementId: record.id,
+                    status: record.status,
+                });
+                return;
+            }
+
+            const loan = await loansRepository.findApplicationByIdOrThrow(record.loanId);
 
         switch (input.status) {
             case 'processed':
@@ -396,6 +426,9 @@ export const disbursementService = {
                     disbursementId: record.id,
                     status: input.status,
                 });
+        }
+        } finally {
+            await releaseLock(lockKey, lockToken);
         }
     },
 
