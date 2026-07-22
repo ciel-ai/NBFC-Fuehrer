@@ -11,7 +11,7 @@
 
 import { prisma } from '@/config/database';
 import { createModuleLogger } from '@/config/logger';
-import { NotFoundError } from '@/errors';
+import { NotFoundError, ConflictError } from '@/errors';
 
 const log = createModuleLogger('goldAuction.service');
 
@@ -91,8 +91,18 @@ export const goldAuctionService = {
         const surplus         = salePrice > outstandingDues ? salePrice - outstandingDues : 0;
         const deficit         = salePrice < outstandingDues ? outstandingDues - salePrice : 0;
 
-        const auction = await prisma.gold_auctions.update({
-            where: { id: params.auctionId },
+        // Previously a plain update() with no status guard and no row
+        // locking — an already-COMPLETED or CANCELLED auction could be
+        // "completed" again, recomputing surplus/deficit and re-firing the
+        // custody-status update. This is now an atomic conditional update
+        // (a single UPDATE ... WHERE id = ? AND status = 'SCHEDULED'
+        // statement) instead of a separate read-then-write — the database
+        // itself, not application logic, enforces that only a genuinely
+        // SCHEDULED auction can transition to COMPLETED, closing the
+        // double-completion race at the source rather than just checking
+        // for it after the fact.
+        const { count } = await prisma.gold_auctions.updateMany({
+            where: { id: params.auctionId, status: 'SCHEDULED' },
             data: {
                 status:            'COMPLETED',
                 actual_sale_price: salePrice,
@@ -103,6 +113,16 @@ export const goldAuctionService = {
                 notes:             params.notes,
                 updated_at:        new Date(),
             },
+        });
+
+        if (count === 0) {
+            throw new ConflictError(
+                `Auction cannot be completed — current status is '${existing.status}', expected 'SCHEDULED'. It may have already been completed or cancelled.`,
+            );
+        }
+
+        const auction = await prisma.gold_auctions.findUniqueOrThrow({
+            where: { id: params.auctionId },
         });
 
         // Update gold custody status to AUCTIONED
