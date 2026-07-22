@@ -30,7 +30,7 @@ model User {
   kycDetail         KycDetail?
   eNachMandate      ENachMandate?
   blacklistedTokens TokenBlacklist[]
-  loan_applications loan_applications[]
+  
   agent             SalesAgent?
 
   @@map("users")
@@ -64,70 +64,7 @@ model RefreshToken {
   @@map("refresh_tokens")
 }
 
-model agents {
-  id        String   @id
-  name      String
-  phone     String   @unique
-  email     String?
-  gstNumber String?
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime
-}
 
-model audit_logs {
-  id                String            @id
-  applicationId     String
-  action            String
-  performedBy       String
-  details           String?
-  createdAt         DateTime          @default(now())
-  loan_applications loan_applications @relation(fields: [applicationId], references: [id])
-}
-
-model emi_schedule {
-  id                String            @id
-  applicationId     String
-  instalmentNo      Int
-  dueDate           DateTime
-  amount            Float
-  status            String            @default("PENDING")
-  retryCount        Int               @default(0)
-  paidAt            DateTime?
-  createdAt         DateTime          @default(now())
-  loan_applications loan_applications @relation(fields: [applicationId], references: [id])
-}
-
-model loan_applications {
-  id                 String         @id
-  userId             String
-  productType        String
-  amount             Float
-  tenure             Int
-  annualInterestRate Float          @default(18)
-  merchantId         String?
-  status             String         @default("PENDING")
-  cibilScore         Int?
-  fraudScore         Float?
-  rejectionReason    String?
-  createdAt          DateTime       @default(now())
-  updatedAt          DateTime
-  audit_logs         audit_logs[]
-  emi_schedule       emi_schedule[]
-  users              User           @relation(fields: [userId], references: [id])
-  payments           payments[]
-}
-
-model payments {
-  id                String            @id
-  applicationId     String
-  amount            Float
-  type              String
-  status            String            @default("PENDING")
-  razorpayId        String?
-  createdAt         DateTime          @default(now())
-  loan_applications loan_applications @relation(fields: [applicationId], references: [id])
-}
 
 model OtpVerification {
   id        String   @id @default(uuid())
