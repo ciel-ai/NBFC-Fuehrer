@@ -183,6 +183,32 @@ export const notificationsService = {
             return;
         }
 
+        // ── In-app notification record ────────────────────────────────────────────
+        // Every dispatched notification also gets a real, queryable in-app
+        // record here — a single choke point that automatically covers all
+        // ~15 event types without touching each individual event handler.
+        // Previously GET /notifications and friends were hardcoded stubs
+        // with no backing table at all.
+        if (recipient.userId) {
+            const title = rendered.pushTitle ?? template;
+            const body = rendered.pushBody ?? rendered.smsBody ?? '';
+            try {
+                await prisma.in_app_notifications.create({
+                    data: {
+                        user_id: recipient.userId,
+                        template_key: template,
+                        title,
+                        body,
+                    },
+                });
+            } catch (err) {
+                log.error('Failed to write in-app notification record', {
+                    template,
+                    error: (err as Error).message,
+                });
+            }
+        }
+
         // ── Dispatch per channel ──────────────────────────────────────────────────
         const dispatchTasks = channels.map(async (channel) => {
             switch (channel) {
@@ -298,6 +324,7 @@ export const notificationsService = {
     // through every event payload.
 
     async resolveRecipient(userId: string): Promise<{
+        userId?: string;
         phone?: string;
         email?: string;
         fcmToken?: string;
@@ -314,6 +341,7 @@ export const notificationsService = {
         if (!user) return {};
 
         return {
+            userId,
             phone: (user.phone as string) ?? undefined,
             email: (user.email as string | null) ?? undefined,
             fcmToken: (user.fcm_token as string | null) ?? undefined,

@@ -639,6 +639,24 @@ model notification_deliveries {
   @@index([created_at])
 }
 
+// Real, user-facing in-app notification records — distinct from
+// notification_deliveries, which tracks OUTBOUND SMS/push/email delivery
+// attempts, not what a customer sees in an in-app notification list.
+// Previously GET /notifications, PATCH /:id/read, POST /read-all, and
+// GET /unread-count were all hardcoded stubs with no backing table at all.
+model in_app_notifications {
+  id          String    @id @default(uuid()) @db.Uuid
+  user_id     String    @db.Uuid
+  template_key String   @db.VarChar(60)
+  title       String    @db.VarChar(200)
+  body        String    @db.VarChar(1000)
+  read_at     DateTime? @db.Timestamptz(6)
+  created_at  DateTime  @default(now()) @db.Timestamptz(6)
+
+  @@index([user_id, created_at])
+  @@index([user_id, read_at])
+}
+
 model admin_users {
   id                                        String             @id @default(uuid()) @db.Uuid
   full_name                                 String             @db.VarChar(100)
