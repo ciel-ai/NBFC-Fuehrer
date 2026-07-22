@@ -8,6 +8,9 @@
 // Run: DATABASE_URL=... npx tsx scripts/seed-permissions.ts
 
 import { PrismaClient } from '@prisma/client';
+import { assertNotProduction } from './_seedGuard';
+
+assertNotProduction('seed-permissions.ts');
 
 const prisma = new PrismaClient();
 

@@ -11,6 +11,9 @@
 
 import { PrismaClient } from '@prisma/client';
 import type { LoanStatus } from '@/config/constants';
+import { assertNotProduction } from './_seedGuard';
+
+assertNotProduction('seed-demo-data.ts');
 
 const prisma = new PrismaClient();
 

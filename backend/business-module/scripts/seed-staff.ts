@@ -14,14 +14,19 @@
 //
 // Run: npx ts-node -r tsconfig-paths/register scripts/seed-staff.ts
 
+import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/config/database';
 import { STAFF_ROLE, type StaffRole } from '@/constants/staffRoles.constants';
+import { assertNotProduction } from './_seedGuard';
 
-const ADMIN_PASSWORD = 'admin@123'; // demo only — change in production
-// NOTE: must_change_password already defaults to true on admin_users
-// (see schema.prisma), so this seeded password can never be used to log
-// in directly — the login route above forces a reset first.
+assertNotProduction('seed-staff.ts');
+
+// Previously a hardcoded literal ('admin@123') committed to source control —
+// anyone with repo read access knows this exact password regardless of
+// must_change_password semantics. Generated fresh, at random, on every run
+// instead, and printed once so whoever ran the seed can actually use it.
+const ADMIN_PASSWORD = crypto.randomBytes(9).toString('base64').replace(/[+/=]/g, '');
 
 interface SeedStaff {
     full_name: string;
