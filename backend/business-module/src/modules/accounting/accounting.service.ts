@@ -5,9 +5,61 @@
 
 import { createModuleLogger } from '@/config/logger';
 import { accountingRepository } from './accounting.repository';
-import type { ReferenceType } from './accounting.types';
+import type { ReferenceType, CreateJournalEntryInput } from './accounting.types';
+import { prisma } from '@/config/database';
 
 const log = createModuleLogger('accounting.service');
+
+// Every posting method previously caught its own createEntry() failure and
+// only logged it — the triggering business operation (a disbursement, an
+// EMI collection) would report success while its corresponding GL entry
+// silently never existed, with no durable, queryable record that this ever
+// happened. Deliberately NOT re-thrown here: re-throwing would change
+// failure-propagation behavior for every caller of these 8 methods across
+// disbursement/payments/NPA services, several of which may not currently
+// await or catch these calls — that is a larger, riskier change requiring
+// a full audit of every call site, tracked separately. This fix keeps the
+// current "GL failure doesn't block the business operation" behavior
+// unchanged, but makes the failure durably visible via a dedicated
+// audit_logs record ops/finance can actually query for, instead of a
+// console log line nobody monitors.
+async function postEntry(
+    data: CreateJournalEntryInput,
+    errorContext: Record<string, unknown>,
+): Promise<void> {
+    try {
+        await accountingRepository.createEntry(data);
+    } catch (err) {
+        log.error('Failed to post GL entry', { error: err, ...errorContext });
+        try {
+            await prisma.audit_logs.create({
+                data: {
+                    action: 'GL_POSTING_FAILED',
+                    entity_type: 'journal_entries',
+                    entity_id: data.referenceId,
+                    // No HTTP request is associated with this internal
+                    // async failure — request_id is a required column, so
+                    // supply a recognizable synthetic value rather than
+                    // fabricating a fake one that looks like a real request.
+                    request_id: 'system:gl-posting-failure',
+                    after_state: JSON.stringify({
+                        referenceType: data.referenceType,
+                        debitAccount: data.debitAccount,
+                        creditAccount: data.creditAccount,
+                        amount: data.amount,
+                        error: err instanceof Error ? err.message : String(err),
+                        ...errorContext,
+                    }),
+                },
+            });
+        } catch (auditErr) {
+            // If even the audit-trail write fails, we've genuinely done
+            // everything we safely can here — log it and move on rather
+            // than risk a secondary failure cascading into the caller.
+            log.error('Failed to record GL_POSTING_FAILED audit entry', { error: auditErr });
+        }
+    }
+}
 
 // ─── GL Account codes ─────────────────────────────────────────────────────────
 
@@ -72,20 +124,16 @@ export const accountingService = {
         amount:         number;
         postedBy:       string;
     }): Promise<void> {
-        try {
-            await accountingRepository.createEntry({
-                entryDate:     new Date(),
-                referenceType: 'DISBURSEMENT',
-                referenceId:   params.disbursementId,
-                debitAccount:  loanAccountByProduct(params.productType),
-                creditAccount: GL.CASH,
-                amount:        params.amount,
-                narration:     `Loan disbursement — Loan A/c ${params.loanAccountId}`,
-                postedBy:      params.postedBy,
-            });
-        } catch (err) {
-            log.error('Failed to post disbursement GL entry', { error: err, ...params });
-        }
+        await postEntry({
+            entryDate:     new Date(),
+            referenceType: 'DISBURSEMENT',
+            referenceId:   params.disbursementId,
+            debitAccount:  loanAccountByProduct(params.productType),
+            creditAccount: GL.CASH,
+            amount:        params.amount,
+            narration:     `Loan disbursement — Loan A/c ${params.loanAccountId}`,
+            postedBy:      params.postedBy,
+        }, params);
     },
 
     // ── 2. Processing fee collection ──────────────────────────────────────────
@@ -98,32 +146,28 @@ export const accountingService = {
         gst:         number;
         postedBy:    string;
     }): Promise<void> {
-        try {
-            await accountingRepository.createEntry({
+        await postEntry({
+            entryDate:     new Date(),
+            referenceType: 'PROCESSING_FEE',
+            referenceId:   params.referenceId,
+            debitAccount:  GL.CASH,
+            creditAccount: GL.PROCESSING_FEE,
+            amount:        params.fee,
+            narration:     `Processing fee collected`,
+            postedBy:      params.postedBy,
+        }, params);
+
+        if (params.gst > 0) {
+            await postEntry({
                 entryDate:     new Date(),
                 referenceType: 'PROCESSING_FEE',
                 referenceId:   params.referenceId,
                 debitAccount:  GL.CASH,
-                creditAccount: GL.PROCESSING_FEE,
-                amount:        params.fee,
-                narration:     `Processing fee collected`,
+                creditAccount: GL.GST_PAYABLE,
+                amount:        params.gst,
+                narration:     `GST on processing fee`,
                 postedBy:      params.postedBy,
-            });
-
-            if (params.gst > 0) {
-                await accountingRepository.createEntry({
-                    entryDate:     new Date(),
-                    referenceType: 'PROCESSING_FEE',
-                    referenceId:   params.referenceId,
-                    debitAccount:  GL.CASH,
-                    creditAccount: GL.GST_PAYABLE,
-                    amount:        params.gst,
-                    narration:     `GST on processing fee`,
-                    postedBy:      params.postedBy,
-                });
-            }
-        } catch (err) {
-            log.error('Failed to post processing fee GL entry', { error: err, ...params });
+            }, params);
         }
     },
 
@@ -138,34 +182,30 @@ export const accountingService = {
         interest:    number;
         postedBy:    string;
     }): Promise<void> {
-        try {
-            if (params.principal > 0) {
-                await accountingRepository.createEntry({
-                    entryDate:     new Date(),
-                    referenceType: 'EMI_COLLECTION',
-                    referenceId:   params.paymentId,
-                    debitAccount:  GL.CASH,
-                    creditAccount: loanAccountByProduct(params.productType),
-                    amount:        params.principal,
-                    narration:     `EMI collection — principal`,
-                    postedBy:      params.postedBy,
-                });
-            }
+        if (params.principal > 0) {
+            await postEntry({
+                entryDate:     new Date(),
+                referenceType: 'EMI_COLLECTION',
+                referenceId:   params.paymentId,
+                debitAccount:  GL.CASH,
+                creditAccount: loanAccountByProduct(params.productType),
+                amount:        params.principal,
+                narration:     `EMI collection — principal`,
+                postedBy:      params.postedBy,
+            }, params);
+        }
 
-            if (params.interest > 0) {
-                await accountingRepository.createEntry({
-                    entryDate:     new Date(),
-                    referenceType: 'EMI_COLLECTION',
-                    referenceId:   params.paymentId,
-                    debitAccount:  GL.CASH,
-                    creditAccount: interestIncomeByProduct(params.productType),
-                    amount:        params.interest,
-                    narration:     `EMI collection — interest`,
-                    postedBy:      params.postedBy,
-                });
-            }
-        } catch (err) {
-            log.error('Failed to post EMI collection GL entry', { error: err, ...params });
+        if (params.interest > 0) {
+            await postEntry({
+                entryDate:     new Date(),
+                referenceType: 'EMI_COLLECTION',
+                referenceId:   params.paymentId,
+                debitAccount:  GL.CASH,
+                creditAccount: interestIncomeByProduct(params.productType),
+                amount:        params.interest,
+                narration:     `EMI collection — interest`,
+                postedBy:      params.postedBy,
+            }, params);
         }
     },
 
@@ -177,20 +217,16 @@ export const accountingService = {
         amount:    number;
         postedBy:  string;
     }): Promise<void> {
-        try {
-            await accountingRepository.createEntry({
-                entryDate:     new Date(),
-                referenceType: 'PENAL_INTEREST',
-                referenceId:   params.paymentId,
-                debitAccount:  GL.CASH,
-                creditAccount: GL.PENAL_INTEREST,
-                amount:        params.amount,
-                narration:     `Penal interest collected`,
-                postedBy:      params.postedBy,
-            });
-        } catch (err) {
-            log.error('Failed to post penal interest GL entry', { error: err, ...params });
-        }
+        await postEntry({
+            entryDate:     new Date(),
+            referenceType: 'PENAL_INTEREST',
+            referenceId:   params.paymentId,
+            debitAccount:  GL.CASH,
+            creditAccount: GL.PENAL_INTEREST,
+            amount:        params.amount,
+            narration:     `Penal interest collected`,
+            postedBy:      params.postedBy,
+        }, params);
     },
 
     // ── 5. NPA provisioning ───────────────────────────────────────────────────
@@ -201,20 +237,16 @@ export const accountingService = {
         outstandingAmount: number;
         postedBy:         string;
     }): Promise<void> {
-        try {
-            await accountingRepository.createEntry({
-                entryDate:     new Date(),
-                referenceType: 'NPA_PROVISION',
-                referenceId:   params.loanAccountId,
-                debitAccount:  GL.NPA_PROVISION,
-                creditAccount: GL.NPA_LOAN,
-                amount:        params.outstandingAmount,
-                narration:     `NPA provision — Loan A/c ${params.loanAccountId}`,
-                postedBy:      'system:npa-watch',
-            });
-        } catch (err) {
-            log.error('Failed to post NPA provision GL entry', { error: err, ...params });
-        }
+        await postEntry({
+            entryDate:     new Date(),
+            referenceType: 'NPA_PROVISION',
+            referenceId:   params.loanAccountId,
+            debitAccount:  GL.NPA_PROVISION,
+            creditAccount: GL.NPA_LOAN,
+            amount:        params.outstandingAmount,
+            narration:     `NPA provision — Loan A/c ${params.loanAccountId}`,
+            postedBy:      'system:npa-watch',
+        }, params);
     },
 
     // ── 6. Loan write-off ─────────────────────────────────────────────────────
@@ -226,20 +258,16 @@ export const accountingService = {
         amount:        number;
         postedBy:      string;
     }): Promise<void> {
-        try {
-            await accountingRepository.createEntry({
-                entryDate:     new Date(),
-                referenceType: 'WRITE_OFF',
-                referenceId:   params.loanAccountId,
-                debitAccount:  GL.WRITE_OFF,
-                creditAccount: loanAccountByProduct(params.productType),
-                amount:        params.amount,
-                narration:     `Loan written off — Loan A/c ${params.loanAccountId}`,
-                postedBy:      params.postedBy,
-            });
-        } catch (err) {
-            log.error('Failed to post write-off GL entry', { error: err, ...params });
-        }
+        await postEntry({
+            entryDate:     new Date(),
+            referenceType: 'WRITE_OFF',
+            referenceId:   params.loanAccountId,
+            debitAccount:  GL.WRITE_OFF,
+            creditAccount: loanAccountByProduct(params.productType),
+            amount:        params.amount,
+            narration:     `Loan written off — Loan A/c ${params.loanAccountId}`,
+            postedBy:      params.postedBy,
+        }, params);
     },
 
     // ── 7. Foreclosure ────────────────────────────────────────────────────────
@@ -250,21 +278,17 @@ export const accountingService = {
         charges:       number;
         postedBy:      string;
     }): Promise<void> {
-        try {
-            if (params.charges > 0) {
-                await accountingRepository.createEntry({
-                    entryDate:     new Date(),
-                    referenceType: 'FORECLOSURE',
-                    referenceId:   params.loanAccountId,
-                    debitAccount:  GL.CASH,
-                    creditAccount: GL.FORECLOSURE_CHARGES,
-                    amount:        params.charges,
-                    narration:     `Foreclosure charges — Loan A/c ${params.loanAccountId}`,
-                    postedBy:      params.postedBy,
-                });
-            }
-        } catch (err) {
-            log.error('Failed to post foreclosure GL entry', { error: err, ...params });
+        if (params.charges > 0) {
+            await postEntry({
+                entryDate:     new Date(),
+                referenceType: 'FORECLOSURE',
+                referenceId:   params.loanAccountId,
+                debitAccount:  GL.CASH,
+                creditAccount: GL.FORECLOSURE_CHARGES,
+                amount:        params.charges,
+                narration:     `Foreclosure charges — Loan A/c ${params.loanAccountId}`,
+                postedBy:      params.postedBy,
+            }, params);
         }
     },
 
@@ -276,20 +300,16 @@ export const accountingService = {
         amount:       number;
         postedBy:     string;
     }): Promise<void> {
-        try {
-            await accountingRepository.createEntry({
-                entryDate:     new Date(),
-                referenceType: 'AGENT_COMMISSION',
-                referenceId:   params.commissionId,
-                debitAccount:  GL.AGENT_COMMISSION,
-                creditAccount: GL.CASH,
-                amount:        params.amount,
-                narration:     `Agent commission payout`,
-                postedBy:      params.postedBy,
-            });
-        } catch (err) {
-            log.error('Failed to post agent commission GL entry', { error: err, ...params });
-        }
+        await postEntry({
+            entryDate:     new Date(),
+            referenceType: 'AGENT_COMMISSION',
+            referenceId:   params.commissionId,
+            debitAccount:  GL.AGENT_COMMISSION,
+            creditAccount: GL.CASH,
+            amount:        params.amount,
+            narration:     `Agent commission payout`,
+            postedBy:      params.postedBy,
+        }, params);
     },
 
     // ── Queries ───────────────────────────────────────────────────────────────
