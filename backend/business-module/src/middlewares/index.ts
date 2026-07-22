@@ -18,6 +18,7 @@ export {
     generalLimiter,
     kycLimiter,
     webhookLimiter,
+    staffLoginLimiter,
     loanApplicationLimiter,
     disbursementLimiter,
     createRateLimiter,

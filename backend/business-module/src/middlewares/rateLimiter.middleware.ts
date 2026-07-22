@@ -109,6 +109,18 @@ export const generalLimiter = createRateLimiter({
     keyPrefix: 'general',
 });
 
+// Staff/admin login — 5 attempts per 15 minutes per IP. Previously had no
+// rate limiting at all on POST /staff/auth/login (the password-based ADMIN
+// login path), unlike otp/request which already has its own internal
+// 3/hour throttle. This is a real online credential-stuffing/brute-force
+// exposure against accounts with real financial-system privileges.
+export const staffLoginLimiter = createRateLimiter({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 5,
+    keyPrefix: 'staff-login',
+    message: 'Too many login attempts. Please try again in 15 minutes.',
+});
+
 // KYC endpoints — 5 req/hour per user
 // Each Signzy call costs ₹10–₹50 — aggressive limiting is essential
 export const kycLimiter = createRateLimiter({

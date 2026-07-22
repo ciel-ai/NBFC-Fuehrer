@@ -9,7 +9,7 @@
 //   GET  /staff/auth/me            (auth)
 
 import { Router } from 'express';
-import { validateBody } from '@/middlewares';
+import { validateBody, staffLoginLimiter } from '@/middlewares';
 import { verifyStaffToken } from '@/middlewares/verifyStaffToken.middleware';
 import { staffAuthController } from './staffAuth.controller';
 import {
@@ -21,7 +21,7 @@ import {
 
 const router = Router();
 
-router.post('/login', validateBody(loginSchema), staffAuthController.login);
+router.post('/login', staffLoginLimiter, validateBody(loginSchema), staffAuthController.login);
 router.post('/otp/request', validateBody(otpRequestSchema), staffAuthController.otpRequest);
 router.post('/otp/verify', validateBody(otpVerifySchema), staffAuthController.otpVerify);
 router.post('/refresh', validateBody(refreshSchema), staffAuthController.refresh);
