@@ -13,7 +13,7 @@ const {
   userIdValidation,
 } = require('../validations/userValidation');
 
-router.post('/register', validateRequest(registerValidation), userController.register);
+router.post('/register', otpRateLimiter, validateRequest(registerValidation), userController.register);
 router.post('/send-otp', otpRateLimiter, validateRequest(sendOtpValidation), userController.sendOtp);
 router.post('/verify-otp', validateRequest(verifyOtpValidation), userController.verifyOtp);
 router.post('/login', otpRateLimiter, validateRequest(loginValidation), userController.login);
