@@ -6,16 +6,36 @@
 // no real auto-debit job existed until now.)
 
 import cron from 'node-cron';
+import { randomUUID } from 'crypto';
 import { prisma } from '@/config/database';
 import { paymentsService } from '@/modules/payments';
 import { createModuleLogger } from '@/config/logger';
 import { CRON_SCHEDULE, EMI_STATUS } from '@/config/constants';
 import { toNumber } from '@/types/common.types';
+import { acquireLock, releaseLock, RedisTTL } from '@/config/redis';
 
 const log = createModuleLogger('job:nachDebit');
 
+const JOB_LOCK_KEY = 'lock:cron:nach-debit';
+
 export async function runNachDebitJob(): Promise<void> {
     const jobStart = Date.now();
+
+    // Distributed lock for the entire job run — node-cron has no
+    // built-in distributed awareness, so if this app is ever horizontally
+    // scaled beyond one instance, every instance runs its own independent
+    // scheduler on the same cron expression. Without this lock, two
+    // instances firing the same schedule would each independently query
+    // for "EMIs due today" and could both attempt to debit the same
+    // customer for the same EMI.
+    const lockToken = randomUUID();
+    const lockAcquired = await acquireLock(JOB_LOCK_KEY, RedisTTL.CRON_JOB_LOCK, lockToken);
+
+    if (!lockAcquired) {
+        log.warn('NACH debit job skipped — another instance already holds the lock');
+        return;
+    }
+
     log.info('NACH debit job started');
 
     let attempted = 0;
@@ -105,6 +125,8 @@ export async function runNachDebitJob(): Promise<void> {
             stack: (err as Error).stack,
             durationMs: Date.now() - jobStart,
         });
+    } finally {
+        await releaseLock(JOB_LOCK_KEY, lockToken);
     }
 }
 

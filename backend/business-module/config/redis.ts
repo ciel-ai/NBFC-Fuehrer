@@ -124,6 +124,11 @@ export const RedisTTL = {
     DISBURSE_LOCK: 30,             // 30 seconds (distributed lock TTL)
     STAFF_OTP: 5 * 60,             // 5 minutes — staff login OTP
     STAFF_OTP_SEND_WINDOW: 60 * 60,    // 1 hour — window for the 3-sends/hour cap
+    // Batch cron jobs (NACH debit, debit retry) can process up to 500 EMIs
+    // with a deliberate delay between each — a run can legitimately take
+    // several minutes. 30s (DISBURSE_LOCK's TTL) would expire mid-run and
+    // let a second overlapping instance start anyway, defeating the lock.
+    CRON_JOB_LOCK: 10 * 60,             // 10 minutes
 } as const;
 
 // ─── Distributed lock utility ──────────────────────────────────────────────────
