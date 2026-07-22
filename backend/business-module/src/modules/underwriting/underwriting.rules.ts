@@ -12,6 +12,8 @@ import { computeMonthlyEmi } from '@/modules/emi/emi.calculator';
 import type { KycUnderwritingData } from '@/modules/kyc';
 import type { RuleResult, UnderwritingConfig } from './underwriting.types';
 import type { Rupees } from '@/types/common.types';
+import { HOUSING_LOAN_RULES } from './rules/housingLoan.rules';
+import { PRODUCT_TYPE } from '@/config/constants';
 
 // ─── Rule evaluation context ───────────────────────────────────────────────────
 // Everything a rule can inspect
@@ -393,8 +395,16 @@ export function runRuleEngine(ctx: RuleContext): RuleEngineResult {
     const results: RuleResult[] = [];
     const hardFailRules: string[] = [];
 
+    // Housing-loan-specific rules (LTV, PMAY thresholds, housing FOIR, etc.)
+    // were written in a separate file but never actually imported or run
+    // anywhere — every housing loan application was evaluated only against
+    // the generic RULE_DEFINITIONS set, meaning product-specific housing
+    // underwriting rules never actually took effect for any application.
+    const productRules: RuleDefinition[] =
+        ctx.productType === PRODUCT_TYPE.HOUSING_LOAN ? HOUSING_LOAN_RULES : [];
+
     // Run every rule — never short-circuit, for complete audit record
-    for (const def of RULE_DEFINITIONS) {
+    for (const def of [...RULE_DEFINITIONS, ...productRules]) {
         let result: RuleResult;
 
         try {
