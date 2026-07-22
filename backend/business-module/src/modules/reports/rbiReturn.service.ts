@@ -26,22 +26,45 @@ const PROVISION_RATE: Record<string, number> = {
     LOSS: 1.00,   // 100%
 };
 
+// classifyAsset and getProvisionRate previously used two independently
+// hand-typed sets of day-boundaries that disagreed with each other — e.g.
+// a loan at 400 days overdue was classified SUB_STANDARD by classifyAsset
+// but had its provisioning amount calculated using getProvisionRate's
+// DOUBTFUL_1 tier rate, a direct IRAC non-compliance in a real regulatory
+// report. classifyAsset now derives its answer from the exact same
+// day-boundary checks getProvisionRate uses, so the two can never disagree
+// again — a single source of truth for the boundaries themselves.
+//
+// NOTE: the specific day-boundary VALUES below (90/365/450/540/1080/1440)
+// have not been independently re-verified against current RBI IRAC norms
+// as part of this fix — that requires finance/compliance sign-off per the
+// audit's own recommendation. This fix only guarantees internal
+// consistency between classification and provisioning; it does not
+// certify the boundaries themselves are correct.
+type AssetTier = 'STANDARD' | 'SUB_STANDARD' | 'DOUBTFUL_1' | 'DOUBTFUL_2' | 'DOUBTFUL_3' | 'DOUBTFUL_4' | 'LOSS';
+
+function getAssetTier(overdueDays: number): AssetTier {
+    if (overdueDays === 0) return 'STANDARD';
+    if (overdueDays <= 90) return 'STANDARD';
+    if (overdueDays <= 365) return 'SUB_STANDARD';
+    if (overdueDays <= 450) return 'DOUBTFUL_1';
+    if (overdueDays <= 540) return 'DOUBTFUL_2';
+    if (overdueDays <= 1080) return 'DOUBTFUL_3';
+    if (overdueDays <= 1440) return 'DOUBTFUL_4';
+    return 'LOSS';
+}
+
 function getProvisionRate(overdueDays: number): number {
-    if (overdueDays === 0) return PROVISION_RATE.STANDARD!;
-    if (overdueDays <= 90) return PROVISION_RATE.STANDARD!;
-    if (overdueDays <= 365) return PROVISION_RATE.SUB_STANDARD!;
-    if (overdueDays <= 450) return PROVISION_RATE.DOUBTFUL_1!;
-    if (overdueDays <= 540) return PROVISION_RATE.DOUBTFUL_2!;
-    if (overdueDays <= 1080) return PROVISION_RATE.DOUBTFUL_3!;
-    if (overdueDays <= 1440) return PROVISION_RATE.DOUBTFUL_4!;
-    return PROVISION_RATE.LOSS!;
+    const tier = getAssetTier(overdueDays);
+    return PROVISION_RATE[tier]!;
 }
 
 function classifyAsset(overdueDays: number): string {
-    if (overdueDays <= 90) return 'STANDARD';
-    if (overdueDays <= 1080) return 'SUB_STANDARD';
-    if (overdueDays <= 1440) return 'DOUBTFUL';
-    return 'LOSS';
+    const tier = getAssetTier(overdueDays);
+    if (tier === 'STANDARD') return 'STANDARD';
+    if (tier === 'SUB_STANDARD') return 'SUB_STANDARD';
+    if (tier === 'LOSS') return 'LOSS';
+    return 'DOUBTFUL'; // DOUBTFUL_1 through DOUBTFUL_4 all classify as DOUBTFUL
 }
 
 // Mask borrower name for regulatory submission — only first letter of each word
