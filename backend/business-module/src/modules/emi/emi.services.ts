@@ -116,10 +116,19 @@ export const emiService = {
             );
         }
 
+        // Compute what's left owed after this payment, rather than
+        // unconditionally forgiving the entire penalty on any payment.
+        // A payment that covers the EMI but not the full penalty leaves a
+        // correct residual, instead of always zeroing it out regardless of
+        // amount actually collected.
+        const totalOwed = emi.emiAmount + emi.penaltyAmount;
+        const residualPenalty = Math.max(0, totalOwed - input.paidAmount);
+
         const updated = await emiRepository.markPaid(
             emi.id,
             input.paidAt,
             input.collectionId,
+            residualPenalty,
         );
 
         setAuditContext(req, {

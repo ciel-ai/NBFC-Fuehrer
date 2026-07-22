@@ -1,15 +1,32 @@
 // src/jobs/debitRetry.job.ts
 import cron from 'node-cron';
+import { randomUUID } from 'crypto';
 import { prisma } from '@/config/database';
 import { paymentsService } from '@/modules/payments';
 import { createModuleLogger } from '@/config/logger';
 import { CRON_SCHEDULE, BUSINESS_RULES, EMI_STATUS } from '@/config/constants';
 import { toNumber } from '@/types/common.types';
+import { acquireLock, releaseLock, RedisTTL } from '@/config/redis';
 
 const log = createModuleLogger('job:debitRetry');
 
+const JOB_LOCK_KEY = 'lock:cron:debit-retry';
+
 export async function runDebitRetryJob(): Promise<void> {
     const jobStart = Date.now();
+
+    // Same reasoning as nachDebit.job.ts's lock — node-cron has no
+    // built-in distributed awareness, so a horizontally-scaled deployment
+    // would otherwise let two instances each independently retry-debit the
+    // same bounced EMI simultaneously.
+    const lockToken = randomUUID();
+    const lockAcquired = await acquireLock(JOB_LOCK_KEY, RedisTTL.CRON_JOB_LOCK, lockToken);
+
+    if (!lockAcquired) {
+        log.warn('Debit retry job skipped — another instance already holds the lock');
+        return;
+    }
+
     log.info('Debit retry job started');
 
     let retried = 0;
@@ -110,6 +127,8 @@ export async function runDebitRetryJob(): Promise<void> {
             stack: (err as Error).stack,
             durationMs: Date.now() - jobStart,
         });
+    } finally {
+        await releaseLock(JOB_LOCK_KEY, lockToken);
     }
 }
 

@@ -196,13 +196,20 @@ export const emiRepository = {
         id: string,
         paidAt: Date,
         collectionId?: string,
+        residualPenalty: number = 0,
     ): Promise<EmiScheduleEntry> {
+        // Previously always zeroed penalty_amount regardless of whether the
+        // payment actually covered it — a payment that covers the EMI but
+        // not the full penalty would silently forgive the shortfall.
+        // residualPenalty is now computed by the caller (which has the real
+        // EMI amount, existing penalty, and amount actually paid) and
+        // defaults to 0 only for callers that don't pass it explicitly.
         const row = await prisma.emi_schedule.update({
             where: { id },
             data: {
                 status: EMI_STATUS.PAID,
                 paid_at: paidAt,
-                penalty_amount: 0,
+                penalty_amount: residualPenalty,
                 collection_id: collectionId ?? null,
                 updated_at: new Date(),
             },
