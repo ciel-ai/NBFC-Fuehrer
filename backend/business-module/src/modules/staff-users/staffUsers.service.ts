@@ -13,7 +13,7 @@ import bcrypt from 'bcryptjs';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/config/database';
 import { logger } from '@/config/logger';
-import { AppError } from '@/errors';
+import { AppError, ForbiddenError } from '@/errors';
 import { STAFF_ROLE, type StaffRole } from '@/constants/staffRoles.constants';
 import { buildPaginationMeta, type PaginatedResult } from '@/types/common.types';
 
@@ -132,6 +132,17 @@ export async function createUser(
     input: { name: string; phone: string; email: string; role: StaffRole; branchId?: string; status?: string },
     actor: Actor,
 ): Promise<{ user: PresentedStaffUser; tempPassword?: string }> {
+    // requireModule('users') only checks that the actor's role has been
+    // granted write access to the "users" module — it never checks what
+    // role the actor is trying to ASSIGN. Any non-ADMIN staff member with
+    // users-module write access (e.g. a CREDIT_MANAGER-equivalent role)
+    // could previously create a brand new ADMIN account, a direct
+    // privilege-escalation path. Only an actor who is themselves ADMIN can
+    // create another ADMIN account.
+    if (input.role === STAFF_ROLE.ADMIN && actor.role !== STAFF_ROLE.ADMIN) {
+        throw new ForbiddenError('Only an ADMIN can create another ADMIN account.');
+    }
+
     const dup = await prisma.admin_users.findFirst({
         where: { OR: [{ email: input.email }, { phone: input.phone }] },
     });
@@ -181,6 +192,14 @@ export async function updateUser(
 ): Promise<PresentedStaffUser> {
     const before = await prisma.admin_users.findUnique({ where: { id } });
     if (!before) throw notFound();
+
+    // Same self-escalation guard as createUser — promoting an EXISTING
+    // user's role to ADMIN is just as much a privilege-escalation path as
+    // creating a new one directly with that role, and was equally
+    // unguarded before this fix.
+    if (patch.role === STAFF_ROLE.ADMIN && before.role !== STAFF_ROLE.ADMIN && actor.role !== STAFF_ROLE.ADMIN) {
+        throw new ForbiddenError('Only an ADMIN can promote another user to ADMIN.');
+    }
 
     if (patch.email || patch.phone) {
         const conflicts: Prisma.admin_usersWhereInput[] = [];
