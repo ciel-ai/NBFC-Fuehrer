@@ -52,7 +52,7 @@ export const housingLoansController = {
             const application = await loansRepository.findApplicationByIdOrThrow(id);
             assertApplicationOwnership(user.id, application, user.role, 'housing loan application');
 
-            const result = housingLoansService.runIncomeAssessment(id, req.body);
+            const result = await housingLoansService.runIncomeAssessment(id, req.body);
             res.status(HTTP.OK).json(successResponse(result));
         } catch (err) { next(err); }
     },

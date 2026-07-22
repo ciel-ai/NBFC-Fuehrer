@@ -149,11 +149,22 @@ export const housingLoansService = {
 
     // ── POST /housing-loans/applications/:id/income-assessment ────────────────
 
-    runIncomeAssessment(
+    async runIncomeAssessment(
         applicationId: string,
         input: HousingIncomeAssessmentInput,
-    ): HousingIncomeAssessment {
-        const proposedEmi      = calcEmi(500000, HOUSING_INTEREST_RATE, 120);
+    ): Promise<HousingIncomeAssessment> {
+        // Previously hardcoded to calcEmi(500000, HOUSING_INTEREST_RATE, 120)
+        // regardless of what the customer actually applied for — this method
+        // never queried the database at all, so the core RBI-relevant
+        // affordability check for this product line was structurally
+        // incapable of reflecting the real application. Fetch the real
+        // requested amount and tenure instead.
+        const application = await loansRepository.findApplicationByIdOrThrow(applicationId);
+        const proposedEmi = calcEmi(
+            application.amountRequested,
+            HOUSING_INTEREST_RATE,
+            application.tenureMonths,
+        );
         const foir             = Math.round(
             ((input.existingEmis + proposedEmi) / input.monthlyIncome) * 100 * 10,
         ) / 10;
