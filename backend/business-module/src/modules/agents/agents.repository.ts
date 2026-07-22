@@ -13,7 +13,7 @@ import {
     buildPaginationMeta,
 } from '@/types/common.types';
 import type { PaginatedResult } from '@/types/common.types';
-import { NotFoundError } from '@/errors';
+import { NotFoundError, ConflictError } from '@/errors';
 import type {
     AgentProfile,
     AgentCommission,
@@ -410,6 +410,35 @@ export const agentsRepository = {
         commissionIds: string[];
     }): Promise<CommissionPayout> {
         return withTransaction(async (tx) => {
+            // Claim the commissions FIRST, conditionally on them still being
+            // EARNED — previously this updateMany had no status condition
+            // at all, so two concurrent payout requests could both read the
+            // same "earned" commissions (in the caller, before this
+            // transaction even starts), and both successfully mark them
+            // PAID and create separate payout batches referencing the same
+            // commission_ids, double-paying the agent. The count check
+            // below confirms every commission we intended to claim was
+            // genuinely still available at the moment of the write, not
+            // just at the moment of the earlier read.
+            const claimed = await tx.agent_commissions.updateMany({
+                where: {
+                    id: { in: data.commissionIds },
+                    status: COMMISSION_STATUS.EARNED,
+                },
+                data: {
+                    status: COMMISSION_STATUS.PAID,
+                    paid_at: new Date(),
+                    updated_at: new Date(),
+                },
+            });
+
+            if (claimed.count !== data.commissionIds.length) {
+                throw new ConflictError(
+                    `Could not claim all commissions for payout — ${claimed.count} of ${data.commissionIds.length} were still EARNED. ` +
+                    'Another payout request likely claimed some of these commissions concurrently. Please retry.',
+                );
+            }
+
             const payout = await tx.commission_payouts.create({
                 data: {
                     agent_id: data.agentId,
@@ -421,15 +450,10 @@ export const agentsRepository = {
                 },
             });
 
-            // Mark all included commissions as PAID
+            // Link the now-claimed commissions to this payout batch
             await tx.agent_commissions.updateMany({
                 where: { id: { in: data.commissionIds } },
-                data: {
-                    status: COMMISSION_STATUS.PAID,
-                    payout_id: payout.id as string,
-                    paid_at: new Date(),
-                    updated_at: new Date(),
-                },
+                data: { payout_id: payout.id as string },
             });
 
             return {
