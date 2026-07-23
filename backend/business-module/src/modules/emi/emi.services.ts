@@ -1,6 +1,7 @@
 // src/modules/emi/emi.service.ts
 import type { Request } from 'express';
 import { emiRepository } from './emi.repository';
+import { loansRepository } from '@/modules/loans';
 import {
     buildAmortizationSchedule,
     computeMonthlyEmi,
@@ -124,6 +125,12 @@ export const emiService = {
         const totalOwed = emi.emiAmount + emi.penaltyAmount;
         const residualPenalty = Math.max(0, totalOwed - input.paidAmount);
 
+        // Resolve the real userId for the payment.received event —
+        // previously hardcoded to an empty string with a comment claiming
+        // "resolved by payments module", but nothing downstream ever
+        // resolved it.
+        const loanAccount = await loansRepository.findAccountByIdOrThrow(emi.loanAccountId);
+
         const updated = await emiRepository.markPaid(
             emi.id,
             input.paidAt,
@@ -143,7 +150,7 @@ export const emiService = {
         eventBus.emit('payment.received', {
             paymentId: input.emiId,   // Placeholder; real paymentId from payments module
             loanAccountId: emi.loanAccountId,
-            userId: '',            // Resolved by payments module
+            userId: loanAccount.userId,
             emiId: emi.id,
             emiNumber: emi.emiNumber,
             amount: input.paidAmount,
