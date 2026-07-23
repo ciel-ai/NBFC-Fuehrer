@@ -948,9 +948,9 @@ model reconciliation_reports {
   run_date        DateTime @db.Date
   report_type     String   @db.VarChar(50)
   status          String   @default("PENDING") @db.VarChar(20)
-  total_expected  Decimal  @db.Decimal(15, 2)
+  total_expected  Decimal? @db.Decimal(15, 2)
   total_actual    Decimal  @db.Decimal(15, 2)
-  variance        Decimal  @db.Decimal(15, 2)
+  variance        Decimal? @db.Decimal(15, 2)
   matched_count   Int      @default(0)
   unmatched_count Int      @default(0)
   details         Json?

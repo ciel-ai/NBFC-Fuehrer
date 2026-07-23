@@ -95,32 +95,39 @@ export const reconciliationService = {
 
         const totalActual = gatewayPayments.reduce((sum, p) => sum + Number(p.amount), 0);
 
-        const gatewaySettlement = {
-            amount:  totalActual,
-            isStub:  true,
-            message: 'Razorpay credentials not yet active — running in stub mode',
-        };
-
-        const variance = totalActual - gatewaySettlement.amount;
+        // Blocked on a confirmed external dependency: real Razorpay
+        // settlement-report access isn't available yet (Razorpay account
+        // activation is a pending client blocker, tracked separately).
+        // Previously this set gatewaySettlement.amount equal to totalActual
+        // by construction, then computed variance = totalActual -
+        // gatewaySettlement.amount, which is mathematically guaranteed to
+        // be 0 regardless of any real discrepancy — comparing a number to
+        // itself, not to an actual external source of truth. total_expected
+        // and variance are now genuinely absent (null) in stub mode, rather
+        // than a fabricated zero that could be misread as a real, checked
+        // "MATCHED" result by anything downstream reading the numeric
+        // fields without also checking status.
+        const isStub = true; // Flip once real Razorpay settlement access is available
+        const message = 'Razorpay credentials not yet active — no real settlement data available to compare against';
 
         await prisma.reconciliation_reports.create({
             data: {
                 run_date:        runDate,
                 report_type:     'PAYMENT_GATEWAY',
-                status:          gatewaySettlement.isStub ? 'STUB' : (variance === 0 ? 'MATCHED' : 'VARIANCE'),
-                total_expected:  gatewaySettlement.amount,
+                status:          'STUB',
+                total_expected:  null,
                 total_actual:    totalActual,
-                variance:        Math.abs(variance),
-                matched_count:   gatewayPayments.length,
+                variance:        null,
+                matched_count:   0,
                 unmatched_count: 0,
-                details:         { gatewaySettlement, paymentsCount: gatewayPayments.length },
+                details:         { isStub, message, paymentsCount: gatewayPayments.length },
                 created_at:      new Date(),
             },
         });
 
-        log.info('Payment gateway reconciliation complete', {
+        log.warn('Payment gateway reconciliation ran in STUB mode — no real comparison was performed', {
             totalActual,
-            isStub: gatewaySettlement.isStub,
+            message,
         });
     },
 
