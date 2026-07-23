@@ -19,9 +19,10 @@ export const createMandateSchema = Joi.object({
 });
 
 export const paymentLinkSchema = Joi.object({
-    loanAccountId: Joi.string().uuid({ version: 'uuidv4' }).required(),
-    amount: Joi.number().positive().required(),
-    description: Joi.string().max(255).optional(),
+    emiId: Joi.string().uuid({ version: 'uuidv4' }).required(),
+    customerName: Joi.string().max(100).required(),
+    customerPhone: Joi.string().min(10).max(15).required(),
+    expiryMinutes: Joi.number().integer().positive().max(1440).default(60),
 });
 
 export const recordCashPaymentSchema = Joi.object({

@@ -51,13 +51,13 @@ export const paymentsController = {
                 expiryMinutes: number;
             }>(req);
 
-            const account = await import('@/modules/loans')
-                .then(({ loansRepository }) =>
-                    loansRepository.findAccountByIdOrThrow(
-                        body.emiId, // Will be resolved from EMI in service
-                    ).catch(() => null),
-                );
-
+            // The service resolves the real EMI, loan account, and payable
+            // amount (EMI + penalty) entirely from emiId itself — it never
+            // reads loanAccountId or amount from this input. The previous
+            // dead lookup here (findAccountByIdOrThrow(body.emiId, ...) —
+            // passing an EMI id where an account id was expected, wrapped
+            // in a catch that discarded the result unused) served no
+            // purpose and has been removed.
             const result = await paymentsService.createPaymentLink(
                 {
                     loanAccountId: '',           // Resolved in service from emiId
