@@ -2,11 +2,12 @@
 import cron from 'node-cron';
 import { createModuleLogger } from '@/config/logger';
 import { reconciliationService } from '@/modules/reconciliation/reconciliation.service';
+import { CRON_SCHEDULE } from '@/config/constants';
 
 const log = createModuleLogger('job:reconciliation');
 
 export function scheduleReconciliationJob(): void {
-    cron.schedule('0 2 * * *', async () => {
+    cron.schedule(CRON_SCHEDULE.RECONCILIATION, async () => {
         log.info('Reconciliation job started');
         try {
             await reconciliationService.runAll();
@@ -16,7 +17,7 @@ export function scheduleReconciliationJob(): void {
         }
     });
 
-    log.info('Reconciliation job scheduled', { schedule: '0 2 * * *' });
+    log.info('Reconciliation job scheduled', { schedule: CRON_SCHEDULE.RECONCILIATION });
 }
 
 export async function runReconciliationJob(date?: Date): Promise<void> {
