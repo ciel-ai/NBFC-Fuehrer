@@ -131,32 +131,35 @@ export const kycRepository = {
         checkType: KycCheck,
         passed: boolean,
     ): Promise<void> {
-        const current = await this.findByUserIdOrThrow(userId);
-
+        // Previously read the current completedChecks/failedChecks arrays,
+        // computed a new array in application memory, then wrote the whole
+        // array back — a classic non-atomic read-modify-write. Two KYC
+        // checks completing at nearly the same moment (e.g. PAN and Aadhaar
+        // verification finishing back to back) would both read the same
+        // stale array, and whichever write landed last would silently wipe
+        // out the other check's completion record (a lost update).
+        //
+        // Using Postgres's native array_append/array_remove directly via
+        // raw SQL performs the mutation atomically at the database level —
+        // there is no read step for a concurrent writer to race against.
+        // Deduplication (avoiding the same checkType appearing twice on a
+        // retried check) is handled by array_remove-then-append, which is
+        // itself atomic within the single UPDATE statement.
         if (passed) {
-            const completed = Array.from(
-                new Set([...current.completedChecks, checkType]),
-            );
-            await prisma.kyc_documents.update({
-                where: { user_id: userId },
-                data: {
-                    completed_checks: completed,
-                    // Remove from failed if it was previously failed and now retried
-                    failed_checks: current.failedChecks.filter((c) => c !== checkType),
-                    updated_at: new Date(),
-                },
-            });
+            await prisma.$executeRaw`
+                UPDATE kyc_documents
+                SET completed_checks = array_append(array_remove(completed_checks, ${checkType}), ${checkType}),
+                    failed_checks = array_remove(failed_checks, ${checkType}),
+                    updated_at = now()
+                WHERE user_id = ${userId}::uuid
+            `;
         } else {
-            const failed = Array.from(
-                new Set([...current.failedChecks, checkType]),
-            );
-            await prisma.kyc_documents.update({
-                where: { user_id: userId },
-                data: {
-                    failed_checks: failed,
-                    updated_at: new Date(),
-                },
-            });
+            await prisma.$executeRaw`
+                UPDATE kyc_documents
+                SET failed_checks = array_append(array_remove(failed_checks, ${checkType}), ${checkType}),
+                    updated_at = now()
+                WHERE user_id = ${userId}::uuid
+            `;
         }
     },
 
