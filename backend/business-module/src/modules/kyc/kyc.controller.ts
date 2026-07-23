@@ -172,7 +172,12 @@ async verifyGST(req: AuthRequest, res: Response, next: NextFunction) {
     async requestESign(req: AuthRequest, res: Response, next: NextFunction) {
         try {
             const body = getValidatedBody<{ loanId: string }>(req);
-            const loan = await getLoanForESign(body.loanId); // Helper below
+            // Previously fetched any loan application by ID with zero
+            // ownership check — a customer could pass another customer's
+            // loanId and retrieve their real loan amount, tenure, interest
+            // rate, and EMI, then generate an eSign request mixing their
+            // own identity with the victim's real loan terms.
+            const loan = await getLoanForESign(body.loanId, req.user.id);
             const input: RequestESignInput = {
                 userId: req.user.id,
                 loanId: body.loanId,
@@ -206,7 +211,7 @@ async verifyGST(req: AuthRequest, res: Response, next: NextFunction) {
 };
 
 // Lazy import — avoids circular dep on loans module at startup
-async function getLoanForESign(loanId: string) {
+async function getLoanForESign(loanId: string, userId: string) {
     const { prisma } = await import('@/config/database');
     const loan = await prisma.loan_applications.findUnique({
         where: { id: loanId },
@@ -215,9 +220,14 @@ async function getLoanForESign(loanId: string) {
             tenure_months: true,
             interest_rate: true,
             monthly_emi: true,
+            user_id: true,
         },
     });
     if (!loan) throw new Error(`Loan ${loanId} not found`);
+    if (loan.user_id !== userId) {
+        const { ForbiddenError } = await import('@/errors');
+        throw new ForbiddenError('You do not have access to this loan application.');
+    }
     return {
         amount: Number(loan.amount_requested),
         tenureMonths: loan.tenure_months,
