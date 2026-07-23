@@ -1,5 +1,6 @@
 // src/modules/kyc/kyc.routes.ts
 import { Router } from 'express';
+import type { Request, Response, NextFunction } from 'express';
 import multer from 'multer';
 import { kycController } from './kyc.controller';
 import {
@@ -24,7 +25,7 @@ import {
      silentBankVerifySchema,
      gstVerifySchema
 } from './kyc.dto';
-import { ROLE, BUSINESS_RULES } from '@/config/constants';
+import { ROLE, BUSINESS_RULES, HTTP } from '@/config/constants';
 
 const router = Router();
 
@@ -86,12 +87,51 @@ router.post(
     kycController.verifyAadhaarOtp,
 );
 
+// Previously only checked file.mimetype in multer's fileFilter — a purely
+// client-supplied HTTP header (the multipart field's declared Content-Type),
+// never an actual inspection of the file's real binary content. An attacker
+// could set Content-Type: image/jpeg while uploading anything at all — a
+// malicious executable, script, or malformed file — and it would pass
+// straight through. This checks the file's real magic bytes (its actual
+// binary signature) against what its claimed type requires, after multer
+// has already buffered the full file in memory.
+function assertRealFileType(req: Request, res: Response, next: NextFunction): void {
+    const file = req.file;
+    if (!file) return next();
+
+    const buf = file.buffer;
+    const isJpeg = buf.length >= 3 && buf[0] === 0xFF && buf[1] === 0xD8 && buf[2] === 0xFF;
+    const isPng = buf.length >= 8 &&
+        buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4E && buf[3] === 0x47 &&
+        buf[4] === 0x0D && buf[5] === 0x0A && buf[6] === 0x1A && buf[7] === 0x0A;
+    const isPdf = buf.length >= 4 &&
+        buf[0] === 0x25 && buf[1] === 0x50 && buf[2] === 0x44 && buf[3] === 0x46; // "%PDF"
+
+    const claimedType = file.mimetype;
+    const actuallyMatches =
+        (claimedType === 'image/jpeg' && isJpeg) ||
+        (claimedType === 'image/png' && isPng) ||
+        (claimedType === 'application/pdf' && isPdf);
+
+    if (!actuallyMatches) {
+        res.status(HTTP.BAD_REQUEST).json({
+            success: false,
+            errorCode: 'INVALID_FILE_CONTENT',
+            message: `File content does not match its declared type (${claimedType}). The file's actual binary signature was checked and did not match.`,
+        });
+        return;
+    }
+
+    next();
+}
+
 // Document upload (multipart)
 router.post(
     '/documents/upload',
     requireAuth(),
     allowRoles(ROLE.CUSTOMER),
     upload.single('file'),
+    assertRealFileType,
     validateBody(uploadDocumentSchema),
     kycController.uploadDocument,
 );
