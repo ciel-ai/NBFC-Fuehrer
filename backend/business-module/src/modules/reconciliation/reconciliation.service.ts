@@ -42,6 +42,45 @@ export const reconciliationService = {
             !todayPayments.some(p => p.loan_account_id === e.loan_account_id),
         );
 
+        // Previously only compared ONE portfolio-wide aggregate (total
+        // expected vs total actual) — an account that underpays by ₹5,000
+        // and an unrelated account that overpays by ₹5,000 on the same day
+        // would net to a reported variance of exactly 0, silently masking
+        // both real discrepancies. unmatchedEmis above already correctly
+        // catches "paid nothing at all" at the per-account level, but the
+        // genuinely missing case was "paid something, but not the right
+        // amount." Added a per-account breakdown (only for accounts whose
+        // own expected-vs-actual doesn't match, not an exhaustive dump of
+        // every account) so a real per-account discrepancy is visible even
+        // when the portfolio-level aggregate looks clean.
+        const expectedByAccount = new Map<string, number>();
+        for (const e of overdueEmis) {
+            expectedByAccount.set(
+                e.loan_account_id,
+                (expectedByAccount.get(e.loan_account_id) ?? 0) + Number(e.emi_amount),
+            );
+        }
+        const actualByAccount = new Map<string, number>();
+        for (const p of todayPayments) {
+            actualByAccount.set(
+                p.loan_account_id,
+                (actualByAccount.get(p.loan_account_id) ?? 0) + Number(p.amount),
+            );
+        }
+        const allAccountIds = new Set([...expectedByAccount.keys(), ...actualByAccount.keys()]);
+        const accountDiscrepancies = Array.from(allAccountIds)
+            .map((accountId) => {
+                const accountExpected = expectedByAccount.get(accountId) ?? 0;
+                const accountActual = actualByAccount.get(accountId) ?? 0;
+                return {
+                    loanAccountId: accountId,
+                    expected: accountExpected,
+                    actual: accountActual,
+                    difference: accountActual - accountExpected,
+                };
+            })
+            .filter((row) => row.difference !== 0);
+
         const details = {
             overdueEmiCount: overdueEmis.length,
             paymentsToday:   todayPayments.length,
@@ -52,6 +91,7 @@ export const reconciliationService = {
                 dueDate:       e.due_date,
                 amount:        Number(e.emi_amount),
             })),
+            accountDiscrepancies,
         };
 
         await prisma.reconciliation_reports.create({
