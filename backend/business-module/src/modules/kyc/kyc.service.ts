@@ -274,6 +274,19 @@ export const kycService = {
             throw new KycIncompleteError(userId, ['PAN not submitted']);
         }
 
+        // Previously had no idempotency guard at all — a customer (or a
+        // buggy frontend retry) could call this endpoint repeatedly, each
+        // time triggering a real, paid Perfios vendor API call with zero
+        // functional benefit once already verified. Short-circuit if this
+        // check has already passed, rather than re-billing the vendor call.
+        if (doc.completedChecks.includes(KYC_CHECK.PAN_VERIFY)) {
+            return {
+                checkType: KYC_CHECK.PAN_VERIFY,
+                passed: true,
+                data: { alreadyVerified: true },
+            };
+        }
+
         const enc = getEncryptionProvider();
         const panPlain = await enc.decrypt(doc.panEncrypted);
         const kycProvider = getKycVerifyProvider();
@@ -485,6 +498,19 @@ export const kycService = {
         accountHolder: string,
         req: Request,
     ): Promise<KycCheckResult> {
+        // Previously called the real vendor with no idempotency guard at
+        // all, unlike other checks in this file — every repeat call (a
+        // customer retry, a buggy frontend) triggered another real, paid
+        // Perfios API call with zero benefit once already verified.
+        const existingDoc = await kycRepository.findByUserIdOrThrow(userId);
+        if (existingDoc.completedChecks.includes(KYC_CHECK.BANK_ACCOUNT)) {
+            return {
+                checkType: KYC_CHECK.BANK_ACCOUNT,
+                passed: true,
+                data: { alreadyVerified: true },
+            };
+        }
+
         const kycProvider = getKycVerifyProvider();
 
         const result = await kycProvider.verifyBankAccount(
@@ -583,10 +609,29 @@ async runGSTVerification(
     gstin: string,
     req: Request,
 ): Promise<KycCheckResult> {
+    // Previously mistagged checkType as PAN_VERIFY instead of GST_VERIFY,
+    // and never called recordCheckResult at all — meaning a GST
+    // verification result was never actually persisted anywhere, and (with
+    // no completedChecks entry ever recorded) there was no way to add an
+    // idempotency guard here either. Both fixed together: the result is
+    // now correctly tagged and recorded, and repeat calls short-circuit
+    // instead of re-billing the vendor.
+    const existingDoc = await kycRepository.findByUserIdOrThrow(userId);
+    if (existingDoc.completedChecks.includes(KYC_CHECK.GST_VERIFY)) {
+        return {
+            checkType: KYC_CHECK.GST_VERIFY,
+            passed: true,
+            data: { alreadyVerified: true },
+        };
+    }
+
     const kycProvider = getKycVerifyProvider();
     const result = await kycProvider.verifyGST(gstin);
+
+    await kycRepository.recordCheckResult(userId, KYC_CHECK.GST_VERIFY, result.valid);
+
     return {
-        checkType: KYC_CHECK.PAN_VERIFY,
+        checkType: KYC_CHECK.GST_VERIFY,
         passed: result.valid,
         data: result,
         failReason: result.valid ? undefined : 'GST verification failed',
