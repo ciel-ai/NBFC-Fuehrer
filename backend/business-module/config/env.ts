@@ -224,6 +224,15 @@ PERFIOS_TIMEOUT_MS: Joi.number().integer().default(15000),
 
     // ── CORS ──────────────────────────────────────────────────────────────────
     CORS_ALLOWED_ORIGINS: Joi.string().default(''),
+
+    // ── Health diagnostics ────────────────────────────────────────────────────
+    // GET /health (full diagnostics — memory, uptime, masked DB/Redis
+    // connection info) previously had no application-level protection at
+    // all, relying entirely on a code comment's assumption that it's never
+    // exposed via the load balancer in production - a network-layer control
+    // that lives outside this repo and can't be verified from source. This
+    // shared secret is a real, code-enforced backstop.
+    HEALTH_CHECK_SECRET: Joi.string().optional(),
     // Comma-separated list e.g. "https://app.feuhrer.in,https://admin.feuhrer.in"
 
     // ── Feature flags ─────────────────────────────────────────────────────────
@@ -383,6 +392,8 @@ export const env = {
             .map((o: string) => o.trim())
             .filter(Boolean),
     },
+
+    healthCheckSecret: value.HEALTH_CHECK_SECRET as string | undefined,
 
     features: {
         // Gold/Housing loan downstream stages (agreement, eSign, NACH,
