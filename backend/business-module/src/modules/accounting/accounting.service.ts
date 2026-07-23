@@ -88,6 +88,32 @@ const GL = {
     AGENT_COMMISSION:      '4004',
 } as const;
 
+// Every code in GL above is hardcoded as a string literal, with no
+// enforced link to the actual gl_accounts table journal_entries has real
+// foreign keys against. If gl_accounts data is ever changed (renumbered,
+// re-seeded with a different chart of accounts) without this constant
+// being updated to match, every GL posting referencing the drifted code
+// would start failing — previously silently (now durably logged, per the
+// GL_POSTING_FAILED audit fix), but only discovered on the next real
+// transaction rather than at boot. This validates all codes exist at
+// startup instead, so drift is caught immediately and loudly rather than
+// waiting for a real financial transaction to surface it.
+export async function assertGlAccountCodesExist(): Promise<void> {
+    const existing = await prisma.gl_accounts.findMany({ select: { code: true } });
+    const existingCodes = new Set(existing.map((row) => row.code));
+
+    const missing = Object.entries(GL)
+        .filter(([, code]) => !existingCodes.has(code))
+        .map(([name, code]) => `${name} (${code})`);
+
+    if (missing.length > 0) {
+        throw new Error(
+            `GL account code(s) referenced in accounting.service.ts do not exist in gl_accounts: ${missing.join(', ')}. ` +
+            'Every GL posting using these codes will fail. Update either the GL constant or the gl_accounts table so they match.',
+        );
+    }
+}
+
 function loanAccountByProduct(productType: string): string {
     switch (productType) {
         case 'GOLD_LOAN':     return GL.LOAN_GOLD;

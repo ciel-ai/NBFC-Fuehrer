@@ -2,6 +2,7 @@ import { createApp } from './app';
 import { env } from '@/config/env';
 import { createModuleLogger } from '@/config/logger';
 import { loadSecrets } from '@/config/secrets';
+import { assertGlAccountCodesExist } from '@/modules/accounting/accounting.service';
 import { scheduleNpaWatchJob }       from '@/jobs/npaWatch.job';
 import { scheduleReconciliationJob } from '@/jobs/reconciliation.job';
 import { scheduleBureauReportingJob } from '@/jobs/bureauReporting.job';
@@ -26,6 +27,15 @@ async function start(): Promise<void> {
         await loadSecrets();
     } catch (err) {
         log.error('Fatal: failed to load secrets at startup — server will not start', {
+            error: err instanceof Error ? err.message : String(err),
+        });
+        process.exit(1);
+    }
+
+    try {
+        await assertGlAccountCodesExist();
+    } catch (err) {
+        log.error('Fatal: GL account code validation failed at startup — server will not start', {
             error: err instanceof Error ? err.message : String(err),
         });
         process.exit(1);
