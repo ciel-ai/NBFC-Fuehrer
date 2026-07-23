@@ -166,7 +166,14 @@ async updateBranch(req: AuthRequest, res: Response, next: NextFunction) {
 // GET /admin/loans
 async listAllLoans(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-        const result = await adminService.listAllLoans(req.query);
+        const query = getValidatedQuery<{
+            productType?: string;
+            status?: string;
+            search?: string;
+            page: number;
+            limit: number;
+        }>(req);
+        const result = await adminService.listAllLoans(query);
         res.status(HTTP.OK).json(successResponse(result));
     } catch (err) { next(err); }
 },

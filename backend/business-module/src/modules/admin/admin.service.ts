@@ -402,20 +402,21 @@ export const adminService = {
             prisma.loan_applications.count({ where }),
         ]);
 
-        const { serializeMoney } = await import('@/utils/money');
-const serialized = rows.map(row => ({
-    ...row,
-    amount_requested: serializeMoney(row.amount_requested),
-    approved_amount: serializeMoney(row.approved_amount),
-    monthly_emi: serializeMoney(row.monthly_emi),
-    processing_fee: serializeMoney(row.processing_fee),
-    processing_fee_gst: serializeMoney(row.processing_fee_gst),
-}));
-
-return {
-    data: rows,
-    pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
-};
+        // Previously computed a `serialized` variable here (via
+        // serializeMoney, converting rupees to paise) but returned the
+        // unserialized `rows` instead — a dead computation, not a bug.
+        // serializeMoney performs the exact same rupees-to-paise conversion
+        // as the global moneyConverter response middleware already applied
+        // to every response; had this "fix" been made to return `serialized`
+        // instead of `rows`, every money field here would have been
+        // converted TWICE (paise, then paise-of-paise), a 10,000x error far
+        // worse than the original dead-code issue. Removed the redundant
+        // computation entirely — the raw Decimal `rows` are exactly what
+        // the global middleware correctly expects to convert once.
+        return {
+            data: rows,
+            pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+        };
     },
 
     async getLoanDetail(loanId: string) {

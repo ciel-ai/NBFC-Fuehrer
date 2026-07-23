@@ -144,7 +144,26 @@ router.patch(
     })),
     adminController.updateBranch,
 );
-router.get('/loans', requireAuth(), allowRoles(...SUPER_ADMIN_ONLY), adminController.listAllLoans);
+// Previously had zero query validation at all — status accepted any string
+// value, and limit had no upper bound, letting a caller request an
+// arbitrarily large page size (e.g. limit=999999) for a full-table dump.
+router.get(
+    '/loans',
+    requireAuth(),
+    allowRoles(...SUPER_ADMIN_ONLY),
+    validateQuery(Joi.object({
+        productType: Joi.string().valid('CONSUMER_DURABLE', 'TWO_WHEELER', 'EDUCATION_DEVICE', 'GOLD_LOAN', 'HOUSING_LOAN').optional(),
+        status: Joi.string().valid(
+            'DRAFT', 'KYC_PENDING', 'KYC_REJECTED', 'UNDERWRITING', 'APPOINTMENT_BOOKED',
+            'APPRAISAL_PENDING', 'PROPERTY_ASSESSMENT', 'PENDING_APPROVAL', 'APPROVED',
+            'REJECTED', 'ESIGN_PENDING', 'DISBURSED', 'ACTIVE', 'CLOSED', 'NPA', 'WRITTEN_OFF',
+        ).optional(),
+        search: Joi.string().max(100).optional(),
+        page: Joi.number().integer().positive().default(1),
+        limit: Joi.number().integer().positive().max(100).default(20),
+    })),
+    adminController.listAllLoans,
+);
 router.get('/loans/:loanId', requireAuth(), allowRoles(...SUPER_ADMIN_ONLY), adminController.getLoanDetail);
 
 export { router as adminRouter };
