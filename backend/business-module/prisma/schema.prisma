@@ -393,7 +393,14 @@ model payments {
   total_collected  Decimal       @db.Decimal(15, 2)
   channel          String        @db.VarChar(20)
   gateway          String        @db.VarChar(30)
-  gateway_txn_id   String?       @db.VarChar(100)
+  // Previously indexed but not unique — two concurrent webhook deliveries
+  // for the same gateway transaction (Razorpay retries these under real
+  // network conditions) could both pass the check-then-act idempotency
+  // checks in _handlePaymentCaptured and both create separate payment rows
+  // for the same transaction. Nullable, so multiple non-gateway payments
+  // (e.g. cash collection) with no gatewayTxnId remain unaffected — only
+  // genuinely duplicate real transaction IDs are rejected.
+  gateway_txn_id   String?       @unique @db.VarChar(100)
   utr_number       String?       @db.VarChar(50)
   status           payment_status @default(PENDING)
   failure_reason   String?

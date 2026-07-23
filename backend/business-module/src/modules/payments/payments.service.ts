@@ -1,5 +1,6 @@
 // src/modules/payments/payments.service.ts
 import type { Request } from 'express';
+import { Prisma } from '@prisma/client';
 import { paymentsRepository } from './payments.repository';
 import { paymentEvents } from './payments.events';
 import { emiRepository } from '@/modules/emi';
@@ -535,22 +536,50 @@ export const paymentsService = {
         const utrNumber = (entity.acquirer_data as Record<string, string>)?.rrn
             ?? null;
 
-        // Find or create the payment record
+        // Resolve the real userId from the loan account — previously
+        // hardcoded to an empty string with a comment claiming it would be
+        // "resolved from EMI → loan account", but no resolution code
+        // actually existed. Every real webhook-driven payment creation
+        // failed with a Postgres UUID-parsing error on this empty string,
+        // discovered while testing the race-condition fix below (both
+        // concurrent test calls failed for this unrelated reason).
+        const loanAccount = await loansRepository.findAccountByIdOrThrow(emi.loanAccountId);
+
+        // Find or create the payment record. gateway_txn_id now has a real
+        // unique constraint at the DB level (previously indexed but not
+        // unique) — this is the actual atomic backstop against duplicate
+        // webhook delivery, not the Redis/DB checks above, which are a
+        // classic check-then-act race: two concurrent deliveries for the
+        // same transaction could both pass those checks before either
+        // commits. If a concurrent caller wins that race and creates the
+        // row first, this insert fails with a real Postgres unique
+        // violation (P2002) — caught here and treated as "already
+        // processed" rather than crashing or silently creating a
+        // duplicate.
         let payment = existing;
         if (!payment) {
-            payment = await paymentsRepository.createPayment({
-                loanAccountId: emi.loanAccountId,
-                userId: '', // Resolved from EMI → loan account
-                emiId,
-                paymentType: 'EMI',
-                amount: amountRupees,
-                penaltyAmount: 0,
-                channel: PAYMENT_CHANNEL.PAYMENT_LINK,
-                gateway: 'razorpay',
-                gatewayTxnId,
-                debitAttemptNo: 1,
-                status: PAYMENT_STATUS.PENDING,
-            });
+            try {
+                payment = await paymentsRepository.createPayment({
+                    loanAccountId: emi.loanAccountId,
+                    userId: loanAccount.userId,
+                    emiId,
+                    paymentType: 'EMI',
+                    amount: amountRupees,
+                    penaltyAmount: 0,
+                    channel: PAYMENT_CHANNEL.PAYMENT_LINK,
+                    gateway: 'razorpay',
+                    gatewayTxnId,
+                    debitAttemptNo: 1,
+                    status: PAYMENT_STATUS.PENDING,
+                });
+            } catch (err) {
+                if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+                    log.info('Payment already created by a concurrent webhook delivery — treating as already processed', { gatewayTxnId });
+                    await redis.setex(lockKey, RedisTTL.WEBHOOK_PROCESSED, '1');
+                    return;
+                }
+                throw err;
+            }
         }
 
         // Mark payment successful
