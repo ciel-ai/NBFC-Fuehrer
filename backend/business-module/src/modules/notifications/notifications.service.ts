@@ -143,9 +143,18 @@ export const notificationsService = {
             dispatch;
 
         // ── Deduplication check ───────────────────────────────────────────────────
-        if (dedupeKey) {
-            const redis = getRedisClient();
-            const fullKey = `${DEDUPE_PREFIX}${dedupeKey}`;
+        // Previously the dedupe key was set immediately here, BEFORE any
+        // channel send was even attempted. If the SMS/push/email send later
+        // failed (a vendor API error, a network blip), the dedupe key was
+        // already set for the full TTL window (default 1 hour) — the
+        // notification could never be retried during that window even
+        // though it never actually reached the customer. The key is now
+        // only set after dispatch completes and only if at least one
+        // channel genuinely succeeded — see the end of this function.
+        const redis = getRedisClient();
+        const fullKey = dedupeKey ? `${DEDUPE_PREFIX}${dedupeKey}` : null;
+
+        if (fullKey) {
             const exists = await redis.get(fullKey).catch(() => null);
 
             if (exists) {
@@ -165,10 +174,6 @@ export const notificationsService = {
 
                 return;
             }
-
-            // Mark as sent — TTL prevents re-send within the window
-            const ttl = dedupeTtl ?? 3600; // Default 1 hour
-            await redis.setex(fullKey, ttl, '1').catch(() => { });
         }
 
         // ── Render template ───────────────────────────────────────────────────────
@@ -210,13 +215,13 @@ export const notificationsService = {
         }
 
         // ── Dispatch per channel ──────────────────────────────────────────────────
-        const dispatchTasks = channels.map(async (channel) => {
+        const dispatchTasks = channels.map(async (channel): Promise<boolean> => {
             switch (channel) {
 
                 case 'SMS': {
                     if (!recipient.phone || !rendered.smsBody) {
                         log.debug('SMS skipped — no phone or no body', { template });
-                        return;
+                        return false;
                     }
 
                     const result = await dispatchSms(recipient.phone, rendered.smsBody);
@@ -236,10 +241,10 @@ export const notificationsService = {
                             phone: recipient.phone,
                             error: result.error,
                         });
-                    } else {
-                        log.debug('SMS sent', { template, phone: recipient.phone });
+                        return false;
                     }
-                    break;
+                    log.debug('SMS sent', { template, phone: recipient.phone });
+                    return true;
                 }
 
                 case 'EMAIL': {
@@ -249,7 +254,7 @@ export const notificationsService = {
                         !rendered.emailHtml
                     ) {
                         log.debug('Email skipped — no address or template', { template });
-                        return;
+                        return false;
                     }
 
                     const result = await dispatchEmail(
@@ -274,8 +279,9 @@ export const notificationsService = {
                             email: recipient.email,
                             error: result.error,
                         });
+                        return false;
                     }
-                    break;
+                    return true;
                 }
 
                 case 'PUSH': {
@@ -285,7 +291,7 @@ export const notificationsService = {
                         !rendered.pushBody
                     ) {
                         log.debug('Push skipped — no token or template', { template });
-                        return;
+                        return false;
                     }
 
                     const result = await dispatchPush(
@@ -309,14 +315,25 @@ export const notificationsService = {
                             template,
                             error: result.error,
                         });
+                        return false;
                     }
-                    break;
+                    return true;
                 }
             }
+            return false;
         });
 
         // Dispatch all channels concurrently — a failure in one does not block others
-        await Promise.allSettled(dispatchTasks);
+        const results = await Promise.allSettled(dispatchTasks);
+        const anySucceeded = results.some((r) => r.status === 'fulfilled' && r.value === true);
+
+        // Only NOW mark the dedupe key — after we know whether the
+        // notification actually reached the customer through any channel,
+        // not before the send was even attempted.
+        if (fullKey && anySucceeded) {
+            const ttl = dedupeTtl ?? 3600; // Default 1 hour
+            await redis.setex(fullKey, ttl, '1').catch(() => { });
+        }
     },
 
     // ── Fetch user contact details ─────────────────────────────────────────────
