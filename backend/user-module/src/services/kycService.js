@@ -1,4 +1,4 @@
-const karzaClient = require('../vendors/karzaClient');
+
 const hypervergeClient = require('../vendors/hypervergeClient');
 const signzyClient = require('../vendors/signzyClient');
 const enachClient = require('../vendors/enachClient');
@@ -85,43 +85,11 @@ const buildKycStatusPayload = async (userId) => {
   };
 };
 
-const verifyPan = async (userId, panNumber) => {
-  await ensureUser(userId);
-
-  const providerResponse = await karzaClient.verifyPan(panNumber);
-
-  if (!providerResponse.success) {
-    throw new AppError('PAN verification failed.', 400);
-  }
-
-  const encryptedPan = encryptText(panNumber);
-
-  await prisma.$transaction([
-    upsertKycDetail(userId, {
-      panNumber: encryptedPan,
-      panVerified: true,
-    }),
-    prisma.user.update({
-      where: {
-        id: userId,
-      },
-      data: {
-        panNumber: encryptedPan,
-      },
-    }),
-  ]);
-
-  const kycStatus = await refreshKycStatus(userId);
-
-  logger.info({
-    message: 'PAN verified successfully.',
-    userId,
-  });
-
-  return {
-    providerResponse,
-    kycStatus,
-  };
+const verifyPan = async () => {
+  throw new AppError(
+    'PAN verification via user-module is not supported. Use the KYC endpoints on the main API (Perfios-based).',
+    410,
+  );
 };
 
 const verifyAadhaar = async (userId, aadhaarNumber) => {
