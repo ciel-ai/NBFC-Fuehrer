@@ -15,7 +15,24 @@ app.use(helmet({
     contentSecurityPolicy: process.env.NODE_ENV === 'production',
     crossOriginEmbedderPolicy: false,
 }));
-app.use(cors());
+
+// Previously app.use(cors()) with zero options — the cors package's
+// documented default behavior with no config is to reflect and allow
+// ANY origin. Restrict to an explicit allowlist in production; allow all
+// in development/test so local tooling and the mobile app's dev client
+// keep working without extra setup.
+const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS ?? '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+
+app.use(cors({
+    origin(origin, callback) {
+        if (process.env.NODE_ENV !== 'production') return callback(null, true);
+        if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+        callback(new Error('Not allowed by CORS'));
+    },
+}));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false }));
 
