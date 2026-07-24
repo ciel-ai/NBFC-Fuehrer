@@ -24,6 +24,16 @@ declare global {
 function buildDatabaseUrl(): string {
     const url = new URL(env.db.url);
     url.searchParams.set('connection_limit', String(env.db.poolMax));
+
+    // DATABASE_SSL was validated and required=true in production (see
+    // env.ts) but never actually applied to the connection at all - a
+    // production deployment believed it had DB-connection SSL enforced
+    // (the env var was required and validated at boot) when the real
+    // Postgres connection never carried any SSL parameter whatsoever.
+    if (env.db.ssl) {
+        url.searchParams.set('sslmode', 'require');
+    }
+
     return url.toString();
 }
 
