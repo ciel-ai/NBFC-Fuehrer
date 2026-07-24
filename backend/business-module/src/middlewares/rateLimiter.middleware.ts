@@ -103,10 +103,20 @@ function createRateLimiter(config: RateLimitConfig) {
 // Import and use these directly in route files.
 
 // General API — 100 req/min per IP
+// Previously used the default IP:path key (like every other limiter here),
+// which is correct for path-specific limiters (KYC, webhook, loan-apply,
+// disburse - each protecting one particular expensive/sensitive operation)
+// but wrong for this one: generalLimiter is applied globally as blanket
+// middleware on every route (see app.ts), meant to be a broad per-IP abuse
+// defense. With IP:path keying, an attacker hitting N different endpoints
+// from one IP got N separate full quotas - e.g. 100 req/min per path,
+// not 100 req/min total - completely defeating the intended global cap.
+// Keyed on IP alone here so the limit is genuinely IP-wide.
 export const generalLimiter = createRateLimiter({
     windowMs: env.rateLimit.windowMs,
     max: env.rateLimit.maxRequests,
     keyPrefix: 'general',
+    keyExtractor: (req) => req.ip ?? 'unknown',
 });
 
 // Staff/admin login — 5 attempts per 15 minutes per IP. Previously had no
