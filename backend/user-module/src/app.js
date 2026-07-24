@@ -1,4 +1,5 @@
 const express = require('express');
+const helmet = require('helmet');
 const cors = require('cors');
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
@@ -8,6 +9,12 @@ const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
 
+// Previously missing entirely — business-module already uses helmet, but
+// user-module (which handles auth/OTP/KYC) had no security headers at all.
+app.use(helmet({
+    contentSecurityPolicy: process.env.NODE_ENV === 'production',
+    crossOriginEmbedderPolicy: false,
+}));
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false }));
