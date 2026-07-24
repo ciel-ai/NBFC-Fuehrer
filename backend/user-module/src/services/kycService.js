@@ -1,5 +1,5 @@
 
-const hypervergeClient = require('../vendors/hypervergeClient');
+
 const signzyClient = require('../vendors/signzyClient');
 const enachClient = require('../vendors/enachClient');
 const prisma = require('../config/prismaClient');
@@ -92,69 +92,25 @@ const verifyPan = async () => {
   );
 };
 
-const verifyAadhaar = async (userId, aadhaarNumber) => {
-  await ensureUser(userId);
-
-  const providerResponse = await hypervergeClient.verifyAadhaar(aadhaarNumber);
-
-  if (!providerResponse.success) {
-    throw new AppError('Aadhaar verification failed.', 400);
-  }
-
-  const encryptedAadhaar = encryptText(aadhaarNumber);
-
-  await prisma.$transaction([
-    upsertKycDetail(userId, {
-      aadhaarNumber: encryptedAadhaar,
-      aadhaarVerified: true,
-    }),
-    prisma.user.update({
-      where: {
-        id: userId,
-      },
-      data: {
-        aadhaarNumber: encryptedAadhaar,
-      },
-    }),
-  ]);
-
-  const kycStatus = await refreshKycStatus(userId);
-
-  logger.info({
-    message: 'Aadhaar verified successfully.',
-    userId,
-  });
-
-  return {
-    providerResponse,
-    kycStatus,
-  };
+// Aadhaar/selfie verification via user-module previously called
+// hypervergeClient.js, a vendor integration that was never actually the
+// confirmed KYC vendor - Perfios is, wired up separately in business-module.
+// Confirmed no reference anywhere in the mobile app to these user-module
+// routes by any naming pattern - the real Aadhaar/selfie flow goes through
+// business-module's Perfios-based routes instead (the same pattern already
+// confirmed and fixed for PAN verification / karzaClient.js).
+const verifyAadhaar = async () => {
+  throw new AppError(
+    'Aadhaar verification via user-module is not supported. Use the KYC endpoints on the main API (Perfios-based).',
+    410,
+  );
 };
 
-const verifySelfie = async (userId, selfiePayload) => {
-  await ensureUser(userId);
-
-  const providerResponse = await hypervergeClient.verifySelfie(selfiePayload);
-
-  if (!providerResponse.success) {
-    throw new AppError('Selfie verification failed.', 400);
-  }
-
-  await upsertKycDetail(userId, {
-    selfieVerified: true,
-  });
-
-  const kycStatus = await refreshKycStatus(userId);
-
-  logger.info({
-    message: 'Selfie verified successfully.',
-    userId,
-  });
-
-  return {
-    providerResponse,
-    kycStatus,
-  };
+const verifySelfie = async () => {
+  throw new AppError(
+    'Selfie verification via user-module is not supported. Use the KYC endpoints on the main API (Perfios-based).',
+    410,
+  );
 };
 
 const getKycStatus = async (userId) => {
