@@ -26,7 +26,7 @@ const generateAccessToken = (user) => {
       jti: crypto.randomUUID(),
     },
     ACCESS_SECRET,
-    { expiresIn: ACCESS_EXPIRES_IN },
+    { expiresIn: ACCESS_EXPIRES_IN, algorithm: 'HS256' },
   );
 };
 
@@ -34,12 +34,17 @@ const generateRefreshToken = (userId) => {
   return jwt.sign(
     { sub: userId, jti: crypto.randomUUID() },
     REFRESH_SECRET,
-    { expiresIn: REFRESH_EXPIRES_IN },
+    { expiresIn: REFRESH_EXPIRES_IN, algorithm: 'HS256' },
   );
 };
 
-const verifyAccessToken = (token) => jwt.verify(token, ACCESS_SECRET);
-const verifyRefreshToken = (token) => jwt.verify(token, REFRESH_SECRET);
+// Previously called with no algorithms option at all — jsonwebtoken's
+// verify() then trusts whatever algorithm the token's own header claims,
+// a classic JWT "alg confusion" attack vector. Explicitly restricting to
+// HS256 means verify() rejects any token using a different algorithm,
+// regardless of what its header says.
+const verifyAccessToken = (token) => jwt.verify(token, ACCESS_SECRET, { algorithms: ['HS256'] });
+const verifyRefreshToken = (token) => jwt.verify(token, REFRESH_SECRET, { algorithms: ['HS256'] });
 
 module.exports = {
   generateAccessToken,

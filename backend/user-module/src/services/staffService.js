@@ -31,7 +31,7 @@ const staffLogin = async (username, password) => {
     const token = jwt.sign(
         { userId: staff.id, username: staff.username, role: staff.role, product: staff.product, jti, aud: 'web' },
         process.env.JWT_SECRET,
-        { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+        { expiresIn: process.env.JWT_EXPIRES_IN || '7d', algorithm: 'HS256' }
     );
     logger.info({ message: 'Staff logged in.', staffId: staff.id, role: staff.role });
     return { token, mustChangePassword: staff.must_change_password, staff: buildStaffResponse(staff) };
