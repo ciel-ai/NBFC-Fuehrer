@@ -1,6 +1,6 @@
 // src/middlewares/errorHandler.middleware.ts
 import type { Request, Response, NextFunction } from 'express';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '../generated/prisma-client';
 import { AppError } from '@/errors';
 import { ValidationError } from '@/errors';
 import { createModuleLogger } from '@/config/logger';
