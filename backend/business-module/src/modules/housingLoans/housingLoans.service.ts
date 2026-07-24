@@ -1,5 +1,6 @@
 // src/modules/housingLoans/housingLoans.service.ts
 import { createModuleLogger } from '@/config/logger';
+import { computeMonthlyEmi } from '@/modules/emi/emi.calculator';
 import { housingLoansRepository } from './housingLoans.repository';
 import { loansRepository } from '@/modules/loans/loans.repository';
 import { LOAN_STATUS, PRODUCT_TYPE } from '@/config/constants';
@@ -50,14 +51,14 @@ const MAX_FOIR              = 50;
 
 // ─── EMI formula ──────────────────────────────────────────────────────────────
 
-function calcEmi(principal: number, annualRate: number, months: number): number {
-    const r = annualRate / 12 / 100;
-    if (r === 0) return Math.round(principal / months);
-    return Math.round(
-        (principal * r * Math.pow(1 + r, months)) /
-        (Math.pow(1 + r, months) - 1),
-    );
-}
+// Previously a local reimplementation using Math.round(), which can round
+// DOWN - meaning the EMI estimate shown here (before disbursement) could be
+// a few paise lower than the real EMI actually charged after disbursement
+// (computeMonthlyEmi deliberately uses Math.ceil(), "customer never
+// underpays by rounding"). Now uses the same authoritative calculation for
+// both the estimate and the real, disbursed schedule, eliminating that
+// discrepancy entirely.
+const calcEmi = computeMonthlyEmi;
 
 // ─── Service ──────────────────────────────────────────────────────────────────
 
