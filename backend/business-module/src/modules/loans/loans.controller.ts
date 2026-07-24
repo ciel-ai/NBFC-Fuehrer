@@ -1,7 +1,7 @@
 // src/modules/loans/loans.controller.ts
 import type { Response, NextFunction } from 'express';
 import { loansService } from './loans.service';
-import { HTTP, ROLE } from '@/config/constants';
+import { HTTP, ROLE, BUSINESS_RULES } from '@/config/constants';
 import { isStaffRole } from '@/constants/roles.constants';
 import {
     successResponse,
@@ -195,12 +195,12 @@ export const loansController = {
     async goldRate(_req: AuthRequest, res: Response, next: NextFunction) {
         try {
             const result = {
-                ratePerGram: 6200,
+                ratePerGram: BUSINESS_RULES.GOLD_RATE_PER_GRAM,
                 purityRates: {
-                    '18K': Math.round(6200 * 0.750),
-                    '20K': Math.round(6200 * 0.833),
-                    '22K': Math.round(6200 * 0.916),
-                    '24K': Math.round(6200 * 0.999),
+                    '18K': Math.round(BUSINESS_RULES.GOLD_RATE_PER_GRAM * 0.750),
+                    '20K': Math.round(BUSINESS_RULES.GOLD_RATE_PER_GRAM * 0.833),
+                    '22K': Math.round(BUSINESS_RULES.GOLD_RATE_PER_GRAM * 0.916),
+                    '24K': Math.round(BUSINESS_RULES.GOLD_RATE_PER_GRAM * 0.999),
                 },
                 maxLtvPercent: 75,
                 currency: 'INR',
@@ -224,7 +224,7 @@ export const loansController = {
                 '24': 0.999,
             };
 
-            const ratePerGram = 6200;
+            const ratePerGram = BUSINESS_RULES.GOLD_RATE_PER_GRAM;
             const purity = purityMap[purityKarat ?? '22'] ?? 0.916;
             const weight = parseFloat(weightGrams ?? '0');
             const estimatedGoldValue = Math.round(ratePerGram * purity * weight);

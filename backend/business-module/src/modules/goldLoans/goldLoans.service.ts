@@ -2,7 +2,7 @@
 import { createModuleLogger } from '@/config/logger';
 import { goldLoansRepository } from './goldLoans.repository';
 import { loansRepository } from '@/modules/loans/loans.repository';
-import { LOAN_STATUS } from '@/config/constants';
+import { LOAN_STATUS, BUSINESS_RULES } from '@/config/constants';
 import { NotFoundError, LoanStateError, ValidationError } from '@/errors';
 import { prisma } from '@/config/database';
 import { emiService } from '@/modules/emi';
@@ -34,7 +34,7 @@ const log = createModuleLogger('goldLoans.service');
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const GOLD_RATE_PER_GRAM  = 6200;
+const GOLD_RATE_PER_GRAM  = BUSINESS_RULES.GOLD_RATE_PER_GRAM;
 const MAX_LTV_PERCENT     = 75;
 const GOLD_INTEREST_RATE  = 10.56;
 const GOLD_PROCESSING_FEE = 0.5;

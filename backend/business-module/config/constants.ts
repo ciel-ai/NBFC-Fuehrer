@@ -228,6 +228,18 @@ export type AuditAction = (typeof AUDIT_ACTION)[keyof typeof AUDIT_ACTION];
 // These are defaults — actual limits come from env.business (configurable)
 
 export const BUSINESS_RULES = {
+    // Gold
+    // Previously hardcoded as the raw literal 6200 in loans.controller.ts
+    // (twice, with no named constant at all) and separately as its own
+    // local GOLD_RATE_PER_GRAM constant in goldLoans.service.ts - two
+    // independent copies that could silently drift if only one was ever
+    // updated. Single shared source of truth here instead.
+    // NOTE: this remains a static placeholder value, not a real-time market
+    // rate feed - gold prices genuinely fluctuate daily. Wiring this to a
+    // real rate source is a separate, larger feature requiring a business
+    // decision on the rate provider, not addressed by this consolidation.
+    GOLD_RATE_PER_GRAM: 6200,
+
     // EMI
     EMI_BOUNCE_PENALTY_RATE: 0.02,   // 2% of EMI amount per bounce
     EMI_OVERDUE_PENALTY_RATE: 0.24,   // 24% p.a. on overdue principal
