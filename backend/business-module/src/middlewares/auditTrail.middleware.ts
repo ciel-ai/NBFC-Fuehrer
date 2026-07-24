@@ -59,7 +59,16 @@ export function auditTrail() {
             // Don't audit failed auth / validation — those aren't business events
             // Do audit 4xx on always-audit paths (e.g. attempted unauthorised approval)
             const statusCode = res.statusCode;
-            if (statusCode < 200 && statusCode >= 300 && !isAlwaysAudit) return;
+            // Previously used && here, a logical impossibility (no number
+            // is both < 200 AND >= 300 simultaneously) - this exclusion
+            // check could never actually fire, meaning failed/rejected
+            // mutations on ordinary (non-always-audit) routes were being
+            // logged as audit events even though the intent, per the
+            // comment above, was to only log failures on always-audit
+            // paths. Corrected to || so the check actually evaluates
+            // "is this outside the 2xx success range".
+            const isOutsideSuccessRange = statusCode < 200 || statusCode >= 300;
+            if (isOutsideSuccessRange && !isAlwaysAudit) return;
             if (statusCode === 401 || statusCode === 429) return;
 
             const ctx = req.auditContext ?? {};
