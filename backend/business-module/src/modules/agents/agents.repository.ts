@@ -104,6 +104,7 @@ export const agentsRepository = {
         bankIfsc: string;
         bankAccountName: string;
         panNumber: string;   // Masked: ABCDE****F
+        panEncrypted: string; // Real, recoverable encrypted PAN
         aadhaarLast4: string;
         commissionRate: number;
     }): Promise<AgentProfile> {
@@ -126,6 +127,7 @@ export const agentsRepository = {
                 status: AGENT_STATUS.PENDING,
                 commission_rate: data.commissionRate,
                 pan_number: data.panNumber,
+                pan_encrypted: data.panEncrypted,
                 aadhaar_last4: data.aadhaarLast4,
                 onboarded_at: new Date(),
                 created_at: new Date(),

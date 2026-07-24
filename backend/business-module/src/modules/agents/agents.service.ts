@@ -3,7 +3,7 @@ import { prisma } from '@/config/database';
 import type { Request } from 'express';
 import { agentsRepository } from './agents.repository';
 import { agentEvents } from './agents.events';
-import { getPaymentProvider } from '@/providers';
+import { getPaymentProvider, getEncryptionProvider } from '@/providers';
 import { setAuditContext } from '@/middlewares';
 import {
     AGENT_STATUS,
@@ -120,6 +120,14 @@ export const agentsService = {
             );
         }
 
+        // Previously only the masked PAN was ever persisted - the real
+        // value was never stored anywhere recoverable. Now also encrypts
+        // and stores the real PAN (matching the customer KYC pattern:
+        // kyc_documents.pan_encrypted), so a legitimate future need (a
+        // compliance report, a re-verification) can actually retrieve it.
+        const enc = getEncryptionProvider();
+        const panEncrypted = await enc.encrypt(panNumber);
+
         const agent = await agentsRepository.create({
             userId,
             fullName,
@@ -133,6 +141,7 @@ export const agentsService = {
             bankIfsc: input.bankIfsc,
             bankAccountName: input.bankAccountName,
             panNumber: maskPan(panNumber),
+            panEncrypted,
             aadhaarLast4,
             commissionRate: commissionRate ?? BUSINESS_RULES.AGENT_COMMISSION_RATE,
         });

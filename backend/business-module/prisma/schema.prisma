@@ -91,6 +91,14 @@ model agents {
   bank_account_name  String               @db.VarChar(100)
   status             String               @default("PENDING") @db.VarChar(20)
   commission_rate    Decimal              @default(0.015) @db.Decimal(6, 4)
+  // Previously pan_number stored ONLY a masked value (e.g. "ABCDE****F")
+  // written at onboarding time - the real PAN was never persisted anywhere
+  // recoverable, unlike the customer KYC flow (kyc_documents.pan_encrypted),
+  // which correctly stores a real, recoverable encrypted value alongside
+  // its own masked display field. Added the same real encrypted storage
+  // here, since a legitimate future need (compliance reporting, re-KYC)
+  // to recover an agent's actual PAN had no way to be satisfied at all.
+  pan_encrypted      String?
   pan_number         String?              @db.VarChar(10)
   aadhaar_last4      String?              @db.VarChar(4)
   suspension_reason  String?

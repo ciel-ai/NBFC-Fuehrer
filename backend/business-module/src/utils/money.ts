@@ -3,7 +3,7 @@
 // DB stores as numeric (rupees with 2 decimals)
 // API exchanges in paise (₹1 = 100 paise)
 
-import { Prisma } from '@prisma/client';
+import { Prisma } from '@/generated/prisma-client';
 
 type MoneyInput = number | string | Prisma.Decimal | null | undefined;
 

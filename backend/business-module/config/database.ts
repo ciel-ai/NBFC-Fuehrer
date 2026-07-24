@@ -1,5 +1,5 @@
 // src/config/database.ts
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../src/generated/prisma-client';
 import { env } from './env';
 import { logger } from './logger';
 

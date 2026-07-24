@@ -24,7 +24,7 @@
 // expects paise, silently misreporting amounts by 100x).
 
 import type { Request, Response, NextFunction } from 'express';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '@/generated/prisma-client';
 
 // Matches: amount, ...Amount, _amount, fee, ...Fee, _fee, emi, ...Emi, _emi,
 // balance, ...Balance, _balance, income, ...Income, _income, interest,

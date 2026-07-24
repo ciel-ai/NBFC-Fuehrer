@@ -10,7 +10,7 @@
 
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '@/generated/prisma-client';
 import { prisma } from '@/config/database';
 import { logger } from '@/config/logger';
 import { AppError, ForbiddenError } from '@/errors';
