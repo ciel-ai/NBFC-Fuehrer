@@ -14,6 +14,13 @@ type MoneyInput = number | string | Prisma.Decimal | null | undefined;
 export const rupeesToPaise = (rupees: MoneyInput): number => {
     if (rupees === null || rupees === undefined) return 0;
     const num = typeof rupees === 'object' ? Number(rupees.toString()) : Number(rupees);
+    // Previously no guard at all - invalid input (a non-numeric string,
+    // NaN, Infinity) silently produced NaN here, which then becomes null
+    // in a JSON API response with zero error surfaced - a customer's loan
+    // amount could silently show as null instead of a clear failure.
+    if (!Number.isFinite(num)) {
+        throw new Error(`rupeesToPaise received a non-finite value: ${rupees}`);
+    }
     return Math.round(num * 100);
 };
 
@@ -24,6 +31,9 @@ export const rupeesToPaise = (rupees: MoneyInput): number => {
 export const paiseToRupees = (paise: number | string | null | undefined): number => {
     if (paise === null || paise === undefined) return 0;
     const num = typeof paise === 'string' ? parseInt(paise, 10) : Number(paise);
+    if (!Number.isFinite(num)) {
+        throw new Error(`paiseToRupees received a non-finite value: ${paise}`);
+    }
     return num / 100;
 };
 
