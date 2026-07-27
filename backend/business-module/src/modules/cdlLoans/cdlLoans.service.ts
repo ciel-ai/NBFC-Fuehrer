@@ -1,5 +1,6 @@
 ﻿// src/modules/cdlLoans/cdlLoans.service.ts
 import { createModuleLogger } from '@/config/logger';
+import { env } from '@/config/env';
 import { computeMonthlyEmi } from '@/modules/emi/emi.calculator';
 import type {
     CdlApplicationInput, CdlApplicationResult,
@@ -100,7 +101,14 @@ export const cdlLoansService = {
         return {
             applicationId,
             agreementId: `agr_cdl_${Date.now()}`,
-            agreementUrl: `https://feuhrer-docs.s3.ap-south-1.amazonaws.com/agreements/cdl_${applicationId}.pdf`,
+            // Previously hardcoded the bucket name and region directly -
+            // both are already configurable via AWS_S3_BUCKET/AWS_REGION
+            // env vars used correctly elsewhere in the codebase. This
+            // entire function is stub-only, gated behind stubGuard() at
+            // the route level (CDL is not yet wired for real), so this
+            // fake URL is never reachable in production regardless - fixed
+            // for consistency, not because it was causing a live issue.
+            agreementUrl: `https://${env.aws.s3Bucket}.s3.${env.aws.region}.amazonaws.com/agreements/cdl_${applicationId}.pdf`,
             status: 'GENERATED',
             eSignRequestId: null,
             note: 'Agreement generated. Please sign to proceed.',
@@ -184,7 +192,7 @@ export const cdlLoansService = {
     generateNoc(loanId: string): { nocRef: string; nocS3Url: string } {
         return {
             nocRef: `NOC-CDL-${loanId}-${Date.now()}`,
-            nocS3Url: `https://feuhrer-docs.s3.ap-south-1.amazonaws.com/noc/cdl_${loanId}.pdf`,
+            nocS3Url: `https://${env.aws.s3Bucket}.s3.${env.aws.region}.amazonaws.com/noc/cdl_${loanId}.pdf`,
         };
     },
 };
