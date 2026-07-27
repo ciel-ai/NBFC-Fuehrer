@@ -197,10 +197,10 @@ export const loansController = {
             const result = {
                 ratePerGram: BUSINESS_RULES.GOLD_RATE_PER_GRAM,
                 purityRates: {
-                    '18K': Math.round(BUSINESS_RULES.GOLD_RATE_PER_GRAM * 0.750),
-                    '20K': Math.round(BUSINESS_RULES.GOLD_RATE_PER_GRAM * 0.833),
-                    '22K': Math.round(BUSINESS_RULES.GOLD_RATE_PER_GRAM * 0.916),
-                    '24K': Math.round(BUSINESS_RULES.GOLD_RATE_PER_GRAM * 0.999),
+                    '18K': Math.round(BUSINESS_RULES.GOLD_RATE_PER_GRAM * BUSINESS_RULES.GOLD_PURITY_MULTIPLIERS['18']!),
+                    '20K': Math.round(BUSINESS_RULES.GOLD_RATE_PER_GRAM * BUSINESS_RULES.GOLD_PURITY_MULTIPLIERS['20']!),
+                    '22K': Math.round(BUSINESS_RULES.GOLD_RATE_PER_GRAM * BUSINESS_RULES.GOLD_PURITY_MULTIPLIERS['22']!),
+                    '24K': Math.round(BUSINESS_RULES.GOLD_RATE_PER_GRAM * BUSINESS_RULES.GOLD_PURITY_MULTIPLIERS['24']!),
                 },
                 maxLtvPercent: 75,
                 currency: 'INR',
@@ -217,12 +217,7 @@ export const loansController = {
         try {
             const { goldType, purityKarat, weightGrams } = req.query as Record<string, string>;
 
-            const purityMap: Record<string, number> = {
-                '18': 0.750,
-                '20': 0.833,
-                '22': 0.916,
-                '24': 0.999,
-            };
+            const purityMap = BUSINESS_RULES.GOLD_PURITY_MULTIPLIERS;
 
             const ratePerGram = BUSINESS_RULES.GOLD_RATE_PER_GRAM;
             const purity = purityMap[purityKarat ?? '22'] ?? 0.916;

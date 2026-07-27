@@ -240,6 +240,18 @@ export const BUSINESS_RULES = {
     // decision on the rate provider, not addressed by this consolidation.
     GOLD_RATE_PER_GRAM: 6200,
 
+    // Previously the same 4 purity-karat multipliers (18K/20K/22K/24K)
+    // were duplicated 3 times across loans.controller.ts (twice, in two
+    // different shapes) and goldLoans.service.ts (as its own local
+    // PURITY_MAP constant) - three independent copies that could silently
+    // drift if only one was ever updated.
+    GOLD_PURITY_MULTIPLIERS: {
+        '18': 0.750,
+        '20': 0.833,
+        '22': 0.916,
+        '24': 0.999,
+    } as Record<string, number>,
+
     // EMI
     EMI_BOUNCE_PENALTY_RATE: 0.02,   // 2% of EMI amount per bounce
     EMI_OVERDUE_PENALTY_RATE: 0.24,   // 24% p.a. on overdue principal

@@ -39,12 +39,7 @@ const MAX_LTV_PERCENT     = 75;
 const GOLD_INTEREST_RATE  = 10.56;
 const GOLD_PROCESSING_FEE = 0.5;
 
-const PURITY_MAP: Record<string, number> = {
-    '18': 0.750,
-    '20': 0.833,
-    '22': 0.916,
-    '24': 0.999,
-};
+const PURITY_MAP: Record<string, number> = BUSINESS_RULES.GOLD_PURITY_MULTIPLIERS;
 
 // ─── Service ──────────────────────────────────────────────────────────────────
 
