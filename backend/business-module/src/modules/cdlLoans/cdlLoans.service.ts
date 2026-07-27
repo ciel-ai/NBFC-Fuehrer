@@ -80,7 +80,7 @@ export const cdlLoansService = {
             foirStatus,
             creditStatus,
             maxLoanAmount: creditStatus === 'PASS' ? maxLoan : 0,
-            note: `CIBIL ${input.cibilScore}, FOIR ${foir}% â€” ${creditStatus}.`,
+            note: `CIBIL ${input.cibilScore}, FOIR ${foir}% — ${creditStatus}.`,
         };
     },
 
@@ -139,7 +139,7 @@ export const cdlLoansService = {
             status: 'COMPLETED',
             utrNumber: `UTR${Date.now()}`,
             disbursedAt: new Date().toISOString(),
-            note: `â‚¹${input.amount.toLocaleString('en-IN')} disbursed to ${input.merchantName} via UPI.`,
+            note: `₹${input.amount.toLocaleString('en-IN')} disbursed to ${input.merchantName} via UPI.`,
         };
     },
 

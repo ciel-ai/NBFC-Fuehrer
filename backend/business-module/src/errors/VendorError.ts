@@ -112,7 +112,7 @@ export const KYC_VENDOR_ERRORS = {
         new KycVendorError({
             checkType: 'ESIGN',
             message: 'eSign request failed at provider',
-            retryable: false, // Don't auto-retry eSign â€” user interaction needed
+            retryable: false, // Don't auto-retry eSign — user interaction needed
             cause,
         }),
 
