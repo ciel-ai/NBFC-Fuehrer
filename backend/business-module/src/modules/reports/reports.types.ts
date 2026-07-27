@@ -3,7 +3,13 @@ import type { Rupees } from '@/types/common.types';
 
 // ─── Report format ────────────────────────────────────────────────────────────
 
-export type ReportFormat = 'json' | 'csv' | 'xlsx';
+// Previously included 'xlsx', but no code path anywhere ever handled it -
+// the real HTTP-facing Joi validation (reports.routes.ts) only ever
+// accepted 'json' | 'csv', so this was purely an internal type
+// inconsistency, never actually reachable from any real request. Removed
+// rather than left as an aspirational/unimplemented value that could
+// mislead a future developer into assuming xlsx export already exists.
+export type ReportFormat = 'json' | 'csv';
 
 // ─── Date range ───────────────────────────────────────────────────────────────
 
