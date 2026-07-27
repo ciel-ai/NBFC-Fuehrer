@@ -224,11 +224,26 @@ export const agentsRepository = {
             ];
         }
 
+        // totalDisbursed is a runtime-computed aggregate (sum of
+        // disbursements per agent), not a real column on this table -
+        // sorting by it correctly requires a raw SQL query with a JOIN and
+        // GROUP BY, not a simple ORDER BY column. Building that properly is
+        // a separate, larger task. Previously silently proxied to
+        // onboarded_at with no indication anywhere that the requested sort
+        // wasn't actually happening - a caller requesting "sort by total
+        // disbursed" got back results sorted by onboarding date instead,
+        // with zero visibility that this occurred. Same fallback behavior
+        // (no regression for anything currently depending on this working),
+        // but now logs a warning every time it's used, so this gap is
+        // genuinely tracked and visible rather than silently hidden.
         const sortColumnMap: Record<string, string> = {
             onboardedAt: 'onboarded_at',
             fullName: 'full_name',
-            totalDisbursed: 'onboarded_at',  // Proxied — real sort needs a view
         };
+
+        if (input.sortBy === 'totalDisbursed') {
+            log.warn('Agent list sort by totalDisbursed requested but not implemented - falling back to onboarded_at. This requires a raw SQL query with a JOIN/GROUP BY over disbursements, not a simple column sort.');
+        }
 
         const orderBy = {
             [sortColumnMap[input.sortBy ?? 'onboardedAt'] ?? 'onboarded_at']:
