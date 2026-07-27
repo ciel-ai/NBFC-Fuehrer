@@ -445,7 +445,6 @@ export const agentsRepository = {
                 data: {
                     agent_id: data.agentId,
                     total_amount: data.totalAmount,
-                    commission_ids: data.commissionIds,
                     status: 'PENDING',
                     created_at: new Date(),
                     updated_at: new Date(),

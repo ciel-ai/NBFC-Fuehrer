@@ -500,7 +500,15 @@ model commission_payouts {
   id             String              @id @default(uuid()) @db.Uuid
   agent_id       String              @db.Uuid
   total_amount   Decimal             @db.Decimal(15, 2)
-  commission_ids String[]            @default([])
+  // Previously commission_ids: String[] duplicated what the real FK
+  // relation (agent_commissions.payout_id -> commission_payouts.id)
+  // already provides authoritatively - a manually-maintained array with no
+  // enforcement that could silently drift out of sync with the real
+  // relation (e.g. if a commission were ever reassigned or clawed back).
+  // Confirmed nothing anywhere in the codebase ever read this column back
+  // from a fetched row - it was purely write-only, dead weight. Removed
+  // entirely; "which commissions are in this payout" is correctly queried
+  // via the commissions relation below.
   utr_number     String?             @db.VarChar(50)
   status         String              @default("PENDING") @db.VarChar(20)
   processed_at   DateTime?           @db.Timestamptz(6)
