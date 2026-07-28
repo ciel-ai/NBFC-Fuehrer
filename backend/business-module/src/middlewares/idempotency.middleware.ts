@@ -17,7 +17,7 @@
 // check-then-insert and both execute the real business logic.
 
 import type { Request, Response, NextFunction } from 'express';
-import type { AuthRequest } from '@/middlewares/auth.middleware';
+import type { AuthRequest } from '@/types/express';
 import { Prisma } from '@/generated/prisma-client';
 import { prisma } from '@/config/database';
 import { createModuleLogger } from '@/config/logger';

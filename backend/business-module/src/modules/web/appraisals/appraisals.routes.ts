@@ -58,7 +58,7 @@ router.post('/gold/:id', requireAuth(), allowRoles(...OPS_ROLES), async (req: Au
 // Get gold appraisal result for a loan application
 router.get('/gold/:id', requireAuth(), allowRoles(...OPS_ROLES, ROLE.CREDIT_MANAGER), async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-        const result = await goldLoansService.getAppraisalResult(req.params.id as string);
+        const result = await goldLoansService.getAppraisalResult(req.params.id as string, req.user!.id, req.user!.role);
         res.status(HTTP.OK).json({ success: true, data: result });
     } catch (err) { next(err); }
 });
