@@ -295,7 +295,23 @@ export const loansRepository = {
                 where,
                 orderBy,
                 ...toPrismaPage({ page: filters.page, limit: filters.limit }),
-                include: { customer: true },
+                include: {
+                    customer: {
+                        select: {
+                            id: true,
+                            user_id: true,
+                            flat_house_no: true,
+                            street_area: true,
+                            city: true,
+                            state: true,
+                            pincode: true,
+                            employment_type: true,
+                            employer_name: true,
+                            created_at: true,
+                            updated_at: true,
+                        },
+                    },
+                },
             }),
             prisma.loan_applications.count({ where }),
         ]);
