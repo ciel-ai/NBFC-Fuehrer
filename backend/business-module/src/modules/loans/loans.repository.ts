@@ -1,6 +1,7 @@
 // src/modules/loans/loans.repository.ts
 import { prisma } from '@/config/database';
 import { withTransaction } from '@/config/database';
+import { Prisma } from '@/generated/prisma-client';
 import { createModuleLogger } from '@/config/logger';
 import { generateLoanAccountNumber, generateLoanApplicationNumber } from '@/utils/referenceNumber.util';
 import {
@@ -333,98 +334,113 @@ export const loansRepository = {
     // Joins customer identity + EMI schedule and derives per-account servicing
     // figures (paid count, next due, overdue amount, DPD) in one query.
 
-    async listAccounts(filters: {
+        async listAccounts(filters: {
         status?: string;
         search?: string;
         page?: number;
         limit?: number;
     }): Promise<PaginatedResult<StaffLoanAccountListItem>> {
-        const page = filters.page ?? PAGINATION.DEFAULT_PAGE;
+        const page  = filters.page  ?? PAGINATION.DEFAULT_PAGE;
         const limit = filters.limit ?? PAGINATION.DEFAULT_LIMIT;
+        const offset = (page - 1) * limit;
 
-        const where: Record<string, unknown> = {};
-        if (filters.status) where.status = filters.status;
-        if (filters.search) {
-            const q = filters.search.trim();
-            where.OR = [
-                { account_number: { contains: q, mode: 'insensitive' } },
-                { user: { full_name: { contains: q, mode: 'insensitive' } } },
-                { user: { phone: { contains: q } } },
-            ];
+        const conditions: Prisma.Sql[] = [];
+        if (filters.status) {
+            conditions.push(Prisma.sql`la.status = ${filters.status}`);
         }
+        if (filters.search) {
+            const q = `%${filters.search.trim()}%`;
+            conditions.push(Prisma.sql`(
+                la.account_number ILIKE ${q}
+                OR u.full_name    ILIKE ${q}
+                OR u.phone        LIKE  ${q}
+            )`);
+        }
+        const where = conditions.length > 0
+            ? Prisma.sql`WHERE ${Prisma.join(conditions, ' AND ')}`
+            : Prisma.empty;
 
-        const [rows, total] = await prisma.$transaction([
-            prisma.loan_accounts.findMany({
-                where,
-                include: {
-                    user: { select: { full_name: true, phone: true } },
-                    emi_schedule: {
-                        select: {
-                            due_date: true,
-                            emi_amount: true,
-                            penalty_amount: true,
-                            status: true,
-                        },
-                        orderBy: { emi_number: 'asc' },
-                    },
-                },
-                orderBy: { created_at: 'desc' },
-                ...toPrismaPage({ page, limit }),
-            }),
-            prisma.loan_accounts.count({ where }),
+        type Row = {
+            id: string; account_number: string; application_id: string;
+            principal_amount: number; interest_rate: number;
+            tenure_months: number; monthly_emi: number;
+            outstanding_balance: number; status: string;
+            disbursed_at: Date | null;
+            full_name: string; phone: string;
+            paid_count: number; total_emis: number;
+            overdue_amount: number;
+            next_due_date: Date | null; first_emi_date: Date | null;
+            dpd: number;
+        };
+
+        const [rows, countResult] = await Promise.all([
+            prisma.$queryRaw<Row[]>`
+                SELECT
+                    la.id,
+                    la.account_number,
+                    la.application_id,
+                    la.principal_amount,
+                    la.interest_rate,
+                    la.tenure_months,
+                    la.monthly_emi,
+                    la.outstanding_balance,
+                    la.status,
+                    la.disbursed_at,
+                    u.full_name,
+                    u.phone,
+                    COUNT(CASE WHEN es.status IN ('PAID','WAIVED') THEN 1 END)::int          AS paid_count,
+                    COUNT(es.id)::int                                                         AS total_emis,
+                    COALESCE(SUM(CASE WHEN es.status IN ('OVERDUE','BOUNCED')
+                        THEN es.emi_amount + COALESCE(es.penalty_amount, 0) ELSE 0 END), 0)  AS overdue_amount,
+                    MIN(CASE WHEN es.status NOT IN ('PAID','WAIVED') THEN es.due_date END)    AS next_due_date,
+                    MIN(es.due_date)                                                          AS first_emi_date,
+                    GREATEST(0, COALESCE(
+                        EXTRACT(DAY FROM NOW() - MIN(
+                            CASE WHEN es.status IN ('OVERDUE','BOUNCED') THEN es.due_date END
+                        ))::int, 0
+                    ))                                                                        AS dpd
+                FROM loan_accounts la
+                JOIN users u ON u.id = la.user_id
+                LEFT JOIN emi_schedule es ON es.loan_account_id = la.id
+                ${where}
+                GROUP BY la.id, u.full_name, u.phone
+                ORDER BY la.created_at DESC
+                LIMIT ${limit} OFFSET ${offset}
+            `,
+            prisma.$queryRaw<Array<{ count: bigint }>>`
+                SELECT COUNT(DISTINCT la.id)::bigint AS count
+                FROM loan_accounts la
+                JOIN users u ON u.id = la.user_id
+                ${where}
+            `,
         ]);
 
-        const data: StaffLoanAccountListItem[] = rows.map((row) => {
-            const emis = row.emi_schedule;
-            const settled = new Set<string>([EMI_STATUS.PAID, EMI_STATUS.WAIVED]);
-            const overdueStates = new Set<string>([EMI_STATUS.OVERDUE, EMI_STATUS.BOUNCED]);
-
-            const paidCount = emis.filter((e) => settled.has(e.status)).length;
-            const overdueEmis = emis.filter((e) => overdueStates.has(e.status));
-            const firstUnpaid = emis.find((e) => !settled.has(e.status));
-
-            const overdueAmount = overdueEmis.reduce(
-                (sum, e) => sum + toNumber(e.emi_amount) + toNumber(e.penalty_amount),
-                0,
-            );
-
-            // DPD = days since the earliest overdue EMI's due date
-            const earliestOverdue = overdueEmis[0];
-            const dpd = earliestOverdue
-                ? Math.max(0, Math.floor(
-                    (Date.now() - new Date(earliestOverdue.due_date).getTime())
-                    / 86_400_000,
-                ))
-                : 0;
-
-            return {
-                id: row.id,
-                accountNumber: row.account_number,
-                applicationId: row.application_id,
-                customerName: row.user.full_name,
-                customerPhone: row.user.phone,
-                principalAmount: toNumber(row.principal_amount),
-                interestRate: toNumber(row.interest_rate),
-                tenureMonths: row.tenure_months,
-                monthlyEmi: toNumber(row.monthly_emi),
-                outstandingBalance: toNumber(row.outstanding_balance),
-                status: row.status,
-                disbursedAt: row.disbursed_at,
-                firstEmiDate: emis[0]?.due_date ?? null,
-                nextDueDate: firstUnpaid?.due_date ?? null,
-                paidCount,
-                totalEmis: emis.length,
-                overdueAmount: Math.round(overdueAmount * 100) / 100,
-                dpd,
-            };
-        });
+        const data: StaffLoanAccountListItem[] = rows.map((row) => ({
+            id:                 row.id,
+            accountNumber:      row.account_number,
+            applicationId:      row.application_id,
+            customerName:       row.full_name,
+            customerPhone:      row.phone,
+            principalAmount:    toNumber(row.principal_amount),
+            interestRate:       toNumber(row.interest_rate),
+            tenureMonths:       row.tenure_months,
+            monthlyEmi:         toNumber(row.monthly_emi),
+            outstandingBalance: toNumber(row.outstanding_balance),
+            status:             row.status,
+            disbursedAt:        row.disbursed_at,
+            firstEmiDate:       row.first_emi_date ?? null,
+            nextDueDate:        row.next_due_date  ?? null,
+            paidCount:          row.paid_count,
+            totalEmis:          row.total_emis,
+            overdueAmount:      Math.round(toNumber(row.overdue_amount) * 100) / 100,
+            dpd:                row.dpd,
+        }));
 
         return {
             data,
-            pagination: buildPaginationMeta(page, limit, total),
+            pagination: buildPaginationMeta(page, limit, Number(countResult[0]?.count ?? 0)),
         };
     },
-
     async findAccountsByUserId(
         userId: string,
         pagination: PaginationParams,
