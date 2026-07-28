@@ -32,6 +32,10 @@ import { Prisma } from '@/generated/prisma-client';
 const MONEY_KEY_PATTERN = /(^|_)(amount|fee|emi|balance|income|interest|principal)($|_|[A-Z])/;
 
 function looksLikeMoneyKey(key: string): boolean {
+    // Percentage/rate fields (e.g. interestRate, annualRatePct) are not
+    // money and must never be converted rupees→paise, even if they
+    // contain a money-like substring (e.g. "interest" in "interestRate").
+    if (/Rate$/.test(key) || /Pct$/.test(key)) return false;
     return MONEY_KEY_PATTERN.test(key);
 }
 

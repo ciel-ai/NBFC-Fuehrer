@@ -10,6 +10,8 @@ import { scheduleEmiReminderJob }    from '@/jobs/emiReminder.job';
 import { scheduleNachDebitJob }      from '@/jobs/nachDebit.job';
 import { scheduleDebitRetryJob }     from '@/jobs/debitRetry.job';
 import { scheduleSettlementJob }     from '@/jobs/settlement.job';
+import { connectDatabase } from '@/config/database';
+import { connectRedis } from '@/config/redis';
 
 const log = createModuleLogger('server');
 
@@ -29,6 +31,23 @@ async function start(): Promise<void> {
         log.error('Fatal: failed to load secrets at startup — server will not start', {
             error: err instanceof Error ? err.message : String(err),
         });
+            try {
+        await connectDatabase();
+    } catch (err) {
+        log.error('Fatal: database connection failed at startup — server will not start', {
+            error: err instanceof Error ? err.message : String(err),
+        });
+        process.exit(1);
+    }
+
+    try {
+        await connectRedis();
+    } catch (err) {
+        log.error('Fatal: Redis connection failed at startup — server will not start', {
+            error: err instanceof Error ? err.message : String(err),
+        });
+        process.exit(1);
+    }
         process.exit(1);
     }
 

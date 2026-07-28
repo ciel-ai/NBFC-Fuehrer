@@ -245,12 +245,28 @@ export const BUSINESS_RULES = {
     // different shapes) and goldLoans.service.ts (as its own local
     // PURITY_MAP constant) - three independent copies that could silently
     // drift if only one was ever updated.
-    GOLD_PURITY_MULTIPLIERS: {
-        '18': 0.750,
-        '20': 0.833,
-        '22': 0.916,
-        '24': 0.999,
-    } as Record<string, number>,
+   GOLD_PURITY_MULTIPLIERS: {
+    '16': 0.666,
+    '18': 0.750,
+    '20': 0.833,
+    '22': 0.916,
+    '24': 0.999,
+} as Record<string, number>,
+
+// Margin applied on estimated gold value before the LTV cap — per client's
+// CAM sheet: Eligible Amount = (Max Net Rate/gm × MAV%) × Net Weight.
+// 97% accounts for assay/appraisal variance, distinct from the 75% max LTV.
+GOLD_MAV_PERCENT: 0.97,
+
+// Gold loan penal interest — tiered by days overdue, per client's CAM sheet.
+// Distinct from EMI_OVERDUE_PENALTY_RATE (flat 24% p.a.), which still
+// applies unchanged to CDL/housing loans.
+GOLD_PENAL_INTEREST_SLABS: [
+    { maxDays: 30,  annualRatePct: 1.25 },
+    { maxDays: 60,  annualRatePct: 1.50 },
+    { maxDays: 90,  annualRatePct: 1.75 },
+    { maxDays: Infinity, annualRatePct: 2.00 },
+] as { maxDays: number; annualRatePct: number }[],
 
     // EMI
     EMI_BOUNCE_PENALTY_RATE: 0.02,   // 2% of EMI amount per bounce

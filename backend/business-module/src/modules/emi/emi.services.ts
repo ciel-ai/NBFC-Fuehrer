@@ -2,13 +2,16 @@
 import type { Request } from 'express';
 import { emiRepository } from './emi.repository';
 import { loansRepository } from '@/modules/loans';
+import { prisma } from '@/config/database';
 import {
     buildAmortizationSchedule,
     computeMonthlyEmi,
     computeDailyOverduePenalty,
+    computeTieredOverduePenalty,
     computeBouncePenalty,
     computeForeclosureAmount,
 } from './emi.calculator';
+
 import { eventBus } from '@/events';
 import { setAuditContext } from '@/middlewares';
 import {
@@ -28,6 +31,7 @@ import {
     EmiAlreadyPaidError,
 } from '@/errors';
 import { createModuleLogger } from '@/config/logger';
+
 import type {
     EmiScheduleEntry,
     AmortizationSchedule,
@@ -230,28 +234,45 @@ export const emiService = {
     // Called by npaWatch.job for each overdue EMI each day.
 
     async applyOverduePenalty(emiId: string): Promise<void> {
-        const emi = await emiRepository.findByIdOrThrow(emiId);
+    const emi = await emiRepository.findByIdOrThrow(emiId);
 
-        if (
-            emi.status === EMI_STATUS.PAID ||
-            emi.status === EMI_STATUS.WAIVED
-        ) return;
+    if (
+        emi.status === EMI_STATUS.PAID ||
+        emi.status === EMI_STATUS.WAIVED
+    ) return;
 
-        const dailyPenalty = computeDailyOverduePenalty(
+    const account = await loansRepository.findAccountByIdOrThrow(emi.loanAccountId);
+    const application = await prisma.loan_applications.findUniqueOrThrow({
+        where: { id: account.applicationId },
+        select: { product_type: true },
+    });
+
+    let dailyPenalty: number;
+
+    if (application.product_type === 'GOLD_LOAN') {
+        const daysOverdue = daysBetween(emi.dueDate, new Date());
+        dailyPenalty = computeTieredOverduePenalty(
+            emi.emiAmount,
+            daysOverdue,
+            BUSINESS_RULES.GOLD_PENAL_INTEREST_SLABS,
+        );
+    } else {
+        dailyPenalty = computeDailyOverduePenalty(
             emi.emiAmount,
             BUSINESS_RULES.EMI_OVERDUE_PENALTY_RATE * 100, // 0.24 → 24%
         );
+    }
 
-        await emiRepository.incrementPenalty(
-            emiId,
-            Math.round(dailyPenalty * 100), // to paisa
-        );
+    await emiRepository.incrementPenalty(
+        emiId,
+        Math.round(dailyPenalty * 100), // to paisa
+    );
 
-        // Mark overdue if not already
-        if (emi.status !== EMI_STATUS.OVERDUE && emi.status !== EMI_STATUS.BOUNCED) {
-            await emiRepository.markOverdue(emiId);
-        }
-    },
+    // Mark overdue if not already
+    if (emi.status !== EMI_STATUS.OVERDUE && emi.status !== EMI_STATUS.BOUNCED) {
+        await emiRepository.markOverdue(emiId);
+    }
+},
 
     // ── 8. Waive EMI (Super Admin / Finance only) ──────────────────────────────
 

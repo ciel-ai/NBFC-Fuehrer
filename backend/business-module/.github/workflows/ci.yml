@@ -50,6 +50,18 @@ jobs:
           DATABASE_URL: ${{ env.DATABASE_URL }}
       - run: npm run lint
 
+  placeholder-check:
+    name: Placeholder check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fail if PENDING-CLIENT-INPUT placeholders remain in NBFC constants
+        run: |
+          if grep -r "PENDING-CLIENT-INPUT" backend/business-module/config/nbfc.constants.ts; then
+            echo "ERROR: nbfc.constants.ts still contains PENDING-CLIENT-INPUT placeholders."
+            echo "Fill in all RBI/regulatory fields before deploying."
+            exit 1
+          fi
   typecheck:
     name: Typecheck
     runs-on: ubuntu-latest
@@ -137,6 +149,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: [lint, typecheck]
+        needs: [lint, typecheck, placeholder-check]
     defaults:
       run:
         working-directory: backend/business-module

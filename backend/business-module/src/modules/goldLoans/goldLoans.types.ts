@@ -45,11 +45,12 @@ export interface Appointment {
 export interface GoldRate {
     ratePerGram:    number;
     purityRates: {
-        '18K': number;
-        '20K': number;
-        '22K': number;
-        '24K': number;
-    };
+    '16K': number;
+    '18K': number;
+    '20K': number;
+    '22K': number;
+    '24K': number;
+};
     maxLtvPercent:  number;
     currency:       string;
     updatedAt:      string;
@@ -61,16 +62,17 @@ export interface GoldRate {
 
 export interface GoldEligibilityRequest {
     goldType:        'JEWELLERY' | 'COIN_BAR';
-    purityKarat:     '18' | '20' | '22' | '24';
+    purityKarat:     '16' | '18' | '20' | '22' | '24';
     weightGrams:     number;
     requestedAmount?: number;
     tenureMonths?:   number;
-    repaymentMode?:  'EMI' | 'INTEREST_ONLY' | 'BULLET';
+    repaymentMode?:  'EMI' | 'BULLET_REPAYMENT' | 'MONTHLY_INTEREST' | 'QUARTERLY_INTEREST' | 'UPFRONT_MONTHLY_INTEREST' | 'UPFRONT_QUARTERLY_INTEREST';
 }
 
 export interface GoldEligibility {
     eligible:        boolean;
     estimatedGoldValue: number;
+    eligiblePledgeValue: number;
     maxLoanAmount:   number;
     requestedAmount: number;
     approvedAmount:  number;
@@ -79,12 +81,14 @@ export interface GoldEligibility {
     repaymentMode:   string;
     monthlyEmi:      number | null;
     monthlyInterest: number | null;
+    quarterlyInterest: number | null;
+    upfrontInterestAmount: number | null;
+    netDisbursalAmount: number;
     processingFee:   number;
     ltv:             number;
     currency:        string;
     note:            string;
 }
-
 // ─── Appointment request ──────────────────────────────────────────────────────
 
 export interface GoldLoanAppointmentRequest {
@@ -114,13 +118,14 @@ export interface GoldLoanAppointment {
 // ─── Appraisal ────────────────────────────────────────────────────────────────
 
 export interface GoldAppraisalInput {
-    loanId:           string;
-    netWeightGrams:   number;
-    grossWeightGrams: number;
-    purityKarat:      number;
-    ratePerGram:      number;
-    items:            object;
-    valuedBy:         string;
+    loanId:            string;
+    grossWeightGrams:  number;
+    stoneWeightGrams:  number;
+    impurityPct:       number;  // fraction, e.g. 0.02 for 2%
+    purityKarat:       number;
+    ratePerGram:       number;
+    items:             object;
+    valuedBy:          string;
 }
 
 export interface GoldLoanAppraisalResult {

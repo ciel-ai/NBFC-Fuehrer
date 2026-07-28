@@ -1003,7 +1003,7 @@ model admin_refresh_tokens {
 
 model idempotency_keys {
   id           String   @id @default(uuid()) @db.Uuid
-  key          String   @db.VarChar(255)
+  key          String   @db.VarChar(400)
   request_path String   @db.VarChar(200)
   response     Json?
   status_code  Int?

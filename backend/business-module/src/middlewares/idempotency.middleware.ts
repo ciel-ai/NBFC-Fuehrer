@@ -17,6 +17,7 @@
 // check-then-insert and both execute the real business logic.
 
 import type { Request, Response, NextFunction } from 'express';
+import type { AuthRequest } from '@/middlewares/auth.middleware';
 import { Prisma } from '@/generated/prisma-client';
 import { prisma } from '@/config/database';
 import { createModuleLogger } from '@/config/logger';
@@ -26,22 +27,24 @@ const log = createModuleLogger('idempotency');
 const EXPIRY_HOURS = 24;
 
 export function idempotency() {
-    return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-        const key = req.headers['idempotency-key'] as string | undefined;
+    return async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+        const rawKey = req.headers['idempotency-key'] as string | undefined;
 
-        if (!key) {
+        if (!rawKey) {
             next();
             return;
         }
-
-        if (key.length > 255) {
+        if (rawKey.length > 200) {
             res.status(400).json({
                 success:   false,
                 errorCode: 'INVALID_IDEMPOTENCY_KEY',
-                message:   'Idempotency-Key must be 255 characters or fewer',
+                message:   'Idempotency-Key must be 200 characters or fewer',
             });
             return;
         }
+
+        const userId = (req as AuthRequest).user?.id ?? 'anon';
+        const key = `${userId}:${rawKey}`;
 
         const expiresAt = new Date(Date.now() + EXPIRY_HOURS * 60 * 60 * 1000);
 

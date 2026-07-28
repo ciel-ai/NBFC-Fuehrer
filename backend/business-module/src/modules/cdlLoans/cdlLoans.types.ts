@@ -11,6 +11,8 @@ export interface CdlApplicationInput {
     storeCity: string;
     employmentType: 'SALARIED' | 'SELF_EMPLOYED' | 'STUDENT';
     monthlyIncome: number;
+    interestRatePct?: number;   // must be one of the allowed rates for the employmentType; defaults if omitted
+    autoDebitDate?: 4 | 7 | 12;
 }
 
 export interface CdlApplicationResult {

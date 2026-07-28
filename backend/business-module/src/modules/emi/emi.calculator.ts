@@ -177,6 +177,22 @@ export function computeDailyOverduePenalty(
     return Math.ceil(overdueAmount * dailyRate * 100) / 100;
 }
 
+// ─── Tiered overdue penalty (gold loans) ───────────────────────────────────────
+//
+// Per client's CAM sheet: penal rate escalates by days-overdue bracket,
+// rather than one flat annual rate for the whole overdue period.
+
+export function computeTieredOverduePenalty(
+    overdueAmount: Rupees,
+    daysOverdue: number,
+    slabs: { maxDays: number; annualRatePct: number }[],
+): Rupees {
+    const slab = slabs.find(s => daysOverdue <= s.maxDays) ?? slabs[slabs.length - 1]!;
+    return computeDailyOverduePenalty(overdueAmount, slab.annualRatePct);
+}
+
+
+
 // ─── Bounce penalty ────────────────────────────────────────────────────────────
 
 export function computeBouncePenalty(

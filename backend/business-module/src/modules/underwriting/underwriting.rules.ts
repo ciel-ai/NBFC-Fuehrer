@@ -43,7 +43,7 @@ export interface RuleDefinition {
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
 
-function pass(
+export function pass(
     def: Omit<RuleDefinition, 'evaluate'>,
     value: RuleResult['value'],
     threshold: RuleResult['threshold'],
@@ -62,7 +62,7 @@ function pass(
     };
 }
 
-function fail(
+export function fail(
     def: Omit<RuleDefinition, 'evaluate'>,
     value: RuleResult['value'],
     threshold: RuleResult['threshold'],

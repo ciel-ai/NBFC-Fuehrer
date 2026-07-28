@@ -1,6 +1,7 @@
 // src/modules/underwriting/rules/housingLoan.rules.ts
 
 import type { RuleContext, RuleDefinition } from '../underwriting.rules';
+import { pass, fail } from '../underwriting.rules';
 import type { RuleResult } from '../underwriting.types';
 import type { Rupees } from '@/types/common.types';
 
@@ -24,13 +25,10 @@ const HOUSING_LOAN = {
     PMAY_MIG2_SUBSIDY:   2_30_156,
 } as const;
 
-function pass(def: Omit<RuleDefinition, 'evaluate'>, value: RuleResult['value'], threshold: RuleResult['threshold'], message: string): RuleResult {
-    return { ruleId: def.id, ruleName: def.name, category: def.category, weight: def.weight, hardFail: def.hardFail, passed: true, value, threshold, message };
-}
-
-function fail(def: Omit<RuleDefinition, 'evaluate'>, value: RuleResult['value'], threshold: RuleResult['threshold'], message: string): RuleResult {
-    return { ruleId: def.id, ruleName: def.name, category: def.category, weight: def.weight, hardFail: def.hardFail, passed: false, value, threshold, message };
-}
+// Previously copy-pasted local duplicates of pass()/fail() from
+// underwriting.rules.ts - confirmed identical logic, now imported from the
+// single shared source instead of maintaining two copies that could
+// silently drift if either was ever changed.
 
 export const HOUSING_LOAN_RULES: RuleDefinition[] = [
     {

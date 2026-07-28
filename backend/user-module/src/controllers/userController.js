@@ -4,8 +4,8 @@ const { sendSuccess } = require('../utils/response');
 const AppError = require('../utils/appError');
 
 const register = asyncHandler(async (req, res) => {
-  const { phone, role } = req.body;
-const result = await userService.registerUser(phone, role);
+  const { phone } = req.body;
+const result = await userService.registerUser(phone);
 
   sendSuccess(res, {
     statusCode: 201,

@@ -8,9 +8,9 @@ import { loansRepository } from '@/modules/loans/loans.repository';
 export const goldLoansController = {
 
     // GET /gold-loans/rate
-    getRate(req: Request, res: Response, next: NextFunction) {
+    async getRate(req: Request, res: Response, next: NextFunction) {
         try {
-            const rate = goldLoansService.getGoldRate();
+            const rate = await goldLoansService.getGoldRate();
             res.json({ success: true, data: rate });
         } catch (err) {
             next(err);
@@ -18,9 +18,9 @@ export const goldLoansController = {
     },
 
     // POST /gold-loans/eligibility
-    calculateEligibility(req: Request, res: Response, next: NextFunction) {
+    async calculateEligibility(req: Request, res: Response, next: NextFunction) {
         try {
-            const result = goldLoansService.calculateEligibility(req.body);
+            const result = await goldLoansService.calculateEligibility(req.body);
             res.json({ success: true, data: result });
         } catch (err) {
             next(err);
@@ -59,7 +59,7 @@ export const goldLoansController = {
     // GET /gold-loans/appointments/:id
     async getAppointment(req: Request, res: Response, next: NextFunction) {
         try {
-            const appointment = await goldLoansService.getAppointment(req.params.id!);
+            const appointment = await goldLoansService.getAppointment(req.params.id!, req.user!.id, req.user!.role);
             res.json({ success: true, data: appointment });
         } catch (err) {
             next(err);
@@ -77,36 +77,39 @@ export const goldLoansController = {
     },
 
     // POST /gold-loans/applications/:id/appraise
-    async submitAppraisal(req: Request, res: Response, next: NextFunction) {
-        try {
-            const {
-                netWeightGrams,
-                grossWeightGrams,
-                purityKarat,
-                ratePerGram,
-                items,
-                valuedBy,
-            } = req.body;
+    // POST /gold-loans/applications/:id/appraise
+async submitAppraisal(req: Request, res: Response, next: NextFunction) {
+    try {
+        const {
+            grossWeightGrams,
+            stoneWeightGrams,
+            impurityPct,
+            purityKarat,
+            ratePerGram,
+            items,
+            valuedBy,
+        } = req.body;
 
-            const result = await goldLoansService.submitAppraisal({
-                loanId:           req.params.id!,
-                netWeightGrams,
-                grossWeightGrams,
-                purityKarat,
-                ratePerGram,
-                items,
-                valuedBy,
-            });
-            res.json({ success: true, data: result });
-        } catch (err) {
-            next(err);
-        }
-    },
+        const result = await goldLoansService.submitAppraisal({
+            loanId:           req.params.id!,
+            grossWeightGrams,
+            stoneWeightGrams,
+            impurityPct,
+            purityKarat,
+            ratePerGram,
+            items,
+            valuedBy,
+        });
+        res.json({ success: true, data: result });
+    } catch (err) {
+        next(err);
+    }
+},
 
     // GET /gold-loans/applications/:id/appraisal
     async getAppraisalResult(req: Request, res: Response, next: NextFunction) {
         try {
-            const result = await goldLoansService.getAppraisalResult(req.params.id!);
+            const result = await goldLoansService.getAppraisalResult(req.params.id!, req.user!.id, req.user!.role);
             res.json({ success: true, data: result });
         } catch (err) {
             next(err);
@@ -197,7 +200,7 @@ export const goldLoansController = {
             const account = await loansRepository.findAccountByIdOrThrow(req.params.id!);
             assertAccountOwnership(user.id, account, user.role, 'gold loan account');
 
-            const result = await goldLoansService.getMonitoring(req.params.id!);
+            const result = await goldLoansService.getMonitoring(req.params.id!, req.user!.id, req.user!.role);
             res.json({ success: true, data: result });
         } catch (err) {
             next(err);
@@ -211,7 +214,7 @@ export const goldLoansController = {
             const account = await loansRepository.findAccountByIdOrThrow(req.params.id!);
             assertAccountOwnership(user.id, account, user.role, 'gold loan account');
 
-            const result = await goldLoansService.getClosureQuote(req.params.id!);
+            const result = await goldLoansService.getClosureQuote(req.params.id!, req.user!.id, req.user!.role);
             res.json({ success: true, data: result });
         } catch (err) {
             next(err);

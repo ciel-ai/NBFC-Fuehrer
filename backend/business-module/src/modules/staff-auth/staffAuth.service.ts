@@ -156,10 +156,12 @@ export async function requestOtp(
     const redis = getRedisClient();
 
     // Throttle: max 3 sends/hour/phone
+    // TEMPORARY, DEMO-ONLY: raised limit for a live client demo to avoid
+    // interruptions from repeated login attempts. Revert to 3 after the demo.
     const sendsKey = RedisKeys.staffOtpSends(phone);
     const sends = await redis.incr(sendsKey);
     if (sends === 1) await redis.expire(sendsKey, RedisTTL.STAFF_OTP_SEND_WINDOW);
-    if (sends > 3) throw err.otpThrottled();
+    if (sends > 50) throw err.otpThrottled();
 
     const u = await findByPhone(phone);
     if (!u) throw err.staffNotFound(portal);
@@ -173,7 +175,11 @@ export async function requestOtp(
     if (family !== portal) throw err.wrongPortal(STAFF_ROLE_META[u.role as StaffRole].label);
 
     // Generate + store hashed OTP, reset the attempt counter
-    const otp = crypto.randomInt(100000, 1000000).toString();
+    // TEMPORARY, DEMO-ONLY: fixed OTP instead of random, for a smoother
+    // live client demo. Already gated behind !env.isProd below (same as
+    // the existing devOtp behavior) - never active in production. Revert
+    // to crypto.randomInt(100000, 1000000) after the demo.
+    const otp = env.isProd ? crypto.randomInt(100000, 1000000).toString() : '123456';
     const otpHash = await bcrypt.hash(otp, 8);
     await redis.set(RedisKeys.staffOtp(phone), otpHash, 'EX', RedisTTL.STAFF_OTP);
     await redis.del(RedisKeys.staffOtpAttempts(phone));

@@ -6,7 +6,11 @@ on:
       - master
     paths:
       - 'backend/business-module/**'
-      - '.github/workflows/deploy.yml'
+      - 'backend/business-module/.github/workflows/deploy.yml'
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
 
 env:
   AWS_REGION:         ap-south-1
@@ -14,9 +18,11 @@ env:
   APP_RUNNER_SERVICE: fuehrer-nbfc-backend
 
 jobs:
-  deploy:
-    name: Build and Deploy
+  build:
+    name: Build & Push Image
     runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.build-image.outputs.image }}
 
     steps:
       - name: Checkout
@@ -45,6 +51,24 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
           echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: build
+    environment: production      # ← requires manual approval in GitHub repo settings
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region:            ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
 
       - name: Deploy to App Runner
         env:

@@ -59,7 +59,7 @@ const CreditDecisionDrawer: React.FC<Props> = ({ app, open, onClose }) => {
     }
   }, [open, app.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const submit = async (values: any): Promise<void> => {
+      const submit = async (values: any): Promise<void> => {
     try {
       if (values.decision === 'APPROVED') {
         await creditApi.approve(app.id, {
@@ -70,33 +70,32 @@ const CreditDecisionDrawer: React.FC<Props> = ({ app, open, onClose }) => {
       } else if (values.decision === 'REJECTED') {
         await creditApi.reject(app.id, { reason: values.reason ?? values.remarks });
       }
+
+      creditDecision(
+        app.id,
+        {
+          decision: values.decision,
+          riskGrade: values.riskGrade,
+          remarks: values.remarks,
+          reason: values.reason,
+          approvedAmount: values.decision === 'APPROVED' ? values.approvedAmount : undefined,
+          approvedTenure: values.decision === 'APPROVED' ? values.approvedTenure : undefined,
+          approvedRate: values.decision === 'APPROVED' ? values.approvedRate : undefined,
+        },
+        { name: user.name, role: user.role },
+      );
+      message.success(
+        values.decision === 'APPROVED'
+          ? `${app.appNumber} approved — moved to Finance queue`
+          : values.decision === 'REJECTED'
+            ? `${app.appNumber} rejected`
+            : `${app.appNumber} returned to sales`,
+      );
+      onClose();
     } catch {
-      // API call failed — still update local store for now
+      message.error('Action failed — please try again.');
     }
-
-    creditDecision(
-      app.id,
-      {
-        decision: values.decision,
-        riskGrade: values.riskGrade,
-        remarks: values.remarks,
-        reason: values.reason,
-        approvedAmount: values.decision === 'APPROVED' ? values.approvedAmount : undefined,
-        approvedTenure: values.decision === 'APPROVED' ? values.approvedTenure : undefined,
-        approvedRate: values.decision === 'APPROVED' ? values.approvedRate : undefined,
-      },
-      { name: user.name, role: user.role },
-    );
-    message.success(
-      values.decision === 'APPROVED'
-        ? `${app.appNumber} approved — moved to Finance queue`
-        : values.decision === 'REJECTED'
-          ? `${app.appNumber} rejected`
-          : `${app.appNumber} returned to sales`,
-    );
-    onClose();
   };
-
   const docsOk = app.documents.every((d) => d.status === 'VERIFIED');
 
   return (

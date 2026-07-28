@@ -9,7 +9,8 @@ export const cdlLoansController = {
 
     async submitApplication(req: AuthRequest, res: Response, next: NextFunction) {
         try {
-            const result = cdlLoansService.submitApplication(req.body);
+            const userId = req.user!.id;
+            const result = await cdlLoansService.submitApplication(userId, req.body);
             res.status(HTTP.CREATED).json(successResponse(result, 'CDL application created'));
         } catch (err) { next(err); }
     },
@@ -17,7 +18,7 @@ export const cdlLoansController = {
     async runKycChecks(req: AuthRequest, res: Response, next: NextFunction) {
         try {
             const id = req.params['id'] as string;
-            const result = cdlLoansService.runKycChecks(id);
+            const result = await cdlLoansService.runKycChecks(id);
             res.status(HTTP.OK).json(successResponse(result));
         } catch (err) { next(err); }
     },
@@ -25,7 +26,7 @@ export const cdlLoansController = {
     async runComplianceChecks(req: AuthRequest, res: Response, next: NextFunction) {
         try {
             const id = req.params['id'] as string;
-            const result = cdlLoansService.runComplianceChecks(id);
+            const result = await cdlLoansService.runComplianceChecks(id);
             res.status(HTTP.OK).json(successResponse(result));
         } catch (err) { next(err); }
     },
@@ -41,7 +42,7 @@ export const cdlLoansController = {
     async getCreditDecision(req: AuthRequest, res: Response, next: NextFunction) {
         try {
             const id = req.params['id'] as string;
-            const result = cdlLoansService.getCreditDecision(id, req.body);
+            const result = await cdlLoansService.getCreditDecision(id, req.body);
             res.status(HTTP.OK).json(successResponse(result));
         } catch (err) { next(err); }
     },
@@ -57,7 +58,8 @@ export const cdlLoansController = {
     async registerNachMandate(req: AuthRequest, res: Response, next: NextFunction) {
         try {
             const id = req.params['id'] as string;
-            const result = cdlLoansService.registerNachMandate(id);
+            const { bankAccount, ifsc } = req.body;
+            const result = await cdlLoansService.registerNachMandate(id, { bankAccount, ifsc });
             res.status(HTTP.OK).json(successResponse(result, 'NACH initiated'));
         } catch (err) { next(err); }
     },
@@ -65,7 +67,8 @@ export const cdlLoansController = {
     async disburseToMerchant(req: AuthRequest, res: Response, next: NextFunction) {
         try {
             const id = req.params['id'] as string;
-            const result = cdlLoansService.disburseToMerchant(id, req.body);
+            const initiatedBy = req.user!.id;
+            const result = await cdlLoansService.disburseToMerchant(id, { ...req.body, initiatedBy });
             res.status(HTTP.OK).json(successResponse(result, 'Disbursed to merchant'));
         } catch (err) { next(err); }
     },
@@ -73,7 +76,7 @@ export const cdlLoansController = {
     async getEmiSchedule(req: AuthRequest, res: Response, next: NextFunction) {
         try {
             const id = req.params['id'] as string;
-            const result = cdlLoansService.getEmiSchedule(id);
+            const result = await cdlLoansService.getEmiSchedule(id);
             res.status(HTTP.OK).json(successResponse(result));
         } catch (err) { next(err); }
     },
@@ -82,7 +85,7 @@ export const cdlLoansController = {
         try {
             const id = req.params['id'] as string;
             const { emiId } = req.body as { emiId: string };
-            const result = cdlLoansService.processManualPayment(id, emiId);
+            const result = await cdlLoansService.processManualPayment(id, emiId, req);
             res.status(HTTP.OK).json(successResponse(result));
         } catch (err) { next(err); }
     },
@@ -91,7 +94,7 @@ export const cdlLoansController = {
         try {
             const id = req.params['id'] as string;
             const { emiId } = req.body as { emiId: string };
-            const result = cdlLoansService.handlePaymentFailure(id, emiId);
+            const result = await cdlLoansService.handlePaymentFailure(id, emiId, req);
             res.status(HTTP.OK).json(successResponse(result));
         } catch (err) { next(err); }
     },
@@ -99,7 +102,7 @@ export const cdlLoansController = {
     async getOverdueStatus(req: AuthRequest, res: Response, next: NextFunction) {
         try {
             const id = req.params['id'] as string;
-            const result = cdlLoansService.getOverdueStatus(id);
+            const result = await cdlLoansService.getOverdueStatus(id);
             res.status(HTTP.OK).json(successResponse(result));
         } catch (err) { next(err); }
     },
@@ -107,7 +110,7 @@ export const cdlLoansController = {
     async closeLoan(req: AuthRequest, res: Response, next: NextFunction) {
         try {
             const id = req.params['id'] as string;
-            const result = cdlLoansService.closeLoan(id);
+            const result = await cdlLoansService.closeLoan(id);
             res.status(HTTP.OK).json(successResponse(result, 'Loan closed'));
         } catch (err) { next(err); }
     },

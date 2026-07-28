@@ -13,6 +13,8 @@ import { getDocStorageProvider } from '@/providers/docStorage';
 import { getEncryptionProvider } from '@/providers/encryption';
 import { getESignProvider } from '@/providers/esign';
 import { paymentsService } from '@/modules/payments';
+import { assertOwnsResource, assertAccountOwnership } from '@/utils/ownership.util';
+import type { Role } from '@/config/constants';
 import type {
     GoldRate,
     GoldEligibilityRequest,
@@ -34,78 +36,124 @@ const log = createModuleLogger('goldLoans.service');
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const GOLD_RATE_PER_GRAM  = BUSINESS_RULES.GOLD_RATE_PER_GRAM;
-const MAX_LTV_PERCENT     = 75;
-const GOLD_INTEREST_RATE  = 10.56;
-const GOLD_PROCESSING_FEE = 0.5;
+const GOLD_RATE_PER_GRAM = BUSINESS_RULES.GOLD_RATE_PER_GRAM;
+const GOLD_MAV_PERCENT   = BUSINESS_RULES.GOLD_MAV_PERCENT;
+const DEFAULT_MAX_LTV_PERCENT = 75; // fallback if loan_products.max_ltv_pct is null
 
 const PURITY_MAP: Record<string, number> = BUSINESS_RULES.GOLD_PURITY_MULTIPLIERS;
 
+// Sourced from loan_products (product_type = 'GOLD_LOAN') instead of a
+// hardcoded constant — rate/LTV/fee are now product-config-driven.
+async function getGoldLoanProductConfig() {
+    const product = await prisma.loan_products.findUniqueOrThrow({
+        where: { product_type: 'GOLD_LOAN' },
+    });
+    return {
+        interestRate:     parseFloat(product.min_rate.toString()),
+        maxLtvPercent:    product.max_ltv_pct ? Number(product.max_ltv_pct) : DEFAULT_MAX_LTV_PERCENT,
+        processingFeePct: Number(product.processing_fee_pct),
+    };
+}
 // ─── Service ──────────────────────────────────────────────────────────────────
 
 export const goldLoansService = {
 
     // ── GET /gold-loans/rate ──────────────────────────────────────────────────
 
-    getGoldRate(): GoldRate {
-        return {
-            ratePerGram: GOLD_RATE_PER_GRAM,
-            purityRates: {
-                '18K': Math.round(GOLD_RATE_PER_GRAM * 0.750),
-                '20K': Math.round(GOLD_RATE_PER_GRAM * 0.833),
-                '22K': Math.round(GOLD_RATE_PER_GRAM * 0.916),
-                '24K': Math.round(GOLD_RATE_PER_GRAM * 0.999),
-            },
-            maxLtvPercent: MAX_LTV_PERCENT,
-            currency:      'INR',
-            updatedAt:     new Date().toISOString(),
-            source:        'IBJA',
-            note:          'Rate is indicative. Final value subject to physical assessment at branch.',
-        };
-    },
+    async getGoldRate(): Promise<GoldRate> {
+    const { maxLtvPercent } = await getGoldLoanProductConfig();
+    return {
+        ratePerGram: GOLD_RATE_PER_GRAM,
+        purityRates: {
+            '16K': Math.round(GOLD_RATE_PER_GRAM * PURITY_MAP['16']!),
+            '18K': Math.round(GOLD_RATE_PER_GRAM * PURITY_MAP['18']!),
+            '20K': Math.round(GOLD_RATE_PER_GRAM * PURITY_MAP['20']!),
+            '22K': Math.round(GOLD_RATE_PER_GRAM * PURITY_MAP['22']!),
+            '24K': Math.round(GOLD_RATE_PER_GRAM * PURITY_MAP['24']!),
+        },
+        maxLtvPercent,
+        currency:      'INR',
+        updatedAt:     new Date().toISOString(),
+        source:        'IBJA',
+        note:          'Rate is indicative. Final value subject to physical assessment at branch.',
+    };
+},
 
     // ── POST /gold-loans/eligibility ──────────────────────────────────────────
 
-    calculateEligibility(req: GoldEligibilityRequest): GoldEligibility {
-        const purity          = PURITY_MAP[req.purityKarat] ?? 0.916;
-        const estimatedValue  = Math.round(GOLD_RATE_PER_GRAM * purity * req.weightGrams);
-        const maxLoan         = Math.round(estimatedValue * (MAX_LTV_PERCENT / 100));
-        const requested       = req.requestedAmount ?? maxLoan;
-        const approved        = Math.min(requested, maxLoan);
-        const tenure          = req.tenureMonths ?? 12;
-        const mode            = req.repaymentMode ?? 'EMI';
-        const processingFee   = Math.round(approved * (GOLD_PROCESSING_FEE / 100));
-        const monthlyRate     = GOLD_INTEREST_RATE / 12 / 100;
+    async calculateEligibility(req: GoldEligibilityRequest): Promise<GoldEligibility> {
+    const purity = PURITY_MAP[req.purityKarat];
+    if (purity === undefined) {
+        throw new ValidationError('purityKarat', `Unsupported gold purity: ${req.purityKarat}K`);
+    }
 
-        let monthlyEmi: number | null      = null;
-        let monthlyInterest: number | null = null;
+    const { interestRate, maxLtvPercent, processingFeePct } = await getGoldLoanProductConfig();
 
-        if (mode === 'EMI') {
+    const estimatedValue      = Math.round(GOLD_RATE_PER_GRAM * purity * req.weightGrams);
+    // Margin per client's CAM formula before the LTV cap is applied.
+    const eligiblePledgeValue = Math.round(estimatedValue * GOLD_MAV_PERCENT);
+    const maxLoan             = Math.round(eligiblePledgeValue * (maxLtvPercent / 100));
+
+    const requested       = req.requestedAmount ?? maxLoan;
+    const approved        = Math.min(requested, maxLoan);
+    const tenure           = req.tenureMonths ?? 12;
+    const mode             = req.repaymentMode ?? 'EMI';
+    const processingFee    = Math.round(approved * (processingFeePct / 100));
+    const monthlyRate      = interestRate / 12 / 100;
+
+    let monthlyEmi: number | null            = null;
+    let monthlyInterest: number | null        = null;
+    let quarterlyInterest: number | null      = null;
+    let upfrontInterestAmount: number | null  = null;
+    let netDisbursalAmount                    = approved;
+
+    switch (mode) {
+        case 'EMI': {
             const r = monthlyRate;
             const n = tenure;
             monthlyEmi = Math.round(approved * r * Math.pow(1 + r, n) / (Math.pow(1 + r, n) - 1));
-        } else if (mode === 'INTEREST_ONLY') {
-            monthlyInterest = Math.round(approved * monthlyRate);
+            break;
         }
+        case 'MONTHLY_INTEREST':
+            monthlyInterest = Math.round(approved * monthlyRate);
+            break;
+        case 'QUARTERLY_INTEREST':
+            quarterlyInterest = Math.round(approved * monthlyRate * 3);
+            break;
+        case 'UPFRONT_MONTHLY_INTEREST':
+            upfrontInterestAmount = Math.round(approved * monthlyRate);
+            netDisbursalAmount    = approved - upfrontInterestAmount;
+            break;
+        case 'UPFRONT_QUARTERLY_INTEREST':
+            upfrontInterestAmount = Math.round(approved * monthlyRate * 3);
+            netDisbursalAmount    = approved - upfrontInterestAmount;
+            break;
+        case 'BULLET_REPAYMENT':
+            // No periodic payment — full principal + accrued interest due at tenure end.
+            break;
+    }
 
-        return {
-            eligible:           approved > 0,
-            estimatedGoldValue: estimatedValue,
-            maxLoanAmount:      maxLoan,
-            requestedAmount:    requested,
-            approvedAmount:     approved,
-            interestRate:       GOLD_INTEREST_RATE,
-            tenureMonths:       tenure,
-            repaymentMode:      mode,
-            monthlyEmi,
-            monthlyInterest,
-            processingFee,
-            ltv:      Math.round((approved / estimatedValue) * 100),
-            currency: 'INR',
-            note:     'Final loan amount subject to physical gold assessment at branch.',
-        };
-    },
-
+    return {
+        eligible:            approved > 0,
+        estimatedGoldValue:  estimatedValue,
+        eligiblePledgeValue,
+        maxLoanAmount:       maxLoan,
+        requestedAmount:     requested,
+        approvedAmount:      approved,
+        interestRate,
+        tenureMonths:        tenure,
+        repaymentMode:       mode,
+        monthlyEmi,
+        monthlyInterest,
+        quarterlyInterest,
+        upfrontInterestAmount,
+        netDisbursalAmount,
+        processingFee,
+        ltv:      Math.round((approved / estimatedValue) * 100),
+        currency: 'INR',
+        note:     'Final loan amount subject to physical gold assessment at branch.',
+    };
+},
     // ── GET /gold-loans/branches ──────────────────────────────────────────────
 
     async getNearbyBranches(): Promise<GoldLoanBranch[]> {
@@ -185,9 +233,11 @@ export const goldLoansService = {
 
     // ── GET /gold-loans/appointments/:id ─────────────────────────────────────
 
-    async getAppointment(appointmentId: string): Promise<GoldLoanAppointment> {
+    async getAppointment(appointmentId: string, callerId: string, callerRole: Role): Promise<GoldLoanAppointment> {
         const appointment = await goldLoansRepository.findAppointmentById(appointmentId);
         if (!appointment) throw new NotFoundError('Appointment', appointmentId);
+        const customer = await loansRepository.findCustomerByUserId(callerId);
+        assertOwnsResource(customer?.id ?? '', appointment.customerId, callerRole, 'appointment');
 
         const branch = await goldLoansRepository.findBranchById(appointment.branchId);
 
@@ -259,15 +309,22 @@ export const goldLoansService = {
             );
         }
 
-        const purityFraction = input.purityKarat / 24;
-        const valuation      = Math.round(input.netWeightGrams * purityFraction * input.ratePerGram);
-        const ltvPct         = MAX_LTV_PERCENT;
-        const finalLoan      = Math.round(valuation * (ltvPct / 100));
+        // Per client's CAM formula:
+        // Net Wt = (Gross Wt − Stone Wt) − (Gross Wt − Stone Wt) × Impurity%
+        const netOfStone     = input.grossWeightGrams - input.stoneWeightGrams;
+        const netWeightGrams = netOfStone - (netOfStone * input.impurityPct);
 
-        // Write collateral record
+        const purityFraction = input.purityKarat / 24;
+        const grossValuation = Math.round(netWeightGrams * purityFraction * input.ratePerGram);
+        // Eligible Amount = (Rate × MAV%) × Net Weight
+        const valuation       = Math.round(grossValuation * GOLD_MAV_PERCENT);
+        const { maxLtvPercent } = await getGoldLoanProductConfig();
+const ltvPct = maxLtvPercent;
+        const finalLoan       = Math.round(valuation * (ltvPct / 100));
+
         await goldLoansRepository.createCollateralGold({
             loanId:           input.loanId,
-            netWeightGrams:   input.netWeightGrams,
+            netWeightGrams,
             grossWeightGrams: input.grossWeightGrams,
             purityKarat:      input.purityKarat,
             ratePerGram:      input.ratePerGram,
@@ -277,7 +334,6 @@ export const goldLoansService = {
             valuedBy:         input.valuedBy,
         });
 
-        // Transition loan → PENDING_APPROVAL
         await loansRepository.updateApplicationStatus(
             input.loanId,
             LOAN_STATUS.PENDING_APPROVAL,
@@ -285,6 +341,7 @@ export const goldLoansService = {
 
         log.info('Gold loan appraisal submitted', {
             loanId:    input.loanId,
+            netWeightGrams,
             valuation,
             finalLoan,
             valuedBy:  input.valuedBy,
@@ -293,7 +350,7 @@ export const goldLoansService = {
         return {
             applicationId:      input.loanId,
             appraisedGoldValue: valuation,
-            actualWeightGrams:  input.netWeightGrams,
+            actualWeightGrams:  netWeightGrams,
             actualPurityKarat:  `${input.purityKarat}K`,
             finalLoanAmount:    finalLoan,
             ltv:                ltvPct,
@@ -306,7 +363,9 @@ export const goldLoansService = {
 
     // ── GET /gold-loans/applications/:id/appraisal ───────────────────────────
 
-    async getAppraisalResult(applicationId: string): Promise<GoldLoanAppraisalResult> {
+    async getAppraisalResult(applicationId: string, callerId: string, callerRole: Role): Promise<GoldLoanAppraisalResult> {
+        const application = await loansRepository.findApplicationByIdOrThrow(applicationId);
+        assertOwnsResource(callerId, application.userId, callerRole, 'gold loan appraisal');
         const collateral = await goldLoansRepository.findCollateralByLoanId(applicationId);
 
         if (!collateral) {
@@ -325,7 +384,8 @@ export const goldLoansService = {
         }
 
         const valuation  = Number(collateral.valuation);
-        const finalLoan  = Math.round(valuation * (MAX_LTV_PERCENT / 100));
+        const { maxLtvPercent } = await getGoldLoanProductConfig();
+const finalLoan  = Math.round(valuation * (maxLtvPercent / 100));
 
         return {
             applicationId,
@@ -344,10 +404,6 @@ export const goldLoansService = {
     // ── Downstream stubs — wired to real flow after PENDING_APPROVAL ──────────
     // These feed into the existing loans approval → eSign → disbursement pipeline
 
-    // Real: validates the state transition (PENDING_APPROVAL → APPROVED)
-    // and persists the accepted amount. Previously logged and returned
-    // success without writing anything — approved_amount never got
-    // recorded and the application never actually advanced state.
     async acceptFinalAmount(
         applicationId: string,
         amount: number,
@@ -379,11 +435,6 @@ export const goldLoansService = {
         };
     },
 
-    // Real: generates the actual agreement PDF, uploads it to S3, decrypts
-    // the borrower's Aadhaar (necessary and legitimate here — eSign binding
-    // requires the full number, not just last 4), and creates a real
-    // signing request with the eSign provider. Previously returned a fake
-    // S3 URL that pointed to a file which never existed.
     async generateAgreement(applicationId: string): Promise<GoldLoanAgreementResult> {
         log.info('Generating gold loan agreement', { applicationId });
 
@@ -449,13 +500,6 @@ export const goldLoansService = {
         };
     },
 
-    // Real: OTP verification actually happens on the vendor's signing page
-    // (the customer visits the signingUrl from generateAgreement and enters
-    // OTP there) — not on our API. This function polls the real signing
-    // status, and if complete, applies the legal e-stamp and stores the
-    // final signed+stamped document. The `otp` parameter is accepted for
-    // route-signature compatibility but isn't used for verification, which
-    // is out of our hands by design.
     async completeESign(
         applicationId: string,
         _otp: string,
@@ -532,9 +576,6 @@ export const goldLoansService = {
         };
     },
 
-    // Real: creates a real NACH mandate against the application (before the
-    // loan account exists — see disbursementService, which links this to
-    // the real account once disbursement happens).
     async initiateNach(
         applicationId: string,
         input: { bankAccount: string; ifsc: string },
@@ -575,11 +616,6 @@ export const goldLoansService = {
         };
     },
 
-    // Real: reads the actual disbursement record. Note the parameter here
-    // is genuinely an applicationId (unlike getClosureQuote/getMonitoring
-    // above, which take an account id) — disbursement records are keyed by
-    // loan_id = loan_applications.id, since a disbursement can be initiated
-    // before the loan_accounts row even exists.
     async getDisbursalStatus(applicationId: string): Promise<GoldLoanDisbursalStatus> {
         const record = await disbursementService.getDisbursementByLoan(applicationId);
 
@@ -623,14 +659,9 @@ export const goldLoansService = {
         };
     },
 
-    // Real: outstanding balance, next EMI, overdue amount, and gold custody
-    // status all come from the actual DB. currentGoldValue/currentLtv are
-    // NOT live-tracked — no live gold rate feed exists anywhere in this
-    // codebase (a genuinely separate, unbuilt feature). Rather than fake a
-    // "current" value that could mislead on actual LTV risk, this uses the
-    // valuation captured at loan origination, clearly labeled as such.
-    async getMonitoring(loanId: string): Promise<GoldLoanMonitoring> {
+    async getMonitoring(loanId: string, callerId: string, callerRole: Role): Promise<GoldLoanMonitoring> {
         const account = await loansRepository.findAccountByIdOrThrow(loanId);
+        assertAccountOwnership(callerId, account, callerRole, 'gold loan');
         const summary = await emiService.getSummary(loanId);
 
         const overdueAgg = await prisma.emi_schedule.aggregate({
@@ -656,8 +687,6 @@ export const goldLoansService = {
             currentGoldValue:  originGoldValue ?? 0,
             currentLtv:        originLtv ?? 0,
             maxLtv,
-            // Cannot be accurately determined without a live rate feed —
-            // conservatively false rather than guessing.
             ltvBreached:       false,
             outstandingAmount: summary.totalOutstanding,
             overdueAmount,
@@ -671,14 +700,9 @@ export const goldLoansService = {
         };
     },
 
-    // Real: reuses the same foreclosure calculation already fixed and
-    // tested for CDL (emiService.getForeclosureQuote — see the earlier fix
-    // where this used to silently charge 0% interest). `loanId` here is a
-    // loan_accounts.id; gold collateral is looked up via the account's
-    // application_id, since collateral_gold.loan_id actually references
-    // loan_applications.id, not loan_accounts.id.
-    async getClosureQuote(loanId: string): Promise<GoldLoanClosureQuote> {
+    async getClosureQuote(loanId: string, callerId: string, callerRole: Role): Promise<GoldLoanClosureQuote> {
         const account = await loansRepository.findAccountByIdOrThrow(loanId);
+        assertAccountOwnership(callerId, account, callerRole, 'gold loan closure quote');
 
         const quote = await emiService.getForeclosureQuote(loanId, account.interestRate);
 
@@ -705,13 +729,6 @@ export const goldLoansService = {
         };
     },
 
-    // Real, with an honest limitation: AML checks genuinely run during KYC
-    // (kyc.service.ts runRiskChecks) and a failure hard-rejects with a
-    // stored reason — so amlStatus below is inferred from that outcome.
-    // PEP status, however, is computed by the AML provider but never
-    // persisted or acted on anywhere in the codebase today — reporting a
-    // fake PASSED here would be a false compliance signal, so it's marked
-    // NOT_TRACKED rather than guessed.
     async runCompliance(applicationId: string): Promise<GoldLoanComplianceResult> {
         log.info('Running compliance for gold loan', { applicationId });
 
@@ -748,7 +765,7 @@ export const goldLoansService = {
         const amlStatus = wasAmlRejected
             ? 'FAILED'
             : kyc.overall_status === 'COMPLETE'
-                ? 'PASSED' // Inferred: a failed AML check would have blocked KYC completion.
+                ? 'PASSED'
                 : 'PENDING';
 
         const overallStatus: GoldLoanComplianceResult['overallStatus'] =

@@ -61,9 +61,10 @@
         // â”€â”€ Type roots â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         // Tell TypeScript to look for global type augmentations in src/types/
         "typeRoots": [
-            "./node_modules/@types",
-            "./src/types"
-        ],
+    "./node_modules/@types",
+    "../../node_modules/@types",
+    "./src/types"
+],
         "types": [
             "node",
             "jest"

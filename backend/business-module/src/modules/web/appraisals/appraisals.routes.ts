@@ -25,11 +25,15 @@ router.post('/gold/:id/arrive', requireAuth(), allowRoles(...OPS_ROLES), async (
 // POST /appraisals/gold/:id
 // Branch staff submits gold appraisal → writes to collateral_gold
 // → transitions loan to PENDING_APPROVAL
+// POST /appraisals/gold/:id
+// Branch staff submits gold appraisal → writes to collateral_gold
+// → transitions loan to PENDING_APPROVAL
 router.post('/gold/:id', requireAuth(), allowRoles(...OPS_ROLES), async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
         const {
-            netWeightGrams,
             grossWeightGrams,
+            stoneWeightGrams,
+            impurityPct,
             purityKarat,
             ratePerGram,
             items,
@@ -37,8 +41,9 @@ router.post('/gold/:id', requireAuth(), allowRoles(...OPS_ROLES), async (req: Au
 
         const result = await goldLoansService.submitAppraisal({
             loanId:           req.params.id as string,
-            netWeightGrams,
             grossWeightGrams,
+            stoneWeightGrams,
+            impurityPct,
             purityKarat,
             ratePerGram,
             items:            items ?? {},
