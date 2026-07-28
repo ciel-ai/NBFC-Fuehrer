@@ -4,6 +4,7 @@ import { adminRepository } from './admin.repository';
 import { setAuditContext } from '@/middlewares';
 import { AUDIT_ACTION } from '@/config/constants';
 import { createModuleLogger } from '@/config/logger';
+import { getRedisClient } from '@/config/redis';
 import {
     ConflictError,
     ForbiddenError,
@@ -301,26 +302,36 @@ export const adminService = {
     },
 
     async isMaintenanceMode(): Promise<{ active: boolean; message: string }> {
-        const config = await adminRepository.getConfig('MAINTENANCE_MODE');
-        if (!config || config.value !== 'true') {
-            return { active: false, message: '' };
-        }
-        const msgConfig = await adminRepository.getConfig('MAINTENANCE_MESSAGE');
-        return {
-            active: true,
-            message: msgConfig?.value ?? 'Platform under maintenance',
-        };
-    },
+    const redis = getRedisClient();
+    const cached = await redis.get('cfg:maintenance').catch(() => null);
+    if (cached !== null) return JSON.parse(cached);
+
+    const config = await adminRepository.getConfig('MAINTENANCE_MODE');
+    if (!config || config.value !== 'true') {
+        const result = { active: false, message: '' };
+        await redis.set('cfg:maintenance', JSON.stringify(result), 'EX', 60).catch(() => null);
+        return result;
+    }
+    const msgConfig = await adminRepository.getConfig('MAINTENANCE_MESSAGE');
+    const result = { active: true, message: msgConfig?.value ?? 'Platform under maintenance' };
+    await redis.set('cfg:maintenance', JSON.stringify(result), 'EX', 60).catch(() => null);
+    return result;
+},
 
     // ── Branch management ─────────────────────────────────────────────────────
 
-    async listBranches() {
-        const { prisma } = await import('@/config/database');
-        const rows = await prisma.branches.findMany({ orderBy: { created_at: 'desc' } });
-        return rows;
-    },
+   async listBranches() {
+    const redis = getRedisClient();
+    const cached = await redis.get('cfg:branches').catch(() => null);
+    if (cached !== null) return JSON.parse(cached);
 
-    async createBranch(data: any, req: Request) {
+    const { prisma } = await import('@/config/database');
+    const rows = await prisma.branches.findMany({ orderBy: { created_at: 'desc' } });
+    await redis.set('cfg:branches', JSON.stringify(rows), 'EX', 300).catch(() => null);
+    return rows;
+},
+
+        async createBranch(data: any, req: Request) {
         const { prisma } = await import('@/config/database');
         const branch = await prisma.branches.create({
             data: {
@@ -333,10 +344,11 @@ export const adminService = {
                 updated_at: new Date(),
             },
         });
+        await getRedisClient().del('cfg:branches').catch(() => null);
         return branch;
     },
 
-    async updateBranch(branchId: string, data: {
+        async updateBranch(branchId: string, data: {
         name?: string;
         address?: string;
         city?: string;
@@ -350,10 +362,6 @@ export const adminService = {
         is_active?: boolean;
     }, req: Request) {
         const { prisma } = await import('@/config/database');
-        // Explicit field whitelist instead of spreading the raw request body —
-        // previously any client-supplied field passed straight through to
-        // Prisma's update(), a mass-assignment risk since validateBody() wasn't
-        // even applied to this route at all.
         const branch = await prisma.branches.update({
             where: { id: branchId },
             data: {
@@ -371,6 +379,7 @@ export const adminService = {
                 updated_at: new Date(),
             },
         });
+        await getRedisClient().del('cfg:branches').catch(() => null);
         return branch;
     },
 

@@ -454,8 +454,18 @@ export const collectionsService = {
         opened: number;
         skipped: number;
     }> {
-        const overdueLoans = await loansRepository
-            .findActiveLoansWithOverdueEmis(30);
+        const [overdueLoans, allEmiStats] = await Promise.all([
+            loansRepository.findActiveLoansWithOverdueEmis(30),
+            emiRepository.findOverdueEmis(0),
+        ]);
+
+        // Index EMI stats by loanAccountId once — O(1) lookup inside the loop
+        const emiStatsByLoan = new Map<string, OverdueEmiResult[]>();
+        for (const e of allEmiStats) {
+            const arr = emiStatsByLoan.get(e.loanAccountId) ?? [];
+            arr.push(e);
+            emiStatsByLoan.set(e.loanAccountId, arr);
+        }
 
         let opened = 0;
         let skipped = 0;
@@ -466,17 +476,12 @@ export const collectionsService = {
             );
 
             if (existing) {
-                // Sync figures on existing case
                 await collectionsRepository.syncOverdueFigures(existing.id);
                 skipped++;
                 continue;
             }
 
-            // Fetch current overdue amount — use findOverdueEmis (correct method name)
-            const emiStats: OverdueEmiResult[] = await emiRepository.findOverdueEmis(0);
-            const thisLoan = emiStats.filter(
-                (e: OverdueEmiResult) => e.loanAccountId === loan.loanAccountId,
-            );
+            const thisLoan = emiStatsByLoan.get(loan.loanAccountId) ?? [];
 
             const overdueAmount = thisLoan.reduce(
                 (sum: number, e: OverdueEmiResult) => sum + Number(e.emiAmount), 0,
@@ -487,8 +492,8 @@ export const collectionsService = {
 
             await this.openCase({
                 loanAccountId: loan.loanAccountId,
-                userId: loan.userId,
-                overdueDays: loan.overdueDays,
+                userId:        loan.userId,
+                overdueDays:   loan.overdueDays,
                 overdueAmount: roundRupees(overdueAmount),
                 penaltyAmount: roundRupees(penaltyAmount),
             });
