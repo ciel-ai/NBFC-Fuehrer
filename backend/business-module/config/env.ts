@@ -246,6 +246,7 @@ PERFIOS_TIMEOUT_MS: Joi.number().integer().default(15000),
     // assertion further down (after the schema validates) prevents it from
     // ever actually being true in production.
     ENABLE_UNWIRED_LOAN_STUBS: Joi.boolean().default(false),
+    SENTRY_DSN: Joi.string().uri().optional().allow(''),
 
 }).unknown(true); // Fail on any undeclared env var in production
 
@@ -307,6 +308,7 @@ if (value.NODE_ENV === 'production') {
 export const env = {
     nodeEnv: value.NODE_ENV as 'development' | 'staging' | 'production' | 'test',
     port: value.PORT as number,
+    sentryDsn: (value.SENTRY_DSN as string | undefined) || undefined,
     appName: value.APP_NAME as string,
     apiVersion: value.API_VERSION as string,
     isProd: value.NODE_ENV === 'production',

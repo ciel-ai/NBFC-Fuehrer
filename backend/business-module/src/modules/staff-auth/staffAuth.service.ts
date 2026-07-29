@@ -256,7 +256,30 @@ export async function refresh(
     return issueTokens(row.admin_user, req);
 }
 
-// ─── 5. Logout ──────────────────────────────────────────────────────────────────
+// ─── 5. Change password ─────────────────────────────────────────────────────────
+
+export async function changePassword(
+    staffId: string,
+    currentPassword: string,
+    newPassword: string,
+): Promise<void> {
+    const u = await prisma.admin_users.findUnique({ where: { id: staffId } });
+    if (!u || u.status !== 'ACTIVE') throw err.userDeactivated();
+    if (!u.password_hash) throw err.invalidCredentials();
+
+    const matches = await bcrypt.compare(currentPassword, u.password_hash);
+    if (!matches) throw err.invalidCredentials();
+
+    const newHash = await bcrypt.hash(newPassword, 10);
+    await prisma.admin_users.update({
+        where: { id: staffId },
+        data: { password_hash: newHash, must_change_password: false },
+    });
+
+    logger.info({ message: 'Staff password changed', staffId });
+}
+
+// ─── 6. Logout ──────────────────────────────────────────────────────────────────
 
 export async function logout(staff: StaffAuthUser): Promise<void> {
     const redis = getRedisClient();
@@ -274,7 +297,7 @@ export async function logout(staff: StaffAuthUser): Promise<void> {
     logger.info({ message: 'Staff logout', adminId: staff.id });
 }
 
-// ─── 6. Current user ──────────────────────────────────────────────────────────────
+// ─── 7. Current user ──────────────────────────────────────────────────────────────
 
 export async function me(staff: StaffAuthUser): Promise<PresentedStaff> {
     const u = await prisma.admin_users.findUnique({ where: { id: staff.id }, include: { branch: true } });

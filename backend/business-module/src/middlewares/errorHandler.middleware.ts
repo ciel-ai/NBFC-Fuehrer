@@ -6,6 +6,7 @@ import { ValidationError } from '@/errors';
 import { createModuleLogger } from '@/config/logger';
 import { env } from '@/config/env';
 import { HTTP } from '@/config/constants';
+import { reportError } from '@/config/crashReporter';
 
 const log = createModuleLogger('errorHandler');
 
@@ -151,8 +152,10 @@ export function errorHandler() {
         if (!appError.isOperational) {
             // Non-operational = programmer bug — needs immediate attention
             log.error('Unhandled application error', logContext);
+            reportError(err, { requestId: req.requestId, path: req.path });
         } else if (appError.statusCode >= 500) {
             log.error('Operational server error', logContext);
+            reportError(err, { requestId: req.requestId, path: req.path });
         } else if (appError.statusCode >= 400) {
             log.warn('Client error', logContext);
         }

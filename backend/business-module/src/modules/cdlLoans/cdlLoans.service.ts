@@ -7,6 +7,7 @@ import { computeMonthlyEmi } from '@/modules/emi/emi.calculator';
 import { emiService } from '@/modules/emi';
 import { loansRepository } from '@/modules/loans/loans.repository';
 import { paymentsService } from '@/modules/payments';
+import { getPaymentProvider } from '@/providers';
 import { LOAN_STATUS, PRODUCT_TYPE, BUSINESS_RULES } from '@/config/constants';
 import type {
     CdlApplicationInput, CdlApplicationResult,
@@ -383,19 +384,60 @@ export const cdlLoansService = {
                 processing_fee: processingFee,
                 processing_fee_gst: processingFeeGst,
                 net_disbursed_amount: input.amount,
-                status: 'COMPLETED',
+                status: 'PENDING',
                 initiated_by: input.initiatedBy,
                 initiated_at: new Date(),
-                completed_at: new Date(),
-                utr_number: `UTR${Date.now()}`,
             },
         });
 
-        log.info('CDL disbursed to merchant', { applicationId, accountId: account.id, merchantName: input.merchantName });
+        // Real payout via the payment provider — this used to unconditionally
+        // write status: 'COMPLETED' with a fabricated `UTR${Date.now()}`
+        // regardless of whether any money actually moved. Now it mirrors the
+        // real disbursement.service.ts flow: call the provider, only mark
+        // COMPLETED with a real UTR on genuine synchronous completion,
+        // otherwise leave it INITIATED for the existing payout webhook to
+        // complete later (the webhook operates on this same shared
+        // disbursements table regardless of loan product).
+        const paymentProvider = getPaymentProvider();
+        let payoutResult;
+        try {
+            payoutResult = await paymentProvider.createPayout({
+                accountNumber: input.merchantName,
+                ifsc: '',
+                accountName: input.merchantName,
+                amount: input.amount,
+                purpose: `CDL merchant disbursement - ${applicationId.slice(0, 8)}`,
+                referenceId: disbursement.id,
+            });
+        } catch (error) {
+            await prisma.disbursements.update({
+                where: { id: disbursement.id },
+                data: { status: 'FAILED', failure_reason: (error as Error).message },
+            });
+            throw new Error(`CDL merchant payout failed: ${(error as Error).message}`);
+        }
+
+        const isSyncComplete = payoutResult.status === 'DONE' && payoutResult.utrNumber;
+        const updatedDisbursement = await prisma.disbursements.update({
+            where: { id: disbursement.id },
+            data: {
+                status: isSyncComplete ? 'COMPLETED' : 'INITIATED',
+                razorpay_payout_id: payoutResult.payoutId,
+                utr_number: isSyncComplete ? payoutResult.utrNumber : null,
+                completed_at: isSyncComplete ? new Date() : null,
+            },
+        });
+
+        log.info('CDL disbursed to merchant', {
+            applicationId,
+            accountId: account.id,
+            merchantName: input.merchantName,
+            status: updatedDisbursement.status,
+        });
 
         return {
             applicationId,
-            disbursalId: disbursement.id,
+            disbursalId: updatedDisbursement.id,
             amount: input.amount,
             mode: 'UPI',
             merchantName: input.merchantName,

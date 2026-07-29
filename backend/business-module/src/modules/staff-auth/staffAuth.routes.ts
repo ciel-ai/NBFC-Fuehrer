@@ -17,6 +17,7 @@ import {
     otpRequestSchema,
     otpVerifySchema,
     refreshSchema,
+    changePasswordSchema,
 } from './staffAuth.validation';
 
 const router = Router();
@@ -27,5 +28,6 @@ router.post('/otp/verify', validateBody(otpVerifySchema), staffAuthController.ot
 router.post('/refresh', validateBody(refreshSchema), staffAuthController.refresh);
 router.post('/logout', verifyStaffToken(), staffAuthController.logout);
 router.get('/me', verifyStaffToken(), staffAuthController.me);
+router.post('/change-password', verifyStaffToken(), validateBody(changePasswordSchema), staffAuthController.changePassword);
 
 export { router as staffAuthRouter };

@@ -12,12 +12,39 @@ import { scheduleDebitRetryJob }     from '@/jobs/debitRetry.job';
 import { scheduleSettlementJob }     from '@/jobs/settlement.job';
 import { connectDatabase } from '@/config/database';
 import { connectRedis } from '@/config/redis';
+import { initCrashReporter, reportError } from '@/config/crashReporter';
 
 const log = createModuleLogger('server');
 
 let server: ReturnType<ReturnType<typeof createApp>['listen']>;
 
 async function start(): Promise<void> {
+    initCrashReporter();
+
+    // Previously there was no handler for uncaughtException/unhandledRejection
+    // at all — an unexpected error in a fire-and-forget async callback (e.g. a
+    // .catch() that was never attached) would crash the process with only a
+    // default Node.js stack trace on stdout, nothing captured, nothing
+    // alerted. These are last-resort nets, not a substitute for fixing the
+    // underlying bug — after reporting, the process still exits, since
+    // continuing to run after a genuinely uncaught exception risks silent
+    // data corruption.
+    process.on('uncaughtException', (err) => {
+        log.error('Uncaught exception — process will exit', {
+            error: err instanceof Error ? err.message : String(err),
+        });
+        reportError(err, { source: 'uncaughtException' });
+        process.exit(1);
+    });
+
+    process.on('unhandledRejection', (reason) => {
+        log.error('Unhandled promise rejection — process will exit', {
+            error: reason instanceof Error ? reason.message : String(reason),
+        });
+        reportError(reason, { source: 'unhandledRejection' });
+        process.exit(1);
+    });
+
     // Secrets must be loaded (or stubbed, in dev/test) BEFORE the server
     // starts accepting traffic. Previously this was never called at all —
     // the app would pass health checks and serve real requests, then fail

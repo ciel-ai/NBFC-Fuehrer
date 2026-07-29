@@ -27,3 +27,8 @@ export const otpVerifySchema = Joi.object({
 export const refreshSchema = Joi.object({
     refreshToken: Joi.string().required(),
 });
+
+export const changePasswordSchema = Joi.object({
+    currentPassword: Joi.string().min(6).max(200).required(),
+    newPassword: Joi.string().min(8).max(200).required(),
+});

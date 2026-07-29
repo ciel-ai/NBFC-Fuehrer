@@ -56,4 +56,12 @@ export const staffAuthController = {
             res.status(200).json(successResponse(user));
         } catch (err) { next(err); }
     },
+
+    async changePassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+        try {
+            const { currentPassword, newPassword } = getValidatedBody<{ currentPassword: string; newPassword: string }>(req);
+            await service.changePassword(getStaffUser(req).id, currentPassword, newPassword);
+            res.status(200).json(successResponse({ success: true }, 'Password changed'));
+        } catch (err) { next(err); }
+    },
 };
