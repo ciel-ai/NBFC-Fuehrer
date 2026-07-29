@@ -1,6 +1,6 @@
 // src/modules/payments/payments.service.ts
 import type { Request } from 'express';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '@/generated/prisma-client';
 import { paymentsRepository } from './payments.repository';
 import { paymentEvents } from './payments.events';
 import { emiRepository } from '@/modules/emi';

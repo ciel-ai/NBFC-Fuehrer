@@ -2,7 +2,7 @@
 import { getRedisClient } from '@/config/redis';
 import { randomUUID } from 'crypto';
 import type { Request } from 'express';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '@/generated/prisma-client';
 import { sha256Fingerprint } from '@/utils/encryption.util';
 import { kycRepository } from './kyc.repository';
 import { kycEvents } from './kyc.events';
