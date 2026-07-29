@@ -165,5 +165,12 @@ router.get(
     adminController.listAllLoans,
 );
 router.get('/loans/:loanId', requireAuth(), allowRoles(...SUPER_ADMIN_ONLY), adminController.getLoanDetail);
+router.patch(
+    '/customers/:userId/status',
+    requireAuth(),
+    allowRoles(...SUPER_ADMIN_ONLY),
+    validateBody(Joi.object({ isActive: Joi.boolean().required() })),
+    adminController.setCustomerActiveStatus,
+);
 
 export { router as adminRouter };

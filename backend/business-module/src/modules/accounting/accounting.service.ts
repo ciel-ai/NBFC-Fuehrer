@@ -7,6 +7,9 @@ import { createModuleLogger } from '@/config/logger';
 import { accountingRepository } from './accounting.repository';
 import type { ReferenceType, CreateJournalEntryInput } from './accounting.types';
 import { prisma } from '@/config/database';
+import type { Prisma } from '@/generated/prisma-client';
+
+type PrismaOrTx = typeof prisma | Prisma.TransactionClient;
 
 const log = createModuleLogger('accounting.service');
 
@@ -26,10 +29,28 @@ const log = createModuleLogger('accounting.service');
 async function postEntry(
     data: CreateJournalEntryInput,
     errorContext: Record<string, unknown>,
+    tx?: PrismaOrTx,
 ): Promise<void> {
     try {
+        if (tx) {
+            // Inside a caller's transaction — let a failure here roll back
+            // the whole transaction (business write + GL entry succeed or
+            // fail together) rather than being swallowed, since swallowing
+            // inside someone else's $transaction would silently commit a
+            // half-done state.
+            await accountingRepository.createEntry(data, tx);
+            return;
+        }
         await accountingRepository.createEntry(data);
     } catch (err) {
+        if (tx) {
+            // Propagate — inside a caller's $transaction, letting this
+            // fail silently would commit the business write with no GL
+            // entry at all. The whole transaction must roll back instead.
+            log.error('GL entry failed inside transaction — rolling back', { error: err, ...errorContext });
+            throw err;
+        }
+
         log.error('Failed to post GL entry', { error: err, ...errorContext });
         try {
             await prisma.audit_logs.create({
@@ -149,7 +170,7 @@ export const accountingService = {
         productType:    string;
         amount:         number;
         postedBy:       string;
-    }): Promise<void> {
+    }, tx?: PrismaOrTx): Promise<void> {
         await postEntry({
             entryDate:     new Date(),
             referenceType: 'DISBURSEMENT',
@@ -159,7 +180,7 @@ export const accountingService = {
             amount:        params.amount,
             narration:     `Loan disbursement — Loan A/c ${params.loanAccountId}`,
             postedBy:      params.postedBy,
-        }, params);
+        }, params, tx);
     },
 
     // ── 2. Processing fee collection ──────────────────────────────────────────

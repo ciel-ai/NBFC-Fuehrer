@@ -1,5 +1,6 @@
 // src/modules/accounting/accounting.repository.ts
 import { prisma } from '@/config/database';
+import type { Prisma } from '@/generated/prisma-client';
 import { createModuleLogger } from '@/config/logger';
 import type {
     GlAccount,
@@ -8,6 +9,12 @@ import type {
     LedgerQueryInput,
     AccountBalance,
 } from './accounting.types';
+
+// Prisma client OR an in-flight $transaction callback's `tx` — lets a
+// caller that's already inside its own transaction (e.g. disbursement)
+// pass it through so the GL entry commits/rolls back atomically with the
+// business write, instead of always using the standalone global client.
+type PrismaOrTx = typeof prisma | Prisma.TransactionClient;
 
 const log = createModuleLogger('accounting.repository');
 
@@ -62,8 +69,8 @@ export const accountingRepository = {
 
     // ── Journal Entries ───────────────────────────────────────────────────────
 
-    async createEntry(data: CreateJournalEntryInput): Promise<JournalEntry> {
-        const row = await prisma.journal_entries.create({
+    async createEntry(data: CreateJournalEntryInput, tx: PrismaOrTx = prisma): Promise<JournalEntry> {
+        const row = await tx.journal_entries.create({
             data: {
                 entry_date:     data.entryDate,
                 reference_type: data.referenceType,

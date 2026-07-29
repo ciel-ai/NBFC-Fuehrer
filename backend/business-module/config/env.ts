@@ -247,6 +247,11 @@ PERFIOS_TIMEOUT_MS: Joi.number().integer().default(15000),
     // ever actually being true in production.
     ENABLE_UNWIRED_LOAN_STUBS: Joi.boolean().default(false),
     SENTRY_DSN: Joi.string().uri().optional().allow(''),
+    USER_MODULE_INTERNAL_URL: Joi.string().uri().default('http://localhost:3001'),
+    USER_MODULE_INTERNAL_API_KEY: Joi.string().when('NODE_ENV', {
+        is: Joi.valid('production', 'staging'),
+        then: Joi.string().required(),
+    }),
 
 }).unknown(true); // Fail on any undeclared env var in production
 
@@ -309,6 +314,8 @@ export const env = {
     nodeEnv: value.NODE_ENV as 'development' | 'staging' | 'production' | 'test',
     port: value.PORT as number,
     sentryDsn: (value.SENTRY_DSN as string | undefined) || undefined,
+    userModuleInternalUrl: value.USER_MODULE_INTERNAL_URL as string,
+    userModuleInternalApiKey: value.USER_MODULE_INTERNAL_API_KEY as string | undefined,
     appName: value.APP_NAME as string,
     apiVersion: value.API_VERSION as string,
     isProd: value.NODE_ENV === 'production',

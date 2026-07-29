@@ -179,6 +179,7 @@ async listAllLoans(req: AuthRequest, res: Response, next: NextFunction) {
 },
 
 // GET /admin/loans/:loanId
+    // GET /admin/loans/:loanId
 async getLoanDetail(req: AuthRequest, res: Response, next: NextFunction) {
     try {
         const loanId = req.params.loanId as string;
@@ -187,6 +188,15 @@ async getLoanDetail(req: AuthRequest, res: Response, next: NextFunction) {
     } catch (err) { next(err); }
 },
 
-};
+// PATCH /admin/customers/:userId/status
+async setCustomerActiveStatus(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+        const userId = req.params.userId as string;
+        const { isActive } = req.body as { isActive: boolean };
+        await adminService.setCustomerActiveStatus(userId, isActive);
+        res.status(HTTP.OK).json(successResponse({ userId, isActive }));
+    } catch (err) { next(err); }
+},
 
+};
 

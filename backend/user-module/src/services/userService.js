@@ -334,6 +334,26 @@ const getUserById = async (userId) => {
   };
 };
 
+// Deactivate/reactivate a customer account. Called only via the internal
+// service-to-service endpoint below — the audit found there was no code
+// path anywhere that ever set isActive: false, meaning authMiddleware's
+// deactivation check (which does work correctly) had nothing that could
+// ever actually trigger it.
+const setUserActiveStatus = async (userId, isActive) => {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) {
+    throw new AppError('User not found.', 404);
+  }
+
+  const updated = await prisma.user.update({
+    where: { id: userId },
+    data: { isActive },
+  });
+
+  logger.info({ message: 'User active status changed', userId, isActive });
+  return { user: buildUserResponse(updated) };
+};
+
 module.exports = {
   registerUser,
   sendOtp,
@@ -344,4 +364,5 @@ module.exports = {
   getProfile,
   updateProfile,
   getUserById,
+  setUserActiveStatus,
 };

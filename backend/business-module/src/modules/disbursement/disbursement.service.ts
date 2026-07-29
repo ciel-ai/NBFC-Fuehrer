@@ -8,6 +8,7 @@ import { loansRepository } from '@/modules/loans';
 import { loansService } from '@/modules/loans';
 import { underwritingRepository } from '@/modules/underwriting';
 import { emiService } from '@/modules/emi';
+import { accountingService } from '@/modules/accounting/accounting.service';
 import { getPaymentProvider } from '@/providers';
 import { generateLoanAccountNumber } from '@/utils/referenceNumber.util';
 import {
@@ -537,6 +538,18 @@ export const disbursementService = {
                     updated_at: new Date(),
                 },
             });
+
+            // 4. Post the GL entry for this disbursement in the same
+            // transaction — succeeds or rolls back together with the loan
+            // account / disbursement-status writes above, instead of being
+            // a separate step that could silently never happen.
+            await accountingService.postDisbursement({
+                disbursementId: record.id,
+                loanAccountId:  accountRow.id as string,
+                productType:    loan.productType,
+                amount:         principalAmount,
+                postedBy:       record.initiatedBy,
+            }, tx);
         });
 
         // ── Generate EMI schedule ─────────────────────────────────────────────

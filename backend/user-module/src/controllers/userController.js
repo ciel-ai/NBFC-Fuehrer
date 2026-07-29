@@ -101,6 +101,18 @@ const getUserById = asyncHandler(async (req, res) => {
   });
 });
 
+const setUserActiveStatus = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  const { isActive } = req.body;
+
+  if (typeof isActive !== 'boolean') {
+    throw new AppError('isActive must be a boolean.', 400);
+  }
+
+  const result = await userService.setUserActiveStatus(userId, isActive);
+  sendSuccess(res, result);
+});
+
 module.exports = {
   register,
   sendOtp,
@@ -111,4 +123,5 @@ module.exports = {
   getProfile,
   updateProfile,
   getUserById,
+  setUserActiveStatus,
 };

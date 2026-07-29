@@ -1,5 +1,7 @@
 // src/modules/admin/admin.service.ts
 import type { Request } from 'express';
+import axios from 'axios';
+import { env } from '@/config/env';
 import { adminRepository } from './admin.repository';
 import { setAuditContext } from '@/middlewares';
 import { AUDIT_ACTION } from '@/config/constants';
@@ -438,5 +440,25 @@ export const adminService = {
         });
         if (!loan) throw new NotFoundError('Loan', loanId);
         return loan;
+    },
+
+    // Deactivate/reactivate a customer account. Customer identity lives in
+    // user-module's own database, not this one — this calls user-module's
+    // internal (shared-secret authenticated) endpoint rather than writing
+    // to a table this service doesn't own, keeping the same service
+    // boundary the earlier staff-auth cleanup established.
+    async setCustomerActiveStatus(userId: string, isActive: boolean): Promise<void> {
+        try {
+            await axios.patch(
+                `${env.userModuleInternalUrl}/api/users/internal/${userId}/status`,
+                { isActive },
+                { headers: { 'x-internal-api-key': env.userModuleInternalApiKey } },
+            );
+        } catch (error) {
+            throw new DomainError(
+                `Failed to update customer status: ${(error as Error).message}`,
+                'CUSTOMER_STATUS_UPDATE_FAILED',
+            );
+        }
     },
 };
