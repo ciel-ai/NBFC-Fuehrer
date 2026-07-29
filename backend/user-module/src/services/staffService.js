@@ -18,7 +18,7 @@ const PORTAL_ROLE_PREFIX = {
 
 const staffLogin = async (username, password) => {
     const { rows } = await query(
-        `SELECT * FROM admin_users WHERE username = $1 AND is_active = true LIMIT 1`,
+        `SELECT * FROM admin_users WHERE username = $1 AND status = 'ACTIVE' LIMIT 1`,
         [username.toLowerCase().trim()]
     );
     if (!rows.length) throw new AppError('Invalid username or password.', 401);
@@ -45,7 +45,7 @@ const requestPortalOtp = async (phone, portal) => {
     const prefix = PORTAL_ROLE_PREFIX[portal];
 
     const { rows } = await query(
-        `SELECT * FROM admin_users WHERE phone = $1 AND is_active = true LIMIT 1`,
+        `SELECT * FROM admin_users WHERE phone = $1 AND status = 'ACTIVE' LIMIT 1`,
         [normalizedPhone]
     );
     if (!rows.length) throw new AppError('No active account found for this phone number.', 404);
@@ -82,7 +82,7 @@ const verifyPortalOtp = async (phone, otp, portal) => {
     const prefix = PORTAL_ROLE_PREFIX[portal];
 
     const { rows } = await query(
-        `SELECT * FROM admin_users WHERE phone = $1 AND is_active = true LIMIT 1`,
+        `SELECT * FROM admin_users WHERE phone = $1 AND status = 'ACTIVE' LIMIT 1`,
         [normalizedPhone]
     );
     if (!rows.length) throw new AppError('No active account found.', 404);
@@ -109,7 +109,7 @@ const verifyPortalOtp = async (phone, otp, portal) => {
 
 const changePassword = async (staffId, currentPassword, newPassword) => {
     const { rows } = await query(
-        `SELECT * FROM admin_users WHERE id = $1 AND is_active = true LIMIT 1`,
+        `SELECT * FROM admin_users WHERE id = $1 AND status = 'ACTIVE' LIMIT 1`,
         [staffId]
     );
     if (!rows.length) throw new AppError('Staff not found.', 404);
@@ -126,7 +126,7 @@ const changePassword = async (staffId, currentPassword, newPassword) => {
 
 const getStaffProfile = async (staffId) => {
     const { rows } = await query(
-        `SELECT * FROM admin_users WHERE id = $1 AND is_active = true LIMIT 1`,
+        `SELECT * FROM admin_users WHERE id = $1 AND status = 'ACTIVE' LIMIT 1`,
         [staffId]
     );
     if (!rows.length) throw new AppError('Staff not found.', 404);
