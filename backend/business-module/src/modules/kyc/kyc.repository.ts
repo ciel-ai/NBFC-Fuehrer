@@ -12,6 +12,7 @@ import type {
 } from './kyc.types';
 import type { KycStatus, KycCheck } from '@/config/constants';
 import { NotFoundError } from '@/errors';
+import { getEncryptionProvider } from '@/providers/encryption';
 
 const log = createModuleLogger('kyc.repository');
 
@@ -253,12 +254,19 @@ export const kycRepository = {
         checkKey: keyof KycCheckResponses,
         response: unknown,
     ): Promise<void> {
-        // PostgreSQL JSONB merge — atomic and avoids read-modify-write race
+        // Vendor responses carry derived PII (bank statement data, fraud/credit
+        // scores) — encrypt each check's payload before it touches the DB.
+        // JSONB merge stays atomic since we're still merging one key at a
+        // time; only the *value* under that key is now ciphertext instead of
+        // a plain object.
+        const enc = getEncryptionProvider();
+        const encryptedResponse = await enc.encrypt(JSON.stringify(response));
+
         await prisma.$executeRaw`
       UPDATE kyc_documents
       SET
         signzy_responses = COALESCE(signzy_responses, '{}'::jsonb)
-          || jsonb_build_object(${checkKey}::text, ${JSON.stringify(response)}::jsonb),
+          || jsonb_build_object(${checkKey}::text, ${JSON.stringify(encryptedResponse)}::jsonb),
         updated_at = NOW()
       WHERE user_id = ${userId}::uuid
     `;
@@ -301,9 +309,21 @@ export const kycRepository = {
 
     async getUnderwritingData(userId: string): Promise<KycUnderwritingData> {
         const doc = await this.findByUserIdOrThrow(userId);
+        const enc = getEncryptionProvider();
 
-        const bankStatement = doc.signzyResponses?.bankStatement;
-        const fraudResult = doc.signzyResponses?.fraudScore;
+        // signzyResponses values are stored as ciphertext strings — decrypt
+        // each check's payload back to its original object before reading.
+        const decryptCheck = async <K extends keyof KycCheckResponses>(
+            key: K,
+        ): Promise<KycCheckResponses[K] | null> => {
+            const raw = doc.signzyResponses?.[key] as unknown;
+            if (raw === undefined || raw === null) return null;
+            const decrypted = await enc.decrypt(raw as string);
+            return JSON.parse(decrypted) as KycCheckResponses[K];
+        };
+
+        const bankStatement = await decryptCheck('bankStatement');
+        const amlCheck = await decryptCheck('amlCheck');
 
         return {
             creditScore: doc.creditScore,
@@ -311,7 +331,7 @@ export const kycRepository = {
             existingEmiPerMonth: bankStatement?.emiObligations ?? null,
             bankBounces: bankStatement?.bounces ?? 0,
             fraudScore: doc.fraudScore,
-            amlClear: doc.signzyResponses?.amlCheck?.clear ?? true,
+            amlClear: amlCheck?.clear ?? true,
             monthsAnalysed: bankStatement?.monthsAnalysed ?? 0,
         };
     },

@@ -24,7 +24,7 @@ router.post('/applications/:id/credit-assessment', requireAuth(), allowRoles(C),
 router.post('/applications/:id/credit-decision', requireAuth(), allowRoles(C), cdlLoansController.getCreditDecision);
 router.post('/applications/:id/agreement', requireAuth(), allowRoles(C), stubGuard(), cdlLoansController.generateAgreement);
 router.post('/applications/:id/nach', requireAuth(), allowRoles(C), cdlLoansController.registerNachMandate);
-router.post('/applications/:id/disburse', requireAuth(), allowRoles(F, A), cdlLoansController.disburseToMerchant);
+router.post('/applications/:id/disburse', requireAuth(), allowRoles(F, A), stubGuard(), cdlLoansController.disburseToMerchant);
 router.get('/loans/:id/emi-schedule', requireAuth(), allowRoles(C), cdlLoansController.getEmiSchedule);
 router.post('/loans/:id/payments', requireAuth(), allowRoles(C), cdlLoansController.processManualPayment);
 router.post('/loans/:id/payment-failure', requireAuth(), allowRoles(C), cdlLoansController.handlePaymentFailure);

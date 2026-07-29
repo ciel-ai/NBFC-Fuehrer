@@ -13,6 +13,7 @@ export function getSmsProvider(): ISmsProvider {
     let created: ISmsProvider;
 
     if (env.sms.provider === 'twilio') {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports -- intentional lazy require, keeps the stub path free of live-provider imports until needed
         const { TwilioSmsProvider } = require('./live');
         const s = getSecrets();
         created = new TwilioSmsProvider(
@@ -21,6 +22,7 @@ export function getSmsProvider(): ISmsProvider {
             s.twilio.fromNumber,
         );
     } else if (env.sms.provider === 'msg91') {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports -- intentional lazy require
         const { Msg91SmsProvider } = require('./live');
         const s = getSecrets();
         created = new Msg91SmsProvider(
@@ -29,6 +31,7 @@ export function getSmsProvider(): ISmsProvider {
             s.msg91.templateId,
         );
     } else {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports -- intentional lazy require
         const { StubSmsProvider } = require('./stub');
         created = new StubSmsProvider();
     }

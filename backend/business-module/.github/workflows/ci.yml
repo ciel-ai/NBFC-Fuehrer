@@ -211,8 +211,7 @@ jobs:
           cache-dependency-path: backend/business-module/package-lock.json
       - run: npm ci --prefer-offline
       - name: npm audit
-        run: npm audit --audit-level=high
-        continue-on-error: true
+        run: npm audit --omit=dev --audit-level=high
       - name: Check for secrets in code
         uses: trufflesecurity/trufflehog@main
         with:

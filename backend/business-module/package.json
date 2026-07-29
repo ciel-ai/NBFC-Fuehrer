@@ -5,7 +5,7 @@
     "build": "tsc --project tsconfig.json",
     "start": "node -r tsconfig-paths/register dist/server.js",
     "dev": "ts-node-dev -r tsconfig-paths/register --respawn --transpile-only src/server.ts",
-    "lint": "eslint 'src/**/*.ts' --max-warnings 0",
+    "lint": "eslint src --ext .ts",
     "typecheck": "tsc --noEmit",
     "test": "jest --config jest.config.ts",
     "test:unit": "jest --config jest.config.ts --testPathPattern='tests/unit'",

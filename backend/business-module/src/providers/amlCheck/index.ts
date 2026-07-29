@@ -37,6 +37,7 @@ export function getAmlCheckProvider(): IAmlCheckProvider {
     if (provider === 'perfios') {
         // Lazy require — keeps the stub path free of Perfios imports
         // so the module loads cleanly before Perfios env vars are set
+        // eslint-disable-next-line @typescript-eslint/no-require-imports -- intentional lazy require, keeps the stub path free of live-provider imports until needed
         const { PerfiosAmlProvider } = require('./live') as {
             PerfiosAmlProvider: new (
                 apiKey: string,

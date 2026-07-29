@@ -33,6 +33,7 @@ export function getBgCheckProvider(): IBgCheckProvider {
     const provider = process.env.BG_CHECK_PROVIDER ?? 'stub';
 
     if (provider === 'live') {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports -- intentional lazy require, keeps the stub path free of live-provider imports until needed
         const { LiveBgCheckProvider } = require('./live') as {
             LiveBgCheckProvider: new (
                 apiKey: string,

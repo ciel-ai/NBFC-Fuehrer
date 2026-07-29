@@ -19,9 +19,11 @@ export function getEmailProvider(): IEmailProvider {
     let created: IEmailProvider;
 
     if (env.email.provider === 'resend') {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports -- intentional lazy require, keeps the stub path free of live-provider imports until needed
         const { ResendEmailProvider } = require('./live');
         created = new ResendEmailProvider(getSecrets().resend.apiKey);
     } else {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports -- intentional lazy require
         const { StubEmailProvider } = require('./stub');
         created = new StubEmailProvider();
     }

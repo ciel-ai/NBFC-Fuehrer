@@ -31,7 +31,10 @@ async function start(): Promise<void> {
         log.error('Fatal: failed to load secrets at startup — server will not start', {
             error: err instanceof Error ? err.message : String(err),
         });
-            try {
+        process.exit(1);
+    }
+
+    try {
         await connectDatabase();
     } catch (err) {
         log.error('Fatal: database connection failed at startup — server will not start', {
@@ -46,8 +49,6 @@ async function start(): Promise<void> {
         log.error('Fatal: Redis connection failed at startup — server will not start', {
             error: err instanceof Error ? err.message : String(err),
         });
-        process.exit(1);
-    }
         process.exit(1);
     }
 

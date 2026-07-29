@@ -14,6 +14,7 @@ export function getDocStorageProvider(): IDocStorageProvider {
     let created: IDocStorageProvider;
 
     if (env.isProd || env.nodeEnv === 'staging') {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports -- intentional lazy require, keeps the stub path free of live-provider imports until needed
         const { S3DocStorageProvider } = require('./live');
         created = new S3DocStorageProvider(
             env.aws.region,
@@ -21,6 +22,7 @@ export function getDocStorageProvider(): IDocStorageProvider {
             env.aws.s3SignedUrlExpiry,
         );
     } else {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports -- intentional lazy require
         const { StubDocStorageProvider } = require('./stub');
         created = new StubDocStorageProvider();
     }

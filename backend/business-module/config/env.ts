@@ -276,6 +276,31 @@ if (value.NODE_ENV === 'production' && value.ENABLE_UNWIRED_LOAN_STUBS === true)
     process.exit(1);
 }
 
+// Regulatory identity fields (CoR number, NBFC registration number,
+// grievance officer contact) must never reach real customer-facing legal
+// documents (KFS, loan agreements) while still set to their placeholder
+// value — that's a compliance failure, not just a cosmetic one.
+if (value.NODE_ENV === 'production') {
+    // Lazy require to avoid a hard circular-import edge at module load time.
+    const { NBFC_IDENTITY } = require('./nbfc.constants');
+    const placeholderFields = Object.entries(NBFC_IDENTITY)
+        .flatMap(([key, val]) =>
+            typeof val === 'object' && val !== null
+                ? Object.entries(val).map(([subKey, subVal]) => [`${key}.${subKey}`, subVal])
+                : [[key, val]],
+        )
+        .filter(([, val]) => val === 'PENDING-CLIENT-INPUT')
+        .map(([key]) => key);
+
+    if (placeholderFields.length > 0) {
+        console.error(
+            `\n❌  FATAL: NBFC_IDENTITY still has unset regulatory placeholder fields in production: ${placeholderFields.join(', ')}.\n` +
+            'These render on real customer-facing legal documents (KFS, loan agreements) and cannot ship as PENDING-CLIENT-INPUT.\n',
+        );
+        process.exit(1);
+    }
+}
+
 // ─── Typed export ─────────────────────────────────────────────────────────────
 // One single source of truth — import `env` everywhere, never `process.env`
 

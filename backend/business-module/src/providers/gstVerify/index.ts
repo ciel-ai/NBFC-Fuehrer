@@ -37,6 +37,7 @@ export function getGstVerifyProvider(): IGstVerifyProvider {
     const provider = process.env.GST_VERIFY_PROVIDER ?? 'stub';
 
     if (provider === 'perfios') {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports -- intentional lazy require, keeps the stub path free of live-provider imports until needed
         const { PerfiosGstVerifyProvider } = require('./live') as {
             PerfiosGstVerifyProvider: new (
                 apiKey: string,

@@ -36,3 +36,5 @@ Thumbs.db
 coverage/
 .cache/
 *.tsbuildinfo
+
+*.dump

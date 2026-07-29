@@ -38,6 +38,7 @@ export function getBankVerifyProvider(): IBankVerifyProvider {
     const provider = process.env.BANK_VERIFY_PROVIDER ?? 'stub';
 
     if (provider === 'perfios') {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports -- intentional lazy require, keeps the stub path free of live-provider imports until needed
         const { PerfiosBankVerifyProvider } = require('./live') as {
             PerfiosBankVerifyProvider: new (
                 apiKey: string,

@@ -742,6 +742,17 @@ async runGSTVerification(
             throw new KycIncompleteError(userId, ['PAN not available']);
         }
 
+        // Credit bureau pulls are paid per-call and repeated pulls can
+        // themselves ding the customer's credit score — short-circuit if
+        // this check already passed instead of re-billing/re-pulling.
+        if (doc.completedChecks.includes(KYC_CHECK.RISK_SCORE)) {
+            return {
+                checkType: KYC_CHECK.RISK_SCORE,
+                passed: true,
+                data: { alreadyVerified: true },
+            };
+        }
+
         const enc = getEncryptionProvider();
         const panPlain = await enc.decrypt(doc.panEncrypted);
         const bureau = getCreditBureauProvider();
