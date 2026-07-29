@@ -9,7 +9,8 @@ const config: Config = {
         '<rootDir>/tests/**/*.test.ts',
         '<rootDir>/tests/**/*.spec.ts',
     ],
-    moduleNameMapper: {
+        moduleNameMapper: {
+        '^@/config/(.*)$': '<rootDir>/config/$1',
         '^@/(.*)$': '<rootDir>/src/$1',
     },
     setupFilesAfterEnv: ['<rootDir>/tests/fixtures/setup.ts'],
