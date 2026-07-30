@@ -50,6 +50,10 @@ export async function runDebitRetryJob(): Promise<void> {
                         user_id: true,
                         razorpay_mandate_id: true,
                         status: true,
+                        enach_mandates: {
+                            where: { status: 'ACTIVE' },
+                            select: { id: true, razorpay_mandate_id: true },
+                        },
                     },
                 },
             },
@@ -69,6 +73,17 @@ export async function runDebitRetryJob(): Promise<void> {
             // Skip if mandate is not available
             if (!account.razorpay_mandate_id) {
                 log.warn('Retry skipped — no mandate', { emiId: emi.id });
+                continue;
+            }
+
+            const hasMatchingActiveMandate = account.enach_mandates?.some(
+                (m) => m.razorpay_mandate_id === account.razorpay_mandate_id,
+            );
+            if (!hasMatchingActiveMandate) {
+                log.warn('Retry skipped — mandate id on loan account has no matching ACTIVE mandate record', {
+                    emiId: emi.id,
+                    razorpayMandateId: account.razorpay_mandate_id,
+                });
                 continue;
             }
 

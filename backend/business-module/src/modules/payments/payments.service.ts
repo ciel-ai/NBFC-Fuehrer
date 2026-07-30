@@ -875,6 +875,13 @@ export const paymentsService = {
             { cancelled_at: new Date() },
         );
 
+        // Keep loan_accounts.razorpay_mandate_id in sync — the debit crons
+        // read that denormalized field directly, not this table, so it must
+        // be cleared here or they'll keep targeting a dead mandate.
+        if (mandate.loanAccountId) {
+            await loansRepository.clearMandateId(mandate.loanAccountId);
+        }
+
         log.warn('eNACH mandate cancelled', {
             mandateId: mandate.id,
             loanAccountId: mandate.loanAccountId,

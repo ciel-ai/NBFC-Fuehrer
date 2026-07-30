@@ -61,6 +61,14 @@ export async function runNachDebitJob(): Promise<void> {
                         user_id: true,
                         razorpay_mandate_id: true,
                         status: true,
+                        // Cross-checked against the denormalized
+                        // razorpay_mandate_id below — the two are supposed
+                        // to stay in sync, but nothing enforced that until
+                        // now, so this is the belt-and-suspenders check.
+                        enach_mandates: {
+                            where: { status: 'ACTIVE' },
+                            select: { id: true, razorpay_mandate_id: true },
+                        },
                     },
                 },
             },
@@ -78,6 +86,18 @@ export async function runNachDebitJob(): Promise<void> {
 
             if (!account.razorpay_mandate_id) {
                 log.warn('Debit skipped — no active mandate', { emiId: emi.id, loanAccountId: account?.id });
+                continue;
+            }
+
+            const hasMatchingActiveMandate = account.enach_mandates?.some(
+                (m) => m.razorpay_mandate_id === account.razorpay_mandate_id,
+            );
+            if (!hasMatchingActiveMandate) {
+                log.warn('Debit skipped — mandate id on loan account has no matching ACTIVE mandate record', {
+                    emiId: emi.id,
+                    loanAccountId: account?.id,
+                    razorpayMandateId: account.razorpay_mandate_id,
+                });
                 continue;
             }
 

@@ -553,6 +553,22 @@ export const loansRepository = {
         });
     },
 
+    // Clears the denormalized mandate reference once a mandate is
+    // cancelled. Without this, loan_accounts.razorpay_mandate_id keeps
+    // pointing at a dead mandate after enach_mandates.status flips to
+    // CANCELLED — the NACH debit cron reads only this denormalized field,
+    // so it would keep attempting debits against a mandate the bank has
+    // already killed.
+    async clearMandateId(accountId: string): Promise<void> {
+        await prisma.loan_accounts.update({
+            where: { id: accountId },
+            data: {
+                razorpay_mandate_id: null,
+                updated_at: new Date(),
+            },
+        });
+    },
+
     // ── Overdue / NPA queries — used by cron jobs ─────────────────────────────
 
     async findActiveLoansWithOverdueEmis(
