@@ -10,6 +10,7 @@ import { scheduleEmiReminderJob }    from '@/jobs/emiReminder.job';
 import { scheduleNachDebitJob }      from '@/jobs/nachDebit.job';
 import { scheduleDebitRetryJob }     from '@/jobs/debitRetry.job';
 import { scheduleSettlementJob }     from '@/jobs/settlement.job';
+import { scheduleMandateConsistencyCheckJob } from '@/jobs/mandateConsistencyCheck.job';
 import { connectDatabase } from '@/config/database';
 import { connectRedis } from '@/config/redis';
 import { initCrashReporter, reportError } from '@/config/crashReporter';
@@ -106,6 +107,7 @@ async function start(): Promise<void> {
         scheduleNachDebitJob();
         scheduleDebitRetryJob();
         scheduleSettlementJob();
+        scheduleMandateConsistencyCheckJob();
         log.info('All jobs started and scheduled');
     });
 }
