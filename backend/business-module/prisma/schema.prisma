@@ -647,6 +647,49 @@ model audit_logs {
   @@index([created_at])
 }
 
+// ─── Data migration tracking (legacy system → FUEHRER NBFC) ─────────────────
+// One row per migration run (customers, loans, EMI schedules, payments,
+// mandates are each migrated as separate batches — see roadmap Phase 5-9).
+// Without this, a partial or failed migration run is untraceable: no way to
+// know which of the ~500 legacy records actually made it across, which
+// failed, or why.
+
+model migration_batches {
+  id            String    @id @default(uuid()) @db.Uuid
+  batch_name    String    @db.VarChar(100)
+  entity_type   String    @db.VarChar(30)   // CUSTOMER | LOAN | EMI_SCHEDULE | PAYMENT | MANDATE
+  source_system String    @db.VarChar(50)   // e.g. "legacy-nbfc-v1"
+  status        String    @default("RUNNING") @db.VarChar(20) // RUNNING | COMPLETED | FAILED | ROLLED_BACK
+  total_records Int       @default(0)
+  success_count Int       @default(0)
+  failure_count Int       @default(0)
+  started_at    DateTime  @default(now()) @db.Timestamptz(6)
+  completed_at  DateTime? @db.Timestamptz(6)
+  triggered_by  String    @db.VarChar(100)  // staff user id, or "cli:script" for a manual run
+  notes         String?
+  records       migration_records[]
+
+  @@index([entity_type, status])
+  @@index([started_at])
+}
+
+model migration_records {
+  id            String   @id @default(uuid()) @db.Uuid
+  batch_id      String   @db.Uuid
+  entity_type   String   @db.VarChar(30)
+  legacy_id     String   @db.VarChar(100)
+  new_record_id String?  @db.Uuid
+  status        String   @db.VarChar(20)   // SUCCESS | FAILED | SKIPPED
+  error_message String?
+  created_at    DateTime @default(now()) @db.Timestamptz(6)
+  batch         migration_batches @relation(fields: [batch_id], references: [id])
+
+  @@unique([batch_id, entity_type, legacy_id])
+  @@index([batch_id])
+  @@index([entity_type, legacy_id])
+}
+
+
 model notification_deliveries {
   id           String    @id @default(uuid()) @db.Uuid
   template_key String    @db.VarChar(60)
