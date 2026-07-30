@@ -33,6 +33,7 @@ import {
     CONFLICT_ERRORS,
 } from '@/errors';
 import { createModuleLogger } from '@/config/logger';
+import { reportError } from '@/config/crashReporter';
 import type {
     PaymentRecord,
     MandateRecord,
@@ -812,7 +813,17 @@ export const paymentsService = {
 
         const mandate = await paymentsRepository.findMandateByRazorpayId(mandateId);
         if (!mandate) {
-            log.warn('Mandate activation for unknown mandate', { mandateId });
+            // Cannot safely fabricate a mandate record here — bank_account,
+            // ifsc, maxAmount and loanAccountId aren't present in this
+            // webhook payload. Previously this was a log.warn nobody would
+            // ever see; a mandate activating with no local row to update
+            // (e.g. a migrated mandate whose row hasn't landed yet, or a
+            // genuine race with mandate creation) needs a human to notice
+            // and reconcile it, not a debug line.
+            reportError(
+                new Error('Mandate activation webhook for unknown mandate'),
+                { mandateId, requestId, event: 'subscription.activated/mandate.confirmed' },
+            );
             return;
         }
 
@@ -845,7 +856,18 @@ export const paymentsService = {
         if (!mandateId) return;
 
         const mandate = await paymentsRepository.findMandateByRazorpayId(mandateId);
-        if (!mandate) return;
+        if (!mandate) {
+            // A cancellation for a mandate we have no local record of is
+            // arguably worse than a missed activation: the bank has killed
+            // the standing instruction, and if we never learn about it, the
+            // next debit attempt against it will simply fail at the gateway
+            // with no advance warning. Surface it the same way as above.
+            reportError(
+                new Error('Mandate cancellation webhook for unknown mandate'),
+                { mandateId, requestId, event: 'mandate.cancelled' },
+            );
+            return;
+        }
 
         await paymentsRepository.updateMandateStatus(
             mandate.id,
