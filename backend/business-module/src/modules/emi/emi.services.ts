@@ -13,6 +13,7 @@ import {
 } from './emi.calculator';
 
 import { eventBus } from '@/events';
+import { accountingService } from '@/modules/accounting/accounting.service';
 import { setAuditContext } from '@/middlewares';
 import {
     EMI_STATUS,
@@ -141,6 +142,28 @@ export const emiService = {
             input.collectionId,
             residualPenalty,
         );
+
+        // Post the GL entries for this collection. Previously only
+        // postDisbursement() was ever called from a live code path —
+        // postEmiCollection() existed but nothing invoked it, so every
+        // recurring EMI collection (the actual subject of "repayments must
+        // go on") created zero ledger entries. Uses the EMI's stored
+        // principal/interest split, which is the authoritative split for a
+        // full EMI payment across all channels (cash, payment link, eNACH).
+        // productType isn't denormalized onto loan_accounts — same lookup
+        // pattern already used in applyOverduePenalty below.
+        const application = await prisma.loan_applications.findUniqueOrThrow({
+            where: { id: loanAccount.applicationId },
+            select: { product_type: true },
+        });
+
+        await accountingService.postEmiCollection({
+            paymentId:   input.paymentId ?? emi.id,
+            productType: application.product_type,
+            principal:   emi.principalComponent,
+            interest:    emi.interestComponent,
+            postedBy:    'system:emi-collection',
+        });
 
         setAuditContext(req, {
             action: AUDIT_ACTION.EMI_PAID,

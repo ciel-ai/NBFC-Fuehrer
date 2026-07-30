@@ -98,6 +98,11 @@ export interface MarkEmiPaidInput {
     paidAt: Date;
     channel: string;
     collectionId?: string;
+    // Real payments.id, used as the GL entry's reference. Falls back to
+    // emiId when a caller doesn't have a payment record yet (matches the
+    // existing placeholder pattern already used for the payment.received
+    // event below).
+    paymentId?: string;
 }
 
 export interface ApplyPenaltyInput {

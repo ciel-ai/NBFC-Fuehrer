@@ -392,6 +392,7 @@ export const paymentsService = {
                 paidAt: new Date(),
                 channel: 'CASH',
                 collectionId,
+                paymentId: payment.id,
             },
             req,
         );
@@ -595,6 +596,7 @@ export const paymentsService = {
                 paidAmount: amountRupees,
                 paidAt: new Date(),
                 channel: PAYMENT_CHANNEL.PAYMENT_LINK,
+                paymentId: payment.id,
             },
             { requestId } as unknown as Request,
         );
@@ -777,6 +779,7 @@ export const paymentsService = {
                     paidAmount: payment.totalCollected,
                     paidAt: new Date(),
                     channel: PAYMENT_CHANNEL.ENACH,
+                    paymentId: payment.id,
                 },
                 { requestId } as unknown as Request,
             );
