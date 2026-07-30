@@ -670,28 +670,110 @@ export const paymentsService = {
         const razorpayPaymentId = entity.payment_id as string;
         if (!razorpayPaymentId) return;
 
-        const existing = await paymentsRepository.findByGatewayTxnId(
+        // Idempotency guard — if this exact gateway payment id was already
+        // recorded as SUCCESS, this is a duplicate webhook delivery.
+        const alreadyRecorded = await paymentsRepository.findByGatewayTxnId(
             razorpayPaymentId,
         );
-        if (!existing || existing.status === PAYMENT_STATUS.SUCCESS) return;
+        if (alreadyRecorded && alreadyRecorded.status === PAYMENT_STATUS.SUCCESS) {
+            return;
+        }
 
         const utrNumber = (entity as Record<string, Record<string, string>>)
             .acquirer_data?.rrn ?? null;
 
+        // The subscription entity's own id IS the Razorpay mandate id —
+        // same field _handleMandateActivated/_handleMandateCancelled read.
+        const mandateRazorpayId = entity.id as string | undefined;
+
+        let payment: PaymentRecord | null = alreadyRecorded;
+
+        if (!payment && mandateRazorpayId) {
+            // Normal case: our own nachDebit cron already wrote a PENDING
+            // row via processNachDebit before calling the gateway. Find it
+            // by mandate, since gateway_txn_id wasn't known until now.
+            payment = await paymentsRepository.findLatestPendingByMandateId(
+                mandateRazorpayId,
+            );
+        }
+
+        let emiIdForPayment: string | null = payment?.emiId ?? null;
+        let mandate: MandateRecord | null = null;
+
+        if (!payment) {
+            // No local PENDING row exists at all — this happens for the
+            // migrated eNACH mandates, whose debits were not initiated by
+            // this system's own processNachDebit. Previously this handler
+            // returned here and silently dropped a real, successful debit.
+            if (!mandateRazorpayId) {
+                log.warn('NACH charge webhook with no mandate reference — cannot reconcile', {
+                    razorpayPaymentId,
+                });
+                return;
+            }
+
+            mandate = await paymentsRepository.findMandateByRazorpayId(mandateRazorpayId);
+            if (!mandate) {
+                log.warn('NACH charge webhook for unknown mandate', {
+                    razorpayPaymentId,
+                    mandateRazorpayId,
+                });
+                return;
+            }
+
+            const notesEmiId = (entity.notes as Record<string, string> | undefined)?.emiId;
+            const targetEmi = notesEmiId
+                ? await emiRepository.findByIdOrThrow(notesEmiId)
+                : await emiRepository.findNextDueEmi(mandate.loanAccountId);
+
+            if (!targetEmi) {
+                log.warn('NACH charge webhook for migrated mandate but no due EMI found', {
+                    razorpayPaymentId,
+                    mandateId: mandate.id,
+                });
+                return;
+            }
+
+            const amountRupees = roundRupees(
+                toNumber(entity.amount as number) / 100,
+            );
+
+            payment = await paymentsRepository.createPayment({
+                loanAccountId: mandate.loanAccountId,
+                userId: mandate.userId,
+                emiId: targetEmi.id,
+                paymentType: 'EMI',
+                amount: amountRupees || toNumber(targetEmi.emiAmount),
+                penaltyAmount: 0,
+                channel: PAYMENT_CHANNEL.ENACH,
+                gateway: 'razorpay',
+                mandateId: mandate.id,
+                debitAttemptNo: 1,
+                status: PAYMENT_STATUS.PENDING,
+            });
+            emiIdForPayment = targetEmi.id;
+
+            log.info('Created payment record for migrated mandate on first webhook', {
+                paymentId: payment.id,
+                mandateId: mandate.id,
+                emiId: targetEmi.id,
+            });
+        }
+
         await paymentsRepository.markPaymentSuccess(
-            existing.id, utrNumber, new Date(),
+            payment.id, utrNumber, new Date(), razorpayPaymentId,
         );
 
-        if (existing.emiId) {
-            const emi = await emiRepository.findByIdOrThrow(existing.emiId);
+        if (emiIdForPayment) {
+            const emi = await emiRepository.findByIdOrThrow(emiIdForPayment);
             const account = await loansRepository.findAccountByIdOrThrow(
-                existing.loanAccountId,
+                payment.loanAccountId,
             );
 
             await emiService.markPaid(
                 {
-                    emiId: existing.emiId,
-                    paidAmount: existing.totalCollected,
+                    emiId: emiIdForPayment,
+                    paidAmount: payment.totalCollected,
                     paidAt: new Date(),
                     channel: PAYMENT_CHANNEL.ENACH,
                 },
@@ -699,12 +781,12 @@ export const paymentsService = {
             );
 
             paymentEvents.received({
-                paymentId: existing.id,
-                loanAccountId: existing.loanAccountId,
+                paymentId: payment.id,
+                loanAccountId: payment.loanAccountId,
                 userId: account.userId,
-                emiId: existing.emiId,
+                emiId: emiIdForPayment,
                 emiNumber: emi.emiNumber,
-                amount: existing.amount,
+                amount: payment.amount,
                 channel: PAYMENT_CHANNEL.ENACH,
                 gatewayTxnId: razorpayPaymentId,
                 paidAt: new Date(),
@@ -713,8 +795,8 @@ export const paymentsService = {
         }
 
         log.info('NACH debit confirmed', {
-            paymentId: existing.id,
-            emiId: existing.emiId,
+            paymentId: payment.id,
+            emiId: emiIdForPayment,
             utrNumber,
         });
     },

@@ -140,6 +140,7 @@ export const paymentsRepository = {
         id: string,
         utrNumber: string | null,
         settledAt: Date,
+        gatewayTxnId?: string,
     ): Promise<PaymentRecord> {
         const row = await prisma.payments.update({
             where: { id },
@@ -147,10 +148,26 @@ export const paymentsRepository = {
                 status: PAYMENT_STATUS.SUCCESS,
                 utr_number: utrNumber,
                 settled_at: settledAt,
+                ...(gatewayTxnId ? { gateway_txn_id: gatewayTxnId } : {}),
                 updated_at: new Date(),
             },
         });
         return mapPayment(row as unknown as Record<string, unknown>);
+    },
+
+    // ── Find the PENDING debit attempt awaiting webhook confirmation ──────────
+    // eNACH debits (processNachDebit) never write gateway_txn_id at creation —
+    // it isn't known until Razorpay's webhook arrives. So the webhook handler
+    // must locate the awaiting payment by mandate, not by gateway_txn_id.
+
+    async findLatestPendingByMandateId(
+        mandateId: string,
+    ): Promise<PaymentRecord | null> {
+        const row = await prisma.payments.findFirst({
+            where: { mandate_id: mandateId, status: PAYMENT_STATUS.PENDING },
+            orderBy: { initiated_at: 'desc' },
+        });
+        return row ? mapPayment(row as unknown as Record<string, unknown>) : null;
     },
 
     async markPaymentFailed(
