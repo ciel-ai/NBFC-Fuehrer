@@ -188,6 +188,15 @@ enum collection_case_status {
     ESCALATED
 }
 
+enum enach_mandate_status {
+    CREATED
+    PENDING_REGISTRATION
+    ACTIVE
+    PAUSED
+    CANCELLED
+    EXPIRED
+}
+
 model loan_applications {
   id                   String                 @id @default(uuid()) @db.Uuid
   user_id              String                 @db.Uuid
@@ -461,7 +470,7 @@ model enach_mandates {
   bank_account        String        @db.VarChar(30)
   ifsc                String        @db.VarChar(11)
   max_amount          Decimal       @db.Decimal(15, 2)
-  status              String        @default("CREATED") @db.VarChar(30)
+  status              enach_mandate_status @default(CREATED)
   registered_at       DateTime?     @db.Timestamptz(6)
   cancelled_at        DateTime?     @db.Timestamptz(6)
   created_at          DateTime      @default(now()) @db.Timestamptz(6)
