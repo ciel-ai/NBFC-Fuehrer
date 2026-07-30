@@ -125,6 +125,7 @@ model customers {
   pincode         String?  @db.VarChar(6)
   employment_type String?  @db.VarChar(30)
   employer_name   String?  @db.VarChar(200)
+  legacy_id       String?  @db.VarChar(100)
   created_at      DateTime @default(now()) @db.Timestamptz(6)
   updated_at      DateTime @updatedAt @db.Timestamptz(6)
   user              users               @relation(fields: [user_id], references: [id])
@@ -132,6 +133,7 @@ model customers {
   appointments    appointments[]
 
   @@index([user_id])
+  @@index([legacy_id])
 }
 
 enum loan_status {
@@ -264,6 +266,7 @@ model loan_accounts {
   status              loan_status         @default(DISBURSED)
   repayment_mode      String              @default("IMPS") @db.VarChar(20)
   razorpay_mandate_id String?             @db.VarChar(100)
+  legacy_id           String?             @db.VarChar(100)
   disbursed_at        DateTime?           @db.Timestamptz(6)
   closed_at           DateTime?           @db.Timestamptz(6)
   created_at          DateTime            @default(now()) @db.Timestamptz(6)
@@ -276,10 +279,11 @@ model loan_accounts {
   application         loan_applications   @relation(fields: [application_id], references: [id])
   user                users               @relation(fields: [user_id], references: [id])
   payments            payments[]
-  gold_auctions gold_auctions[]
+  gold_auctions       gold_auctions[]
   grievances          grievances[]
 
   @@index([user_id])
+  @@index([legacy_id])
   @@index([status])
   @@index([account_number])
   @@index([razorpay_mandate_id])
@@ -420,6 +424,7 @@ model payments {
   settled_at       DateTime?     @db.Timestamptz(6)
   created_at       DateTime      @default(now()) @db.Timestamptz(6)
   updated_at       DateTime      @updatedAt @db.Timestamptz(6)
+  legacy_id        String?       @db.VarChar(100)
   emi              emi_schedule? @relation(fields: [emi_id], references: [id])
   loan_account     loan_accounts @relation(fields: [loan_account_id], references: [id])
 
@@ -430,6 +435,7 @@ model payments {
   @@index([channel, status])
   @@index([initiated_at])
   @@index([loan_account_id, status])
+  @@index([legacy_id])
 }
 
 // A partial unique index (one non-cancelled mandate per loan_account_id)
@@ -463,11 +469,13 @@ model enach_mandates {
   loan_account        loan_accounts?    @relation(fields: [loan_account_id], references: [id])
   application          loan_applications? @relation(fields: [application_id], references: [id])
   debit_day          Int      @default(4)
+  legacy_id           String?  @db.VarChar(100)
 
   @@index([loan_account_id])
   @@index([application_id])
   @@index([status])
   @@index([razorpay_mandate_id])
+  @@index([legacy_id])
 }
 
 model agent_commissions {
