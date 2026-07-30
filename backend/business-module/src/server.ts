@@ -11,6 +11,7 @@ import { scheduleNachDebitJob }      from '@/jobs/nachDebit.job';
 import { scheduleDebitRetryJob }     from '@/jobs/debitRetry.job';
 import { scheduleSettlementJob }     from '@/jobs/settlement.job';
 import { scheduleMandateConsistencyCheckJob } from '@/jobs/mandateConsistencyCheck.job';
+import { scheduleWebhookDeadLetterCheckJob } from '@/jobs/webhookDeadLetterCheck.job';
 import { connectDatabase } from '@/config/database';
 import { connectRedis } from '@/config/redis';
 import { initCrashReporter, reportError } from '@/config/crashReporter';
@@ -108,6 +109,7 @@ async function start(): Promise<void> {
         scheduleDebitRetryJob();
         scheduleSettlementJob();
         scheduleMandateConsistencyCheckJob();
+        scheduleWebhookDeadLetterCheckJob();
         log.info('All jobs started and scheduled');
     });
 }

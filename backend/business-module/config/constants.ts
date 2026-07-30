@@ -334,5 +334,6 @@ export const CRON_SCHEDULE = {
     BUREAU_REPORTING: '0 2 1 * *', // Monthly, 1st at 2:00 AM IST (bureau submissions are monthly)
     RECONCILIATION: '0 2 * * *',   // Daily 2:00 AM IST — previously hardcoded directly in reconciliation.job.ts instead of sourced from this shared config like every other job
     MANDATE_CONSISTENCY_CHECK: '0 3 * * *', // Daily 3:00 AM IST — after reconciliation, before the 8 AM debit run
+    WEBHOOK_DEAD_LETTER_CHECK: '30 3 * * *', // Daily 3:30 AM IST — after the mandate consistency check
 } as const;
 

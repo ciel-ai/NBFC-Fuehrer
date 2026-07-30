@@ -11,3 +11,4 @@ export { scheduleNachDebitJob, runNachDebitJob } from './nachDebit.job';
 export { scheduleDebitRetryJob, runDebitRetryJob } from './debitRetry.job';
 export { scheduleSettlementJob } from './settlement.job';
 export { scheduleMandateConsistencyCheckJob, runMandateConsistencyCheckJob } from './mandateConsistencyCheck.job';
+export { scheduleWebhookDeadLetterCheckJob, runWebhookDeadLetterCheckJob } from './webhookDeadLetterCheck.job';
