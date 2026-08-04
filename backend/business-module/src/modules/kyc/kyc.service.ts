@@ -365,6 +365,24 @@ export const kycService = {
 
         log.info('KYC document uploaded', { userId, documentType, s3Key });
 
+        // Auto-trigger OCR for the document types it applies to. runOcrChecks
+        // itself only needs userId — no extra input the customer has to
+        // supply — so there's no reason to make this a separate manual step.
+        // Previously this check had no caller anywhere in the codebase,
+        // meaning AADHAAR_OCR/PAN_OCR could never complete and KYC could
+        // never finish. Non-fatal: an OCR failure here shouldn't block the
+        // upload response itself, since runOcrChecks already treats OCR
+        // failures as non-fatal internally.
+        if (documentType === 'aadhaar_front' || documentType === 'pan') {
+            try {
+                await this.runOcrChecks(userId, req);
+            } catch (err) {
+                log.warn('Auto-triggered OCR failed after document upload', {
+                    userId, documentType, error: (err as Error).message,
+                });
+            }
+        }
+
         return { s3Key, documentType, uploadedAt: new Date() };
     },
 
@@ -794,8 +812,9 @@ async runGSTVerification(
     async finaliseKyc(
         userId: string,
         req: Request,
+        dob?: string,
     ): Promise<KycStatusResponse> {
-        const doc = await kycRepository.findByUserIdOrThrow(userId);
+        let doc = await kycRepository.findByUserIdOrThrow(userId);
 
         // Already terminal
         if (
@@ -803,6 +822,43 @@ async runGSTVerification(
             doc.overallStatus === KYC_STATUS.REJECTED
         ) {
             return toStatusResponse(doc);
+        }
+
+        // Trigger the final, most expensive checks (credit bureau + fraud/
+        // AML) right here, right before evaluating completion — matching
+        // the design intent already documented above MANDATORY_CHECKS
+        // ("bureau is last, costs most... run after all other checks
+        // pass"). Previously runRiskChecks/runCreditBureauCheck had no
+        // caller anywhere in the codebase, so RISK_SCORE and DATA_BREACH
+        // could never complete and finaliseKyc could never reach COMPLETE.
+        const needsFinalChecks =
+            !doc.completedChecks.includes(KYC_CHECK.DATA_BREACH) ||
+            !doc.completedChecks.includes(KYC_CHECK.RISK_SCORE);
+
+        if (needsFinalChecks && doc.panEncrypted) {
+            if (!dob) {
+                throw new KycIncompleteError(userId, ['dob is required to run final risk/credit checks']);
+            }
+
+            const user = await prisma.users.findUniqueOrThrow({
+                where: { id: userId },
+                select: { full_name: true, phone: true },
+            });
+            const enc = getEncryptionProvider();
+            const panPlain = await enc.decrypt(doc.panEncrypted);
+
+            await this.runRiskChecks(userId, panPlain, user.full_name, dob, user.phone, req);
+
+            // runRiskChecks may have already rejected KYC on an AML hit —
+            // re-fetch and short-circuit before spending money on a bureau
+            // pull for an application that's already rejected.
+            doc = await kycRepository.findByUserIdOrThrow(userId);
+            if (doc.overallStatus === KYC_STATUS.REJECTED) {
+                return toStatusResponse(doc);
+            }
+
+            await this.runCreditBureauCheck(userId, user.full_name, dob, user.phone, req);
+            doc = await kycRepository.findByUserIdOrThrow(userId);
         }
 
         const hardFailChecks: KycCheck[] = [

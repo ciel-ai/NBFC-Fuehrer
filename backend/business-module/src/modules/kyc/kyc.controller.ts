@@ -163,8 +163,17 @@ async verifyGST(req: AuthRequest, res: Response, next: NextFunction) {
     // POST /kyc/finalise
     async finalise(req: AuthRequest, res: Response, next: NextFunction) {
         try {
-            const result = await kycService.finaliseKyc(req.user.id, req);
+            const body = getValidatedBody<{ dob: string }>(req);
+            const result = await kycService.finaliseKyc(req.user.id, req, body.dob);
             res.status(HTTP.OK).json(successResponse(result, 'KYC finalised'));
+        } catch (err) { next(err); }
+    },
+
+    // POST /kyc/bank-statement/analyze
+    async analyzeBankStatement(req: AuthRequest, res: Response, next: NextFunction) {
+        try {
+            const result = await kycService.runBankStatementAnalysis(req.user.id, req);
+            res.status(HTTP.OK).json(successResponse(result, 'Bank statement analyzed'));
         } catch (err) { next(err); }
     },
 

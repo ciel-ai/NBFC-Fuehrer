@@ -15,6 +15,7 @@ import {
     aadhaarOtpRequestSchema,
     aadhaarOtpVerifySchema,
     uploadDocumentSchema,
+    finaliseKycSchema,
     requestESignSchema,
     manualOverrideSchema,
     userIdParamSchema,
@@ -145,12 +146,23 @@ router.post(
     kycController.runFaceChecks,
 );
 
-// Finalise (customer confirms all docs submitted)
+// Finalise (customer confirms all docs submitted — triggers the final
+// risk/credit checks, then evaluates completion)
 router.post(
     '/finalise',
     requireAuth(),
     allowRoles(ROLE.CUSTOMER),
+    validateBody(finaliseKycSchema),
     kycController.finalise,
+);
+
+// Bank statement analysis — requires the statement already uploaded
+router.post(
+    '/bank-statement/analyze',
+    requireAuth(),
+    allowRoles(ROLE.CUSTOMER),
+    kycLimiter,
+    kycController.analyzeBankStatement,
 );
 
 // eSign request
@@ -241,6 +253,7 @@ router.post(
     '/complete',
     requireAuth(),
     allowRoles(ROLE.CUSTOMER),
+    validateBody(finaliseKycSchema),
     kycController.finalise,
 );
 

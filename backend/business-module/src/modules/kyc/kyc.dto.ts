@@ -71,6 +71,15 @@ export const uploadDocumentSchema = Joi.object({
         .required(),
 });
 
+// ─── Finalise KYC ───────────────────────────────────────────────────────────────
+// dob isn't stored anywhere on the KYC record (only PAN/Aadhaar are
+// encrypted and persisted) — matches the existing pattern in verify-pan,
+// which requires the same field for the same reason.
+
+export const finaliseKycSchema = Joi.object({
+    dob: Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/).required(),
+});
+
 // ─── eSign request ─────────────────────────────────────────────────────────────
 
 export const requestESignSchema = Joi.object({
