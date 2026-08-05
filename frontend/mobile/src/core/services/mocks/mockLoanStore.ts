@@ -5,7 +5,10 @@
 
 import { calculateEMI } from '@/src/core/utils/formatters';
 import type { EMISchedule, Loan } from '@/src/entities/loan';
-import { CDL_ANNUAL_INTEREST_RATE } from '@/src/entities/consumerDurableLoan';
+import {
+  CDL_DEFAULT_AUTO_DEBIT_DATE,
+  CDL_DEFAULT_INTEREST_RATE,
+} from '@/src/entities/consumerDurableLoan';
 
 const runtimeLoans: Loan[] = [];
 const runtimeSchedules: Record<string, EMISchedule[]> = {};
@@ -39,23 +42,27 @@ export function updateRuntimeLoan(id: string, patch: Partial<Loan>): void {
 }
 
 /**
- * Generate a reducing-balance EMI schedule. Due dates fall on the 5th of each
- * month (matches the NACH auto-debit date in the LMS workflow).
+ * Generate a reducing-balance EMI schedule. Due dates fall on the customer's
+ * chosen auto-debit date (4th, 7th or 12th — client spec 1(d)).
+ *
+ * At 0% (no-cost EMI) the interest component is zero and the principal is split
+ * evenly across the tenure.
  */
 export function generateCdlSchedule(
   loanId: string,
   principal: number,
   tenure: number,
   startDate: Date = new Date(),
-  annualRate: number = CDL_ANNUAL_INTEREST_RATE,
+  annualRate: number = CDL_DEFAULT_INTEREST_RATE,
+  debitDay: number = CDL_DEFAULT_AUTO_DEBIT_DATE,
 ): EMISchedule[] {
   const emi = calculateEMI(principal, annualRate, tenure);
   const monthlyRate = annualRate / 12 / 100;
   const schedule: EMISchedule[] = [];
   let balance = principal;
 
-  // First due date is the 5th of the month after disbursal.
-  const firstDue = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 5);
+  // First due date is the chosen debit day of the month after disbursal.
+  const firstDue = new Date(startDate.getFullYear(), startDate.getMonth() + 1, debitDay);
 
   for (let i = 0; i < tenure; i += 1) {
     const interest = Math.round(balance * monthlyRate);
@@ -65,7 +72,7 @@ export function generateCdlSchedule(
     if (isLast) principalPart = balance;
     balance = Math.max(0, balance - principalPart);
 
-    const dueDate = new Date(firstDue.getFullYear(), firstDue.getMonth() + i, 5);
+    const dueDate = new Date(firstDue.getFullYear(), firstDue.getMonth() + i, debitDay);
     schedule.push({
       id: `${loanId}_emi_${String(i + 1).padStart(2, '0')}`,
       loanId,

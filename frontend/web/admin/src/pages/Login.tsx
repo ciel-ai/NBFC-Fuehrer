@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { staffAuthApi, staffAuthError } from '../api/staffAuth.api';
 import type { StaffAuthResult, StaffPortal } from '../api/staffAuth.api';
+import { USE_MOCK } from '../config';
 
 type Portal = 'Admin' | 'Credit Team' | 'Finance Team';
 
@@ -97,6 +98,19 @@ const Login: React.FC = () => {
 
   const handleAdmin = async (values: { username: string; password: string }): Promise<void> => {
     setLoading(true);
+    if (USE_MOCK) {
+      // Mock mode — bypass real API, sign in instantly as SUPER_ADMIN
+      await new Promise((r) => setTimeout(r, 400));
+      login(
+        { id: 'mock-admin-1', name: 'Mock Administrator', role: 'SUPER_ADMIN',
+          email: 'admin@mock.dev', phone: '9999900000', branch: 'Head Office', loginAt: new Date().toISOString() },
+        { accessToken: 'mock-access-token', refreshToken: 'mock-refresh-token' },
+      );
+      message.success('Signed in (mock mode)');
+      navigate('/dashboard', { replace: true });
+      setLoading(false);
+      return;
+    }
     try {
       const result = await staffAuthApi.login(values.username.trim(), values.password);
       finishLogin(result);
@@ -109,6 +123,15 @@ const Login: React.FC = () => {
 
   const requestOtp = async (toPhone: string): Promise<void> => {
     setLoading(true);
+    if (USE_MOCK) {
+      await new Promise((r) => setTimeout(r, 400));
+      setPhone(toPhone);
+      setOtpStage('otp');
+      setResendIn(30);
+      message.success(`OTP sent to +91 ${toPhone} (mock OTP: 123456)`);
+      setLoading(false);
+      return;
+    }
     try {
       const r = await staffAuthApi.otpRequest(toPhone, portalFamily);
       setPhone(toPhone);
@@ -129,6 +152,21 @@ const Login: React.FC = () => {
 
   const verifyOtp = async (values: { otp: string }): Promise<void> => {
     setLoading(true);
+    if (USE_MOCK) {
+      await new Promise((r) => setTimeout(r, 400));
+      const roleMap: Record<string, string> = { 'Credit Team': 'CREDIT_CDL', 'Finance Team': 'FINANCE_CDL' };
+      login(
+        { id: `mock-${portal.toLowerCase().replace(' ', '-')}-1`, name: `Mock ${portal}`,
+          role: (roleMap[portal] ?? 'CREDIT_CDL') as never,
+          email: `mock@${portal.toLowerCase().replace(' ', '')}.dev`, phone,
+          branch: 'Head Office', loginAt: new Date().toISOString() },
+        { accessToken: 'mock-access-token', refreshToken: 'mock-refresh-token' },
+      );
+      message.success(`Signed in as ${portal} (mock mode)`);
+      navigate('/dashboard', { replace: true });
+      setLoading(false);
+      return;
+    }
     try {
       const result = await staffAuthApi.otpVerify(phone, values.otp, portalFamily);
       finishLogin(result);

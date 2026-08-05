@@ -59,10 +59,12 @@ export function SalesWizardScreen({ product }: { product: SalesProduct }) {
   const [submitted, setSubmitted] = useState<{ queued: boolean; id?: string } | null>(null);
 
   // Default every field so RHF tracks it; seed from the resumed draft.
+  // `derived` fields are read-only output — they hold no form value.
   const defaultValues = useMemo<FormValues>(() => {
     const dv: FormValues = {};
     for (const step of steps) {
       for (const field of step.fields ?? []) {
+        if (field.type === 'derived') continue;
         dv[field.name] = field.type === 'checkbox' ? false : '';
       }
     }
@@ -197,7 +199,7 @@ export function SalesWizardScreen({ product }: { product: SalesProduct }) {
             <ReviewSummary steps={formSteps} values={values} />
           ) : (
             (step.fields ?? []).map((field) => (
-              <SalesField key={field.name} field={field} control={control} />
+              <SalesField key={field.name} field={field} control={control} values={values} />
             ))
           )}
 

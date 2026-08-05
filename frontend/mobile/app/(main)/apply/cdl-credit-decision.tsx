@@ -11,7 +11,12 @@ import { Button } from '@/src/shared/components/common/Button';
 import { LoadingSpinner } from '@/src/shared/components/common/LoadingSpinner';
 import { formatCurrency } from '@/src/core/utils/formatters';
 import { useServices } from '@/src/core/services/ServiceProvider';
-import type { CdlCreditAssessment, CdlCreditDecision } from '@/src/entities/consumerDurableLoan';
+import {
+  ageFromDob,
+  CDL_FOIR_MAX,
+  type CdlCreditAssessment,
+  type CdlCreditDecision,
+} from '@/src/entities/consumerDurableLoan';
 
 export default function CdlCreditDecisionScreen() {
   const params = useLocalSearchParams<Record<string, string>>();
@@ -37,8 +42,10 @@ export default function CdlCreditDecisionScreen() {
           existingObligations: Number(params.existingObligations ?? 0),
           proposedEmi: Number(params.emi ?? 0),
           foir: Number(params.foir ?? 0),
-          foirLimit: 50,
+          foirLimit: CDL_FOIR_MAX,
           foirStatus: (params.foirStatus as CdlCreditAssessment['foirStatus']) ?? 'passed',
+          age: params.dob ? ageFromDob(params.dob) : undefined,
+          loanAmount: amount,
         };
         const data = await consumerDurableLoanService.getCreditDecision(
           assessment.applicationId,
@@ -150,6 +157,32 @@ export default function CdlCreditDecisionScreen() {
           <Ionicons name="information-circle-outline" size={16} color={Colors.primary} />
           <Text style={styles.reasonText}>{decision.reason}</Text>
         </View>
+
+        {/* Every rule that fired (4.1–4.4) */}
+        {decision.reasons?.length > 1 && (
+          <View style={styles.card}>
+            <Text style={styles.factorsTitle}>
+              {decision.decision === 'approved' ? 'Criteria met' : 'Contributing factors'}
+            </Text>
+            {decision.reasons.map((r, i) => (
+              <View key={i} style={styles.factorRow}>
+                <Ionicons
+                  name={decision.decision === 'approved' ? 'checkmark-circle' : 'ellipse'}
+                  size={14}
+                  color={
+                    decision.decision === 'approved'
+                      ? Colors.success
+                      : decision.decision === 'rejected'
+                        ? Colors.error
+                        : Colors.gold
+                  }
+                  style={styles.factorIcon}
+                />
+                <Text style={styles.factorText}>{r}</Text>
+              </View>
+            ))}
+          </View>
+        )}
       </ScrollView>
 
       <View style={styles.footer}>
@@ -197,5 +230,9 @@ const styles = StyleSheet.create({
   divider: { height: 1, backgroundColor: Colors.border },
   reasonBox: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm, backgroundColor: Colors.primaryLight, borderRadius: BorderRadius.md, padding: Spacing.md },
   reasonText: { ...Typography.caption, flex: 1, color: Colors.primary, lineHeight: 18 },
+  factorsTitle: { fontFamily: FontFamily.semiBold, fontSize: FontSize.sm, color: Colors.textSecondary, paddingTop: Spacing.md, paddingHorizontal: Spacing.md },
+  factorRow: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm },
+  factorIcon: { marginTop: 2 },
+  factorText: { ...Typography.caption, flex: 1, color: Colors.textPrimary, lineHeight: 18 },
   footer: { padding: Spacing.md, backgroundColor: Colors.background, borderTopWidth: 1, borderTopColor: Colors.border },
 });

@@ -4,29 +4,41 @@ import { Colors } from '@/src/core/theme/colors';
 import { Typography } from '@/src/core/theme/typography';
 import { Spacing, BorderRadius } from '@/src/core/theme/spacing';
 import { formatDate } from '@/src/core/utils/formatters';
-import type { SalesStepConfig } from '@/src/features/sales/config/types';
+import type {
+  SalesFieldConfig,
+  SalesFormValues,
+  SalesStepConfig,
+} from '@/src/features/sales/config/types';
 
 interface ReviewSummaryProps {
   /** All form-collecting steps (kind 'form'), in order. */
   steps: SalesStepConfig[];
-  values: Record<string, unknown>;
+  values: SalesFormValues;
 }
 
-function displayValue(value: unknown, type: string, options?: { label: string; value: string }[]): string {
+function displayValue(
+  field: SalesFieldConfig,
+  values: SalesFormValues,
+): string {
+  // Derived rows (EMI, processing fee) hold no form value — recompute them.
+  if (field.type === 'derived') return field.compute?.(values) ?? '—';
+
+  const value = values[field.name];
   if (value == null || value === '') return '—';
-  if (type === 'checkbox') return value ? 'Yes' : 'No';
-  if (type === 'select' && options) {
+  if (field.type === 'checkbox') return value ? 'Yes' : 'No';
+  if (field.type === 'select') {
+    const options = field.optionsFrom ? field.optionsFrom(values) : field.options ?? [];
     return options.find((o) => o.value === value)?.label ?? String(value);
   }
-  if (type === 'date') {
+  if (field.type === 'date') {
     try {
       return formatDate(value as string);
     } catch {
       return String(value);
     }
   }
-  if (type === 'currency') return `₹${Number(value).toLocaleString('en-IN')}`;
-  if (type === 'photo' || type === 'document') return 'Captured';
+  if (field.type === 'currency') return `₹${Number(value).toLocaleString('en-IN')}`;
+  if (field.type === 'photo' || field.type === 'document') return 'Captured';
   return String(value);
 }
 
@@ -34,7 +46,9 @@ export function ReviewSummary({ steps, values }: ReviewSummaryProps) {
   return (
     <View style={styles.container}>
       {steps.map((step) => {
-        const fields = (step.fields ?? []).filter((f) => values[f.name] != null && values[f.name] !== '');
+        const fields = (step.fields ?? []).filter(
+          (f) => f.type === 'derived' || (values[f.name] != null && values[f.name] !== ''),
+        );
         if (fields.length === 0) return null;
         return (
           <View key={step.id} style={styles.group}>
@@ -45,7 +59,7 @@ export function ReviewSummary({ steps, values }: ReviewSummaryProps) {
                   {f.label}
                 </Text>
                 <Text style={styles.rowValue} numberOfLines={1}>
-                  {displayValue(values[f.name], f.type, f.options)}
+                  {displayValue(f, values)}
                 </Text>
               </View>
             ))}

@@ -11,7 +11,11 @@ import { Button } from '@/src/shared/components/common/Button';
 import { LoadingSpinner } from '@/src/shared/components/common/LoadingSpinner';
 import { formatCurrency } from '@/src/core/utils/formatters';
 import { useServices } from '@/src/core/services/ServiceProvider';
-import type { CdlCreditAssessment } from '@/src/entities/consumerDurableLoan';
+import {
+  CDL_CIBIL_AUTO_APPROVE,
+  CDL_CIBIL_REVIEW_MIN,
+  type CdlCreditAssessment,
+} from '@/src/entities/consumerDurableLoan';
 
 const FOIR_META = {
   passed: { label: 'Within limit', color: Colors.success, bg: Colors.successLight },
@@ -35,6 +39,9 @@ export default function CdlCreditAssessmentScreen() {
             monthlyIncome: Number(params.monthlyIncome ?? 0),
             employmentType: params.employmentType ?? 'salaried',
             proposedEmi: Number(params.emi ?? 0),
+            existingObligations: params.existingEmi ? Number(params.existingEmi) : undefined,
+            loanAmount: Number(params.loanAmount ?? 0),
+            dob: params.dob,
           },
         );
         if (mounted) setAssessment(data);
@@ -49,7 +56,11 @@ export default function CdlCreditAssessmentScreen() {
 
   const foirMeta = assessment ? FOIR_META[assessment.foirStatus] : null;
   const cibilColor = assessment
-    ? assessment.cibilScore >= 720 ? Colors.success : assessment.cibilScore >= 650 ? Colors.gold : Colors.error
+    ? assessment.cibilScore >= CDL_CIBIL_AUTO_APPROVE
+      ? Colors.success
+      : assessment.cibilScore >= CDL_CIBIL_REVIEW_MIN
+        ? Colors.gold
+        : Colors.error
     : Colors.textPrimary;
 
   return (

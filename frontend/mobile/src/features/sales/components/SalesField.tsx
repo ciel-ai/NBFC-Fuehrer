@@ -19,11 +19,17 @@ import { Spacing, BorderRadius } from '@/src/core/theme/spacing';
 import { scale } from '@/src/core/utils/responsive';
 import { formatDate } from '@/src/core/utils/formatters';
 import { useAssetPicker } from '@/src/features/sales/hooks/useAssetPicker';
-import type { SalesFieldConfig } from '@/src/features/sales/config/types';
+import type {
+  SalesFieldConfig,
+  SalesFieldOption,
+  SalesFormValues,
+} from '@/src/features/sales/config/types';
 
 interface SalesFieldProps {
   field: SalesFieldConfig;
   control: Control<Record<string, unknown>>;
+  /** Every answer so far — lets a field derive its options / value / helper. */
+  values?: SalesFormValues;
 }
 
 const KEYBOARD_BY_TYPE: Record<string, KeyboardTypeOptions> = {
@@ -39,7 +45,23 @@ function digitsOnly(text: string): string {
   return text.replace(/\D/g, '');
 }
 
-export function SalesField({ field, control }: SalesFieldProps) {
+/** Resolve a field's options — dynamic (from earlier answers) wins over static. */
+function resolveOptions(
+  field: SalesFieldConfig,
+  values: SalesFormValues,
+): SalesFieldOption[] {
+  return field.optionsFrom ? field.optionsFrom(values) : field.options ?? [];
+}
+
+export function SalesField({ field, control, values = {} }: SalesFieldProps) {
+  // `derived` rows are read-only output, not inputs — they hold no form value.
+  if (field.type === 'derived') {
+    return <DerivedRow field={field} values={values} />;
+  }
+
+  const options = resolveOptions(field, values);
+  const helper = field.helperFrom ? field.helperFrom(values) : field.helper;
+
   return (
     <Controller
       control={control}
@@ -50,6 +72,7 @@ export function SalesField({ field, control }: SalesFieldProps) {
 
           <FieldBody
             field={field}
+            options={options}
             value={value}
             onChange={onChange}
             onBlur={onBlur}
@@ -60,8 +83,8 @@ export function SalesField({ field, control }: SalesFieldProps) {
             <Text style={styles.errorText} accessibilityLiveRegion="polite">
               {error.message as string}
             </Text>
-          ) : field.helper ? (
-            <Text style={styles.hintText}>{field.helper}</Text>
+          ) : helper ? (
+            <Text style={styles.hintText}>{helper}</Text>
           ) : null}
         </View>
       )}
@@ -71,16 +94,25 @@ export function SalesField({ field, control }: SalesFieldProps) {
 
 interface FieldBodyProps {
   field: SalesFieldConfig;
+  options: SalesFieldOption[];
   value: unknown;
   onChange: (v: unknown) => void;
   onBlur: () => void;
   hasError: boolean;
 }
 
-function FieldBody({ field, value, onChange, onBlur, hasError }: FieldBodyProps) {
+function FieldBody({ field, options, value, onChange, onBlur, hasError }: FieldBodyProps) {
   switch (field.type) {
     case 'select':
-      return <SelectInput field={field} value={value} onChange={onChange} hasError={hasError} />;
+      return (
+        <SelectInput
+          field={field}
+          options={options}
+          value={value}
+          onChange={onChange}
+          hasError={hasError}
+        />
+      );
     case 'date':
       return <DateInput field={field} value={value} onChange={onChange} hasError={hasError} />;
     case 'checkbox':
@@ -101,8 +133,36 @@ function FieldBody({ field, value, onChange, onBlur, hasError }: FieldBodyProps)
   }
 }
 
+// ── Derived (read-only) ────────────────────────────────────────────────────
+function DerivedRow({
+  field,
+  values,
+}: {
+  field: SalesFieldConfig;
+  values: SalesFormValues;
+}) {
+  const text = field.compute?.(values) ?? '—';
+  const helper = field.helperFrom ? field.helperFrom(values) : field.helper;
+
+  return (
+    <View style={styles.section}>
+      <Text style={styles.label}>{field.label.toUpperCase()}</Text>
+      <View style={styles.derivedRow} accessibilityLabel={`${field.label}: ${text}`}>
+        <Text style={styles.derivedText}>{text}</Text>
+      </View>
+      {helper ? <Text style={styles.hintText}>{helper}</Text> : null}
+    </View>
+  );
+}
+
 // ── Text / number family ─────────────────────────────────────────────────
-function TextInputField({ field, value, onChange, onBlur, hasError }: FieldBodyProps) {
+function TextInputField({
+  field,
+  value,
+  onChange,
+  onBlur,
+  hasError,
+}: Omit<FieldBodyProps, 'options'>) {
   const transform = (text: string): string => {
     switch (field.type) {
       case 'pan':
@@ -148,12 +208,13 @@ function TextInputField({ field, value, onChange, onBlur, hasError }: FieldBodyP
 // ── Select ────────────────────────────────────────────────────────────────
 function SelectInput({
   field,
+  options,
   value,
   onChange,
   hasError,
 }: Omit<FieldBodyProps, 'onBlur'>) {
   const [open, setOpen] = useState(false);
-  const selected = field.options?.find((o) => o.value === value);
+  const selected = options.find((o) => o.value === value);
 
   return (
     <>
@@ -173,7 +234,7 @@ function SelectInput({
         <Pressable style={styles.modalBackdrop} onPress={() => setOpen(false)}>
           <Pressable style={styles.modalSheet} onPress={(e) => e.stopPropagation()}>
             <Text style={styles.modalTitle}>{field.label}</Text>
-            {field.options?.map((opt) => {
+            {options.map((opt) => {
               const active = opt.value === value;
               return (
                 <Pressable
@@ -208,7 +269,7 @@ function DateInput({
   value,
   onChange,
   hasError,
-}: Omit<FieldBodyProps, 'onBlur'>) {
+}: Omit<FieldBodyProps, 'onBlur' | 'options'>) {
   const [open, setOpen] = useState(false);
   const current = value ? new Date(value as string) : new Date(2000, 0, 1);
 
@@ -274,7 +335,7 @@ function AssetInput({
   value,
   onChange,
   hasError,
-}: Omit<FieldBodyProps, 'onBlur'>) {
+}: Omit<FieldBodyProps, 'onBlur' | 'options'>) {
   const { pick, busy } = useAssetPicker();
   const uri = value as string | undefined;
   const source = field.capture ?? (field.type === 'photo' ? 'camera' : 'library');
@@ -376,6 +437,23 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   placeholderText: { color: Colors.textDisabled },
+  // Derived (read-only) row
+  derivedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    borderRadius: BorderRadius.md,
+    minHeight: scale(52),
+    paddingHorizontal: Spacing.md,
+    backgroundColor: Colors.backgroundLight,
+  },
+  derivedText: {
+    fontFamily: FontFamily.semiBold,
+    fontSize: FontSize.md,
+    color: Colors.textPrimary,
+  },
   errorText: {
     ...Typography.caption,
     color: Colors.error,

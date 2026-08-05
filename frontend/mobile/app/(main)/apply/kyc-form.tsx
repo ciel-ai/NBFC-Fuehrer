@@ -150,12 +150,8 @@ const fi = StyleSheet.create({
 });
 
 export default function KYCFormScreen() {
-  const { productName, loanAmount, tenure, emi } = useLocalSearchParams<{
-    productName: string;
-    loanAmount: string;
-    tenure: string;
-    emi: string;
-  }>();
+  const params = useLocalSearchParams<Record<string, string>>();
+  const { productName, loanAmount, tenure, emi } = params;
 
   const [fullName, setFullName] = useState('');
   const [dob, setDob] = useState('');
@@ -195,11 +191,10 @@ export default function KYCFormScreen() {
 
     router.push({
       pathname: '/(main)/apply/pan-verify',
+      // Preserve everything carried in (interestRate, processingFee,
+      // productValue, employmentType, …) and add the personal details.
       params: {
-        productName: productName ?? '',
-        loanAmount: loanAmount ?? '',
-        tenure: tenure ?? '',
-        emi: emi ?? '',
+        ...params,
         fullName: fullName.trim(),
         dob,
         phone,

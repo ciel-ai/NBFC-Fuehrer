@@ -30,22 +30,37 @@ export type SalesFieldType =
   | 'date'
   | 'checkbox'
   | 'photo'
-  | 'document';
+  | 'document'
+  /** Read-only row computed from earlier answers (e.g. processing fee, EMI). */
+  | 'derived';
 
 export interface SalesFieldOption {
   label: string;
   value: string;
 }
 
+/** All answers collected so far, across every step of the wizard. */
+export type SalesFormValues = Record<string, unknown>;
+
 export interface SalesFieldConfig {
   name: string;
   label: string;
   type: SalesFieldType;
   placeholder?: string;
-  /** Options for `select`. */
+  /** Static options for `select`. */
   options?: SalesFieldOption[];
+  /**
+   * Options derived from earlier answers — e.g. the permitted interest rates
+   * depend on the employment type chosen two steps back. Takes precedence over
+   * `options` when present.
+   */
+  optionsFrom?: (values: SalesFormValues) => SalesFieldOption[];
+  /** Value renderer for `derived` fields. */
+  compute?: (values: SalesFormValues) => string;
   /** Helper / hint text shown under the field when there is no error. */
   helper?: string;
+  /** Helper text derived from earlier answers. Takes precedence over `helper`. */
+  helperFrom?: (values: SalesFormValues) => string | undefined;
   /** Marks the field as optional (skips required validation messaging). */
   optional?: boolean;
   maxLength?: number;

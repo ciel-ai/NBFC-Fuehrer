@@ -24,7 +24,17 @@ export interface IConsumerDurableLoanService {
   runComplianceChecks(applicationId: string): Promise<CdlComplianceResult>;
   runCreditAssessment(
     applicationId: string,
-    input: { monthlyIncome: number; employmentType: string; proposedEmi: number },
+    input: {
+      monthlyIncome: number;
+      employmentType: string;
+      proposedEmi: number;
+      /** Existing EMIs captured on the occupation step — drives FOIR. */
+      existingObligations?: number;
+      /** Needed to apply the ₹40k auto-approval ceiling (4.1). */
+      loanAmount?: number;
+      /** Needed to apply the 21–55 age band (4.1). */
+      dob?: string;
+    },
   ): Promise<CdlCreditAssessment>;
   /** Pure FOIR calculation — kept synchronous so screens can recompute live. */
   calculateFOIR(input: CdlFoirInput): number;
@@ -37,11 +47,11 @@ export interface IConsumerDurableLoanService {
   // Agreement → NACH → Disbursal
   generateAgreement(
     applicationId: string,
-    input: { amount: number; tenure: number; emi: number },
+    input: { amount: number; tenure: number; emi: number; interestRate?: number },
   ): Promise<CdlAgreementResult>;
   registerNachMandate(
     applicationId: string,
-    input: { emi: number; bankAccount: string },
+    input: { emi: number; bankAccount: string; autoDebitDate?: number },
   ): Promise<CdlNachResult>;
   disburseToMerchant(
     applicationId: string,

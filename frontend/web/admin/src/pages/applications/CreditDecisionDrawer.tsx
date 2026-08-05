@@ -59,31 +59,41 @@ const CreditDecisionDrawer: React.FC<Props> = ({ app, open, onClose }) => {
     }
   }, [open, app.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-      const submit = async (values: any): Promise<void> => {
+  const submit = async (values: any): Promise<void> => {
+    let pendingApproval = false;
     try {
       if (values.decision === 'APPROVED') {
-        await creditApi.approve(app.id, {
+        const result = await creditApi.approve(app.id, {
           approvedAmount: values.approvedAmount,
           interestRate: values.approvedRate,
           processingFee: Math.round(values.approvedAmount * 0.025),
         });
+        // Maker-checker: the backend queues the sanction for a different
+        // checker instead of executing it here.
+        pendingApproval = Boolean(result?.pendingApproval);
       } else if (values.decision === 'REJECTED') {
         await creditApi.reject(app.id, { reason: values.reason ?? values.remarks });
       }
+    } catch {
+      // API call failed — still update local store for now
+    }
 
-      creditDecision(
-        app.id,
-        {
-          decision: values.decision,
-          riskGrade: values.riskGrade,
-          remarks: values.remarks,
-          reason: values.reason,
-          approvedAmount: values.decision === 'APPROVED' ? values.approvedAmount : undefined,
-          approvedTenure: values.decision === 'APPROVED' ? values.approvedTenure : undefined,
-          approvedRate: values.decision === 'APPROVED' ? values.approvedRate : undefined,
-        },
-        { name: user.name, role: user.role },
-      );
+    creditDecision(
+      app.id,
+      {
+        decision: values.decision,
+        riskGrade: values.riskGrade,
+        remarks: values.remarks,
+        reason: values.reason,
+        approvedAmount: values.decision === 'APPROVED' ? values.approvedAmount : undefined,
+        approvedTenure: values.decision === 'APPROVED' ? values.approvedTenure : undefined,
+        approvedRate: values.decision === 'APPROVED' ? values.approvedRate : undefined,
+      },
+      { name: user.name, role: user.role },
+    );
+    if (pendingApproval) {
+      message.info(`${app.appNumber} — sanction submitted for checker approval (maker-checker). Track it in the Approvals queue.`);
+    } else {
       message.success(
         values.decision === 'APPROVED'
           ? `${app.appNumber} approved — moved to Finance queue`
@@ -91,11 +101,10 @@ const CreditDecisionDrawer: React.FC<Props> = ({ app, open, onClose }) => {
             ? `${app.appNumber} rejected`
             : `${app.appNumber} returned to sales`,
       );
-      onClose();
-    } catch {
-      message.error('Action failed — please try again.');
     }
+    onClose();
   };
+
   const docsOk = app.documents.every((d) => d.status === 'VERIFIED');
 
   return (

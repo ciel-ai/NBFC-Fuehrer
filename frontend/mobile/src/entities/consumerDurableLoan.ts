@@ -2,24 +2,51 @@
 // Mirrors the LOS + LMS workflow: Application → KYC → Compliance → Credit
 // Assessment → Credit Decision → Agent Review (if flagged) → Agreement →
 // NACH → Disbursal → Activation → EMI Cycle → Failure/Overdue → Closure.
+//
+// Product rules (rates, FOIR, CIBIL bands, fees, tenure, foreclosure) live in
+// ./cdlPolicy — this file is types only.
 
-export const CDL_ANNUAL_INTEREST_RATE = 18; // % p.a. reducing balance
-export const CDL_FOIR_LIMIT = 50; // % — above this the application is flagged
-export const CDL_FOIR_REJECT = 65; // % — above this the application is rejected
-export const CDL_CIBIL_APPROVE = 720;
-export const CDL_CIBIL_REJECT = 650;
+import {
+  CDL_CIBIL_AUTO_APPROVE,
+  CDL_FOIR_MAX,
+  CDL_INTEREST_RATES,
+  type CdlCustomerType,
+  type CdlDecisionOutcome,
+} from './cdlPolicy';
+
+export * from './cdlPolicy';
+
+/**
+ * Fallback rate when none has been chosen yet (e.g. the pre-login EMI
+ * calculator). The real rate is picked per application from the customer
+ * type's permitted set — see CDL_INTEREST_RATES.
+ */
+export const CDL_DEFAULT_INTEREST_RATE = CDL_INTEREST_RATES.salaried[1]; // 13%
+
+/** @deprecated Use CDL_FOIR_MAX. Kept so older imports keep compiling. */
+export const CDL_FOIR_LIMIT = CDL_FOIR_MAX;
+/** @deprecated Use CDL_CIBIL_AUTO_APPROVE. */
+export const CDL_CIBIL_APPROVE = CDL_CIBIL_AUTO_APPROVE;
 
 export type CdlStepStatus = 'pending' | 'in_progress' | 'completed' | 'failed';
 export type CdlCheckStatus = 'pending' | 'passed' | 'failed' | 'review';
-export type CdlDecision = 'approved' | 'flagged' | 'rejected';
+/** 'flagged' == the spec's "Manual Review" outcome. */
+export type CdlDecision = CdlDecisionOutcome;
 
 export interface CdlApplicationInput {
   productName: string;
+  /** Manually entered product value (2a) — no product pop-up list. */
+  productValue?: number;
   amount: number;
   tenure: number;
   emi: number;
+  /** Rate chosen from the customer type's permitted set. */
+  interestRate?: number;
+  processingFee?: number;
+  /** Day of month for the NACH auto-debit — 4, 7 or 12. */
+  autoDebitDate?: number;
   monthlyIncome?: number;
-  employmentType?: string;
+  employmentType?: CdlCustomerType | string;
   merchantName?: string;
 }
 
@@ -61,7 +88,7 @@ export interface CdlFoirInput {
 export interface CdlCreditAssessment {
   applicationId: string;
   employmentVerified: boolean;
-  employmentType: string;
+  employmentType: CdlCustomerType | string;
   annualIncome: number;
   monthlyIncome: number;
   cibilScore: number;
@@ -70,6 +97,9 @@ export interface CdlCreditAssessment {
   foir: number;
   foirLimit: number;
   foirStatus: 'passed' | 'flagged' | 'failed';
+  /** Applicant age — 4.1 requires 21–55. */
+  age?: number;
+  loanAmount?: number;
 }
 
 export interface CdlCreditDecision {
@@ -79,6 +109,8 @@ export interface CdlCreditDecision {
   foir: number;
   approvedAmount: number;
   reason: string;
+  /** Every rule that fired, most significant first (4.1–4.4). */
+  reasons: string[];
   requiresAgentReview: boolean;
 }
 

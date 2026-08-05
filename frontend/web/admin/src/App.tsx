@@ -36,6 +36,7 @@ const Collections = lazy(() => import('./pages/collections/Collections'));
 const Reports = lazy(() => import('./pages/reports/Reports'));
 const UserManagement = lazy(() => import('./pages/users/UserManagement'));
 const RolesPermissions = lazy(() => import('./pages/permissions/RolesPermissions'));
+const ApprovalsQueue = lazy(() => import('./pages/approvals/ApprovalsQueue'));
 const AuditLogs = lazy(() => import('./pages/audit/AuditLogs'));
 const Settings = lazy(() => import('./pages/settings/Settings'));
 
@@ -112,6 +113,7 @@ const App: React.FC = () => (
                 <Route path="branches" element={<RequireModule module="branches"><BranchManagement /></RequireModule>} />
 
                 <Route path="users" element={<RequireModule module="users"><UserManagement /></RequireModule>} />
+                <Route path="approvals" element={<RequireModule module="approvals"><ApprovalsQueue /></RequireModule>} />
                 <Route path="permissions" element={<RequireModule module="permissions"><RolesPermissions /></RequireModule>} />
                 <Route path="audit" element={<RequireModule module="audit"><AuditLogs /></RequireModule>} />
                 <Route path="settings" element={<RequireModule module="settings"><Settings /></RequireModule>} />

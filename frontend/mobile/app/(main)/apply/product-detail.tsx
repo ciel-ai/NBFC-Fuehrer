@@ -19,14 +19,19 @@ import { Header } from '@/src/shared/components/common/Header';
 import { Button } from '@/src/shared/components/common/Button';
 
 import { calculateEMI } from '@/src/core/utils/formatters';
-import { CDL_ANNUAL_INTEREST_RATE } from '@/src/entities/consumerDurableLoan';
+import {
+  cdlInterestRatesFor,
+  cdlProcessingFee,
+  CDL_MAX_LOAN_AMOUNT,
+  CDL_MIN_LOAN_AMOUNT,
+  CDL_TENURE_OPTIONS,
+  type CdlCustomerType,
+} from '@/src/entities/consumerDurableLoan';
 
-const TENURES = [6, 12, 18, 24];
-const ANNUAL_RATE = CDL_ANNUAL_INTEREST_RATE;
-
-function calcEMI(principal: number, months: number): number {
-  return calculateEMI(principal, ANNUAL_RATE, months);
-}
+const CUSTOMER_TYPES: { label: string; value: CdlCustomerType }[] = [
+  { label: 'Salaried', value: 'salaried' },
+  { label: 'Self-Employed', value: 'self_employed' },
+];
 
 function formatPrice(n: number) {
   return '₹' + n.toLocaleString('en-IN');
@@ -45,11 +50,28 @@ export default function ProductDetailScreen() {
       icon: string;
     }>();
 
-  const maxLoan = parseInt(loanAmount ?? '50000', 10);
+  // Never offer more than the product's sanctionable ceiling.
+  const maxLoan = Math.min(
+    parseInt(loanAmount ?? String(CDL_MAX_LOAN_AMOUNT), 10) || CDL_MAX_LOAN_AMOUNT,
+    CDL_MAX_LOAN_AMOUNT,
+  );
   const mrpVal = parseInt(mrp ?? '0', 10);
 
   const [loanInput, setLoanInput] = useState(maxLoan.toString());
   const [selectedTenure, setSelectedTenure] = useState(12);
+  const [customerType, setCustomerType] = useState<CdlCustomerType>('salaried');
+
+  // Permitted rates depend on the customer type (spec 1b / 2b).
+  const rates = useMemo(() => cdlInterestRatesFor(customerType), [customerType]);
+  const [selectedRate, setSelectedRate] = useState<number>(rates[1] ?? 0);
+
+  // Switching customer type can invalidate the chosen rate (e.g. 13% salaried
+  // has no self-employed equivalent) — fall back to that type's default.
+  const handleCustomerType = (next: CdlCustomerType) => {
+    setCustomerType(next);
+    const nextRates = cdlInterestRatesFor(next);
+    if (!nextRates.includes(selectedRate)) setSelectedRate(nextRates[1] ?? 0);
+  };
 
   const loanValue = useMemo(() => {
     const v = parseInt(loanInput.replace(/[^0-9]/g, ''), 10);
@@ -57,12 +79,15 @@ export default function ProductDetailScreen() {
     return Math.min(v, maxLoan);
   }, [loanInput, maxLoan]);
 
+  const belowMinimum = loanValue > 0 && loanValue < CDL_MIN_LOAN_AMOUNT;
+
   const emi = useMemo(
-    () => (loanValue > 0 ? calcEMI(loanValue, selectedTenure) : 0),
-    [loanValue, selectedTenure]
+    () => (loanValue > 0 ? calculateEMI(loanValue, selectedRate, selectedTenure) : 0),
+    [loanValue, selectedRate, selectedTenure]
   );
   const totalPayable = emi * selectedTenure;
   const totalInterest = totalPayable - loanValue;
+  const processingFee = cdlProcessingFee(loanValue);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -115,8 +140,10 @@ export default function ProductDetailScreen() {
               accessibilityHint="Enter the loan amount you want to borrow, up to the maximum eligible"
             />
           </View>
-          <Text style={styles.hintText}>
-            Max eligible: {formatPrice(maxLoan)}  ·  Min: ₹5,000
+          <Text style={[styles.hintText, belowMinimum && styles.hintTextError]}>
+            {belowMinimum
+              ? `Minimum loan amount is ${formatPrice(CDL_MIN_LOAN_AMOUNT)}`
+              : `Max eligible: ${formatPrice(maxLoan)}  ·  Min: ${formatPrice(CDL_MIN_LOAN_AMOUNT)}`}
           </Text>
           <View style={styles.progressTrack}>
             <View
@@ -132,13 +159,38 @@ export default function ProductDetailScreen() {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>EMI Calculator</Text>
 
+          {/* Customer type — decides which rates are on offer */}
+          <Text style={styles.tenureLabel}>I am</Text>
+          <View style={styles.tenureRow}>
+            {CUSTOMER_TYPES.map((t) => (
+              <TouchableOpacity
+                key={t.value}
+                style={[styles.tenureBtn, customerType === t.value && styles.tenureBtnActive]}
+                onPress={() => handleCustomerType(t.value)}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: customerType === t.value }}
+              >
+                <Text
+                  style={[
+                    styles.tenureBtnText,
+                    customerType === t.value && styles.tenureBtnTextActive,
+                  ]}
+                >
+                  {t.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
           <Text style={styles.tenureLabel}>Select Tenure</Text>
           <View style={styles.tenureRow}>
-            {TENURES.map((t) => (
+            {CDL_TENURE_OPTIONS.map((t) => (
               <TouchableOpacity
                 key={t}
-                style={[styles.tenureBtn, selectedTenure === t && styles.tenureBtnActive]}
+                style={[styles.tenureChip, selectedTenure === t && styles.tenureBtnActive]}
                 onPress={() => setSelectedTenure(t)}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: selectedTenure === t }}
               >
                 <Text style={[styles.tenureBtnText, selectedTenure === t && styles.tenureBtnTextActive]}>
                   {t}M
@@ -147,10 +199,30 @@ export default function ProductDetailScreen() {
             ))}
           </View>
 
+          <Text style={styles.tenureLabel}>Interest Rate</Text>
+          <View style={styles.tenureRow}>
+            {rates.map((r) => (
+              <TouchableOpacity
+                key={r}
+                style={[styles.tenureBtn, selectedRate === r && styles.tenureBtnActive]}
+                onPress={() => setSelectedRate(r)}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: selectedRate === r }}
+                accessibilityLabel={r === 0 ? 'Zero percent, no-cost EMI' : `${r} percent per annum`}
+              >
+                <Text style={[styles.tenureBtnText, selectedRate === r && styles.tenureBtnTextActive]}>
+                  {r === 0 ? 'No-cost' : `${r}%`}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
           <View style={styles.rateRow}>
             <Ionicons name="information-circle-outline" size={14} color={Colors.textSecondary} />
             <Text style={styles.rateText}>
-              Interest rate: {ANNUAL_RATE}% p.a. (reducing balance)
+              {selectedRate === 0
+                ? 'No-cost EMI — you repay only the principal.'
+                : `${selectedRate}% p.a. (reducing balance)`}
             </Text>
           </View>
 
@@ -168,6 +240,7 @@ export default function ProductDetailScreen() {
               {[
                 { label: 'Principal', value: formatPrice(loanValue), color: Colors.textPrimary },
                 { label: 'Total Interest', value: loanValue > 0 ? formatPrice(totalInterest) : '—', color: Colors.goldDark },
+                { label: 'Processing Fee', value: processingFee > 0 ? formatPrice(processingFee) : '—', color: Colors.goldDark },
                 { label: 'Total Payable', value: loanValue > 0 ? formatPrice(totalPayable) : '—', color: Colors.primary },
               ].map((row) => (
                 <View key={row.label} style={styles.emiRow}>
@@ -207,13 +280,17 @@ export default function ProductDetailScreen() {
               pathname: '/(main)/apply/kyc-form',
               params: {
                 productName: productName ?? '',
+                productValue: mrpVal.toString(),
                 loanAmount: loanValue.toString(),
                 tenure: selectedTenure.toString(),
                 emi: emi.toString(),
+                interestRate: selectedRate.toString(),
+                employmentType: customerType,
+                processingFee: processingFee.toString(),
               },
             })
           }
-          disabled={loanValue <= 0}
+          disabled={loanValue < CDL_MIN_LOAN_AMOUNT}
         />
       </View>
     </SafeAreaView>
@@ -319,13 +396,27 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
   },
   hintText: { ...Typography.caption, color: Colors.textDisabled, marginBottom: Spacing.sm },
+  hintTextError: { color: Colors.error },
   progressTrack: { height: 6, backgroundColor: Colors.border, borderRadius: 3, overflow: 'hidden' },
   progressFill: { height: '100%', backgroundColor: Colors.primary, borderRadius: 3 },
 
   tenureLabel: { ...Typography.captionMedium, color: Colors.textSecondary, marginBottom: Spacing.sm },
-  tenureRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.md },
+  tenureRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginBottom: Spacing.md },
   tenureBtn: {
     flex: 1,
+    height: 44,
+    borderRadius: BorderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.backgroundLight,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+  },
+  // 7 tenure options wrap onto two rows — fixed basis rather than flex:1.
+  tenureChip: {
+    minWidth: 56,
+    flexGrow: 1,
+    flexBasis: '18%',
     height: 44,
     borderRadius: BorderRadius.md,
     alignItems: 'center',

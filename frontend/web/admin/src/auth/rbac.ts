@@ -13,6 +13,7 @@ export type ModuleKey =
   | 'agents'
   | 'branches'
   | 'users'
+  | 'approvals'
   | 'permissions'
   | 'audit'
   | 'settings';
@@ -28,11 +29,11 @@ interface RoleMeta {
   modules: ModuleKey[];
 }
 
-const CREDIT_MODULES: ModuleKey[] = ['dashboard', 'applications', 'customers', 'appraisals', 'credit', 'reports'];
+const CREDIT_MODULES: ModuleKey[] = ['dashboard', 'applications', 'customers', 'appraisals', 'credit', 'approvals', 'reports'];
 const FINANCE_MODULES: ModuleKey[] = ['dashboard', 'applications', 'customers', 'finance', 'lms', 'reports'];
 const ALL_MODULES: ModuleKey[] = [
   'dashboard', 'applications', 'customers', 'appraisals', 'credit', 'finance', 'lms',
-  'collections', 'reports', 'agents', 'branches', 'users', 'permissions', 'audit', 'settings',
+  'collections', 'reports', 'agents', 'branches', 'users', 'approvals', 'permissions', 'audit', 'settings',
 ];
 
 export const ROLE_META: Record<Role, RoleMeta> = {

@@ -18,12 +18,13 @@ import { Header } from '@/src/shared/components/common/Header';
 import { Button } from '@/src/shared/components/common/Button';
 import { scale } from '@/src/core/utils/responsive';
 
-type EmploymentType = 'salaried' | 'self_employed' | 'business';
+// Consumer Durable Loan eligibility (spec 4.1) covers Salaried and
+// Self-employed only — each has its own permitted interest-rate set.
+type EmploymentType = 'salaried' | 'self_employed';
 
 const EMPLOYMENT_OPTIONS: { key: EmploymentType; label: string }[] = [
   { key: 'salaried', label: 'Salaried' },
   { key: 'self_employed', label: 'Self-Employed' },
-  { key: 'business', label: 'Business Owner' },
 ];
 
 const STATES = [

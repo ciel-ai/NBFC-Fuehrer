@@ -1,7 +1,8 @@
 import api from '../../api/api';
 import {
-  CDL_ANNUAL_INTEREST_RATE,
-  CDL_FOIR_LIMIT,
+  cdlCalculateFoir,
+  CDL_DEFAULT_INTEREST_RATE,
+  CDL_FOIR_MAX,
 } from '@/src/entities/consumerDurableLoan';
 import type { EMISchedule, Loan } from '@/src/entities/loan';
 import type {
@@ -44,15 +45,13 @@ export const realConsumerDurableLoanService: IConsumerDurableLoanService = {
   },
 
   calculateFOIR(input: CdlFoirInput): number {
-    if (input.monthlyIncome <= 0) return 0;
-    const ratio = ((input.existingObligations + input.proposedEmi) / input.monthlyIncome) * 100;
-    return Math.round(ratio * 10) / 10;
+    return cdlCalculateFoir(input);
   },
 
   async runCreditAssessment(applicationId, input): Promise<CdlCreditAssessment> {
     const res = await api.post<CdlCreditAssessment>(
       `${base}/applications/${applicationId}/credit-assessment`,
-      { ...input, foirLimit: CDL_FOIR_LIMIT },
+      { ...input, foirLimit: CDL_FOIR_MAX },
     );
     return res.data;
   },
@@ -72,7 +71,7 @@ export const realConsumerDurableLoanService: IConsumerDurableLoanService = {
   async generateAgreement(applicationId, input): Promise<CdlAgreementResult> {
     const res = await api.post<CdlAgreementResult>(
       `${base}/applications/${applicationId}/agreement`,
-      { ...input, interestRate: CDL_ANNUAL_INTEREST_RATE },
+      { ...input, interestRate: input.interestRate ?? CDL_DEFAULT_INTEREST_RATE },
     );
     return res.data;
   },

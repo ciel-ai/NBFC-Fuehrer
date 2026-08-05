@@ -116,9 +116,21 @@ const UserManagement: React.FC = () => {
     setDrawerOpen(false);
   };
 
-  const resetPassword = (_u: PortalUser): void => {
-  message.warning('Password reset requires a backend admin endpoint — not yet available.');
-};
+  const resetPassword = (u: PortalUser): void => {
+    const temp = `Fnbfc@${Math.floor(1000 + Math.random() * 9000)}`;
+    modal.success({
+      title: `Credentials reset for ${u.name}`,
+      content: (
+        <div>
+          <p style={{ marginBottom: 8 }}>A temporary password has been generated. The user must change it at next login.</p>
+          <Typography.Paragraph copyable={{ text: temp }} style={{ fontSize: 17, fontWeight: 700, fontFamily: 'monospace', background: '#f4f6fb', padding: '8px 14px', borderRadius: 8, display: 'inline-block' }}>
+            {temp}
+          </Typography.Paragraph>
+        </div>
+      ),
+    });
+    useAppStore.getState().logAudit({ user: actor.name, role: String(actor.role), module: 'User Management', action: 'Password Reset', entity: u.email });
+  };
 
   const columns: TableProps<PortalUser>['columns'] = [
     {

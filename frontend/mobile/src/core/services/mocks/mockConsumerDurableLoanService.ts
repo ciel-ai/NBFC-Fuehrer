@@ -2,10 +2,13 @@ import { mockDelay } from '../../api/api';
 import { calculateEMI } from '@/src/core/utils/formatters';
 import type { EMISchedule, Loan } from '@/src/entities/loan';
 import {
-  CDL_ANNUAL_INTEREST_RATE,
-  CDL_CIBIL_APPROVE,
-  CDL_CIBIL_REJECT,
-  CDL_FOIR_LIMIT,
+  ageFromDob,
+  cdlAutoDebitLabel,
+  cdlCalculateFoir,
+  evaluateCdlApplication,
+  CDL_DEFAULT_AUTO_DEBIT_DATE,
+  CDL_DEFAULT_INTEREST_RATE,
+  CDL_FOIR_MAX,
   CDL_FOIR_REJECT,
 } from '@/src/entities/consumerDurableLoan';
 import type {
@@ -36,11 +39,15 @@ import {
 
 const ref = (prefix: string) => `${prefix}-${Date.now().toString().slice(-8)}`;
 
+/**
+ * Stand-in bureau score. Bands are chosen to exercise all four 4.2 outcomes in
+ * the demo: auto-approve (≥750), manual review (700–749) and reject (<700).
+ */
 function mockCibilFor(monthlyIncome: number): number {
-  if (monthlyIncome >= 60000) return 780;
-  if (monthlyIncome >= 40000) return 730;
-  if (monthlyIncome >= 28000) return 690;
-  return 630;
+  if (monthlyIncome >= 60000) return 780; // auto approve
+  if (monthlyIncome >= 40000) return 762; // auto approve
+  if (monthlyIncome >= 28000) return 720; // manual review
+  return 668;                             // reject
 }
 
 export const mockConsumerDurableLoanService: IConsumerDurableLoanService = {
@@ -53,7 +60,7 @@ export const mockConsumerDurableLoanService: IConsumerDurableLoanService = {
         amount: input.amount,
         tenure: input.tenure,
         emi: input.emi,
-        interestRate: CDL_ANNUAL_INTEREST_RATE,
+        interestRate: input.interestRate ?? CDL_DEFAULT_INTEREST_RATE,
       },
       1200,
     );
@@ -95,21 +102,21 @@ export const mockConsumerDurableLoanService: IConsumerDurableLoanService = {
   },
 
   calculateFOIR(input: CdlFoirInput): number {
-    if (input.monthlyIncome <= 0) return 0;
-    const ratio = ((input.existingObligations + input.proposedEmi) / input.monthlyIncome) * 100;
-    return Math.round(ratio * 10) / 10;
+    return cdlCalculateFoir(input);
   },
 
   async runCreditAssessment(applicationId, input): Promise<CdlCreditAssessment> {
     const monthlyIncome = input.monthlyIncome || 0;
-    const existingObligations = Math.round(monthlyIncome * 0.15);
-    const foir = this.calculateFOIR({
+    // Prefer the obligations the agent captured; fall back to a 15% estimate.
+    const existingObligations =
+      input.existingObligations ?? Math.round(monthlyIncome * 0.15);
+    const foir = cdlCalculateFoir({
       monthlyIncome,
       existingObligations,
       proposedEmi: input.proposedEmi,
     });
     const foirStatus: CdlCreditAssessment['foirStatus'] =
-      foir > CDL_FOIR_REJECT ? 'failed' : foir > CDL_FOIR_LIMIT ? 'flagged' : 'passed';
+      foir > CDL_FOIR_REJECT ? 'failed' : foir > CDL_FOIR_MAX ? 'flagged' : 'passed';
 
     return mockDelay(
       {
@@ -122,38 +129,37 @@ export const mockConsumerDurableLoanService: IConsumerDurableLoanService = {
         existingObligations,
         proposedEmi: input.proposedEmi,
         foir,
-        foirLimit: CDL_FOIR_LIMIT,
+        foirLimit: CDL_FOIR_MAX,
         foirStatus,
+        age: input.dob ? ageFromDob(input.dob) : undefined,
+        loanAmount: input.loanAmount,
       },
       1700,
     );
   },
 
   async getCreditDecision(applicationId, assessment): Promise<CdlCreditDecision> {
-    const { cibilScore, foir } = assessment;
-    let decision: CdlCreditDecision['decision'];
-    let reason: string;
-
-    if (cibilScore < CDL_CIBIL_REJECT || foir > CDL_FOIR_REJECT) {
-      decision = 'rejected';
-      reason = `Declined: CIBIL ${cibilScore} / FOIR ${foir}% breach the minimum risk thresholds.`;
-    } else if (cibilScore >= CDL_CIBIL_APPROVE && foir <= CDL_FOIR_LIMIT) {
-      decision = 'approved';
-      reason = `Auto-approved: CIBIL ${cibilScore} ≥ ${CDL_CIBIL_APPROVE} and FOIR ${foir}% ≤ ${CDL_FOIR_LIMIT}%.`;
-    } else {
-      decision = 'flagged';
-      reason = `Flagged for agent review: CIBIL ${cibilScore} / FOIR ${foir}% fall in the manual-review band.`;
-    }
+    // The full 4.1–4.4 matrix lives in the policy module.
+    const result = evaluateCdlApplication({
+      customerType: assessment.employmentType,
+      age: assessment.age,
+      monthlyIncome: assessment.monthlyIncome,
+      existingObligations: assessment.existingObligations,
+      proposedEmi: assessment.proposedEmi,
+      loanAmount: assessment.loanAmount ?? 0,
+      cibilScore: assessment.cibilScore,
+    });
 
     return mockDelay(
       {
         applicationId,
-        decision,
-        cibilScore,
-        foir,
-        approvedAmount: assessment.proposedEmi * 0, // overwritten by caller's amount
-        reason,
-        requiresAgentReview: decision === 'flagged',
+        decision: result.outcome,
+        cibilScore: result.cibilScore,
+        foir: result.foir,
+        approvedAmount: assessment.loanAmount ?? 0,
+        reason: result.summary,
+        reasons: result.reasons,
+        requiresAgentReview: result.outcome === 'flagged',
       },
       1400,
     );
@@ -174,7 +180,7 @@ export const mockConsumerDurableLoanService: IConsumerDurableLoanService = {
         amount: input.amount,
         tenure: input.tenure,
         emi: input.emi,
-        interestRate: CDL_ANNUAL_INTEREST_RATE,
+        interestRate: input.interestRate ?? CDL_DEFAULT_INTEREST_RATE,
       },
       1300,
     );
@@ -185,7 +191,7 @@ export const mockConsumerDurableLoanService: IConsumerDurableLoanService = {
       {
         mandateId: ref('RP-NACH'),
         status: 'completed',
-        debitDate: '5th of every month',
+        debitDate: cdlAutoDebitLabel(input.autoDebitDate ?? CDL_DEFAULT_AUTO_DEBIT_DATE),
         emi: input.emi,
         bankAccount: input.bankAccount,
       },
@@ -210,8 +216,17 @@ export const mockConsumerDurableLoanService: IConsumerDurableLoanService = {
 
   async activateLoan(input): Promise<Loan> {
     const disbursedAt = new Date();
-    const schedule = generateCdlSchedule(input.loanAccountId, input.amount, input.tenure, disbursedAt);
-    const emi = calculateEMI(input.amount, CDL_ANNUAL_INTEREST_RATE, input.tenure);
+    const rate = input.interestRate ?? CDL_DEFAULT_INTEREST_RATE;
+    const debitDate = input.autoDebitDate ?? CDL_DEFAULT_AUTO_DEBIT_DATE;
+    const schedule = generateCdlSchedule(
+      input.loanAccountId,
+      input.amount,
+      input.tenure,
+      disbursedAt,
+      rate,
+      debitDate,
+    );
+    const emi = calculateEMI(input.amount, rate, input.tenure);
     const loan: Loan = {
       id: input.loanAccountId,
       type: 'consumer_durable',

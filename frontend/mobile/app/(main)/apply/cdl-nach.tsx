@@ -10,7 +10,12 @@ import { Header } from '@/src/shared/components/common/Header';
 import { Button } from '@/src/shared/components/common/Button';
 import { formatCurrency } from '@/src/core/utils/formatters';
 import { useServices } from '@/src/core/services/ServiceProvider';
-import type { CdlNachResult } from '@/src/entities/consumerDurableLoan';
+import {
+  cdlAutoDebitLabel,
+  CDL_AUTO_DEBIT_DATES,
+  CDL_DEFAULT_AUTO_DEBIT_DATE,
+  type CdlNachResult,
+} from '@/src/entities/consumerDurableLoan';
 
 export default function CdlNachScreen() {
   const params = useLocalSearchParams<Record<string, string>>();
@@ -21,6 +26,9 @@ export default function CdlNachScreen() {
   const [agreed, setAgreed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<CdlNachResult | null>(null);
+  const [debitDate, setDebitDate] = useState<number>(
+    params.debitDate ? Number(params.debitDate) : CDL_DEFAULT_AUTO_DEBIT_DATE,
+  );
 
   const emi = Number(params.emi ?? 0);
   const accountsMatch = accountNumber.length >= 9 && accountNumber === confirmAccount;
@@ -32,7 +40,7 @@ export default function CdlNachScreen() {
     try {
       const data = await consumerDurableLoanService.registerNachMandate(
         params.applicationId ?? 'cdl_mock_application',
-        { emi, bankAccount: `****${accountNumber.slice(-4)}` },
+        { emi, bankAccount: `****${accountNumber.slice(-4)}`, autoDebitDate: debitDate },
       );
       setResult(data);
     } catch {
@@ -95,10 +103,30 @@ export default function CdlNachScreen() {
                 />
               </View>
 
+              <View style={styles.field}>
+                <Text style={styles.label}>AUTO-DEBIT DATE</Text>
+                <View style={styles.debitRow}>
+                  {CDL_AUTO_DEBIT_DATES.map((d) => (
+                    <Pressable
+                      key={d}
+                      style={[styles.debitChip, debitDate === d && styles.debitChipActive]}
+                      onPress={() => setDebitDate(d)}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected: debitDate === d }}
+                      accessibilityLabel={cdlAutoDebitLabel(d)}
+                    >
+                      <Text style={[styles.debitChipText, debitDate === d && styles.debitChipTextActive]}>
+                        {d}th
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+
               <View style={styles.summaryCard}>
                 {[
                   ['Mandate amount', formatCurrency(emi)],
-                  ['Debit date', '5th of every month'],
+                  ['Debit date', cdlAutoDebitLabel(debitDate)],
                   ['Mandate validity', 'Till loan closure'],
                   ['Provider', 'Razorpay NACH'],
                 ].map(([label, value], index, arr) => (
@@ -116,7 +144,7 @@ export default function CdlNachScreen() {
                 <View style={[styles.checkbox, agreed && styles.checkboxChecked]}>
                   {agreed && <Ionicons name="checkmark" size={12} color={Colors.textWhite} />}
                 </View>
-                <Text style={styles.agreeText}>I authorize monthly auto-debit of {formatCurrency(emi)} on the 5th of every month.</Text>
+                <Text style={styles.agreeText}>I authorize monthly auto-debit of {formatCurrency(emi)} on the {cdlAutoDebitLabel(debitDate)}.</Text>
               </Pressable>
 
               <Button title="Register NACH Mandate" disabled={!canSubmit || loading} loading={loading} onPress={setupNach} />
@@ -170,6 +198,11 @@ const styles = StyleSheet.create({
   input: { minHeight: 50, borderRadius: BorderRadius.md, borderWidth: 1.5, borderColor: Colors.border, backgroundColor: Colors.background, paddingHorizontal: Spacing.md, color: Colors.textPrimary, fontFamily: FontFamily.medium, fontSize: FontSize.base },
   inputError: { borderColor: Colors.error },
   errorText: { ...Typography.tiny, color: Colors.error },
+  debitRow: { flexDirection: 'row', gap: Spacing.sm },
+  debitChip: { flex: 1, height: 44, borderRadius: BorderRadius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.background, borderWidth: 1.5, borderColor: Colors.border },
+  debitChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  debitChipText: { fontFamily: FontFamily.semiBold, fontSize: FontSize.sm, color: Colors.textSecondary },
+  debitChipTextActive: { color: Colors.textWhite },
   summaryCard: { backgroundColor: Colors.background, borderRadius: BorderRadius.lg, paddingHorizontal: Spacing.md, borderWidth: 1, borderColor: Colors.border, ...Shadow.small },
   row: { flexDirection: 'row', justifyContent: 'space-between', gap: Spacing.md, paddingVertical: Spacing.md },
   key: { ...Typography.body, color: Colors.textSecondary },

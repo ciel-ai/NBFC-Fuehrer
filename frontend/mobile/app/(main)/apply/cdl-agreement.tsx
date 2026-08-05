@@ -11,8 +11,13 @@ import { Button } from '@/src/shared/components/common/Button';
 import { OTPInput } from '@/src/shared/components/common/OTPInput';
 import { formatCurrency, formatTenure } from '@/src/core/utils/formatters';
 import { useServices } from '@/src/core/services/ServiceProvider';
-import { CDL_ANNUAL_INTEREST_RATE } from '@/src/entities/consumerDurableLoan';
-import type { CdlAgreementResult } from '@/src/entities/consumerDurableLoan';
+import {
+  cdlAutoDebitLabel,
+  cdlProcessingFee,
+  CDL_DEFAULT_AUTO_DEBIT_DATE,
+  CDL_DEFAULT_INTEREST_RATE,
+  type CdlAgreementResult,
+} from '@/src/entities/consumerDurableLoan';
 
 type Step = 'review' | 'otp' | 'signed';
 
@@ -29,6 +34,9 @@ export default function CdlAgreementScreen() {
   const amount = Number(params.loanAmount ?? 0);
   const tenure = Number(params.tenure ?? 12);
   const emi = Number(params.emi ?? 0);
+  const interestRate = params.interestRate ? Number(params.interestRate) : CDL_DEFAULT_INTEREST_RATE;
+  const autoDebitDate = params.debitDate ? Number(params.debitDate) : CDL_DEFAULT_AUTO_DEBIT_DATE;
+  const processingFee = params.processingFee ? Number(params.processingFee) : cdlProcessingFee(amount);
 
   const sign = async () => {
     if (otp !== '123456') {
@@ -40,7 +48,7 @@ export default function CdlAgreementScreen() {
     try {
       const data = await consumerDurableLoanService.generateAgreement(
         params.applicationId ?? 'cdl_mock_application',
-        { amount, tenure, emi },
+        { amount, tenure, emi, interestRate },
       );
       setAgreement(data);
       setStep('signed');
@@ -76,10 +84,11 @@ export default function CdlAgreementScreen() {
               {[
                 ['Product', params.productName ?? 'Consumer Durable'],
                 ['Loan amount', formatCurrency(amount)],
-                ['Interest', `${CDL_ANNUAL_INTEREST_RATE}% p.a. (reducing)`],
+                ['Interest', interestRate === 0 ? 'No-cost EMI (0%)' : `${interestRate}% p.a. (reducing)`],
+                ['Processing fee', processingFee > 0 ? formatCurrency(processingFee) : '—'],
                 ['Tenure', formatTenure(tenure)],
                 ['Monthly EMI', formatCurrency(emi)],
-                ['Auto-debit', '5th of every month'],
+                ['Auto-debit', cdlAutoDebitLabel(autoDebitDate)],
               ].map(([label, value], index, arr) => (
                 <View key={label}>
                   <View style={styles.row}>

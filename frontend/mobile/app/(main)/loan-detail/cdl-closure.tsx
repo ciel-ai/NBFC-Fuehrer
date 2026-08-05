@@ -11,7 +11,14 @@ import { Header } from '@/src/shared/components/common/Header';
 import { Button } from '@/src/shared/components/common/Button';
 import { LoadingSpinner } from '@/src/shared/components/common/LoadingSpinner';
 import { useServices } from '@/src/core/services/ServiceProvider';
-import type { CdlClosureResult } from '@/src/entities/consumerDurableLoan';
+import {
+  cdlForeclosureQuote,
+  CDL_FORECLOSURE_RATE,
+  CDL_GST_RATE,
+  type CdlClosureResult,
+} from '@/src/entities/consumerDurableLoan';
+
+const inr = (n: number) => `₹${n.toLocaleString('en-IN')}`;
 
 export default function CdlClosureScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
@@ -111,22 +118,42 @@ export default function CdlClosureScreen() {
     );
   }
 
-  // Pre-closure
+  // Pre-closure — foreclosure charge is 5% of principal outstanding + GST (spec 8).
+  const quote = cdlForeclosureQuote(outstanding ?? 0);
+
   return (
     <SafeAreaView style={styles.container}>
       <Header title="Loan Closure" showBack />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.amountCard}>
-          <Text style={styles.amountLabel}>Outstanding to close</Text>
+          <Text style={styles.amountLabel}>Total foreclosure amount</Text>
           <Text style={styles.amount}>
-            {outstanding != null ? `₹${outstanding.toLocaleString('en-IN')}` : '—'}
+            {outstanding != null ? inr(quote.totalPayable) : '—'}
           </Text>
-          <Text style={styles.amountSub}>Pay the final amount to close this loan.</Text>
+          <Text style={styles.amountSub}>Pay this amount to foreclose and close the loan.</Text>
+        </View>
+
+        {/* Foreclosure charge breakdown */}
+        <View style={styles.card}>
+          {[
+            ['Principal outstanding', inr(quote.principalOutstanding)],
+            [`Foreclosure charge (${Math.round(CDL_FORECLOSURE_RATE * 100)}%)`, inr(quote.foreclosureCharge)],
+            [`GST (${Math.round(CDL_GST_RATE * 100)}%)`, inr(quote.gst)],
+            ['Total payable', inr(quote.totalPayable)],
+          ].map(([label, value], index, arr) => (
+            <View key={label}>
+              <View style={styles.row}>
+                <Text style={styles.key}>{label}</Text>
+                <Text style={[styles.value, index === arr.length - 1 && styles.valueEmphasis]}>{value}</Text>
+              </View>
+              {index < arr.length - 1 && <View style={styles.divider} />}
+            </View>
+          ))}
         </View>
 
         <View style={styles.stepsCard}>
           {[
-            'Collect the final EMI / outstanding',
+            'Collect the outstanding plus foreclosure charge + GST',
             'Mark the loan account closed',
             'Generate the NOC and store it in AWS S3',
             'Cancel the NACH mandate via Razorpay',
@@ -176,6 +203,8 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', justifyContent: 'space-between', gap: Spacing.md, paddingVertical: Spacing.md },
   key: { ...Typography.body, color: Colors.textSecondary },
   value: { fontFamily: FontFamily.semiBold, fontSize: FontSize.sm, color: Colors.textPrimary, textAlign: 'right', flex: 1 },
+  valueEmphasis: { color: Colors.primary, fontSize: FontSize.base },
+  divider: { height: 1, backgroundColor: Colors.border },
   agreeRow: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm },
   checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center' },
   checkboxChecked: { backgroundColor: Colors.primary, borderColor: Colors.primary },

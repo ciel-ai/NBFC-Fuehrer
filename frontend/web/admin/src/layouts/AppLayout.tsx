@@ -140,6 +140,7 @@ const LayoutInner: React.FC<{ user: SessionUser }> = ({ user }) => {
     }
     if (canAccess(user.role, 'agents')) items.push({ key: '/agents', icon: <UsergroupAddOutlined />, label: 'Agents' });
     if (canAccess(user.role, 'branches')) items.push({ key: '/branches', icon: <ApartmentOutlined />, label: 'Branches' });
+    if (canAccess(user.role, 'approvals')) items.push({ key: '/approvals', icon: <AuditOutlined />, label: 'Approvals' });
     if (canAccess(user.role, 'users')) items.push({ key: '/users', icon: <TeamOutlined />, label: 'User Management' });
     if (canAccess(user.role, 'permissions')) items.push({ key: '/permissions', icon: <SafetyCertificateOutlined />, label: 'Roles & Permissions' });
     if (canAccess(user.role, 'audit')) items.push({ key: '/audit', icon: <AuditOutlined />, label: 'Audit Logs' });
