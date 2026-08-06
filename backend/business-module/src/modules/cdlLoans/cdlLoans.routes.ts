@@ -24,7 +24,11 @@ router.post('/applications/:id/credit-assessment', requireAuth(), allowRoles(C),
 router.post('/applications/:id/credit-decision', requireAuth(), allowRoles(C), cdlLoansController.getCreditDecision);
 router.post('/applications/:id/agreement', requireAuth(), allowRoles(C), stubGuard(), cdlLoansController.generateAgreement);
 router.post('/applications/:id/nach', requireAuth(), allowRoles(C), cdlLoansController.registerNachMandate);
-router.post('/applications/:id/disburse', requireAuth(), allowRoles(F, A), stubGuard(), cdlLoansController.disburseToMerchant);
+// disburseToMerchant is real, wired code (real payment provider call, real
+// disbursements row) — stubGuard() was blocking it unconditionally (see
+// env.ts ENABLE_UNWIRED_LOAN_STUBS fix), which made this endpoint
+// unreachable in every environment, not just production.
+router.post('/applications/:id/disburse', requireAuth(), allowRoles(F, A), cdlLoansController.disburseToMerchant);
 router.get('/loans/:id/emi-schedule', requireAuth(), allowRoles(C), cdlLoansController.getEmiSchedule);
 router.post('/loans/:id/payments', requireAuth(), allowRoles(C), cdlLoansController.processManualPayment);
 router.post('/loans/:id/payment-failure', requireAuth(), allowRoles(C), cdlLoansController.handlePaymentFailure);
