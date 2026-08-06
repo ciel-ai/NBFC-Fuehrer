@@ -190,9 +190,12 @@ export default function KYCFormScreen() {
     if (nameErr || dobErr || phoneErr || emailErr || genderErr) return;
 
     router.push({
-      pathname: '/(main)/apply/pan-verify',
+      pathname: '/(main)/apply/address-employment',
       // Preserve everything carried in (interestRate, processingFee,
       // productValue, employmentType, …) and add the personal details.
+      // The shared CAM capture screen collects address/employment/co-applicant
+      // /nominee, then the shared KYC chain runs; `nextPath` sends the
+      // post-selfie step straight to cdl-kyc-verification (skips loan-step-2).
       params: {
         ...params,
         fullName: fullName.trim(),
@@ -200,6 +203,7 @@ export default function KYCFormScreen() {
         phone,
         email: email.trim(),
         gender: gender ?? '',
+        nextPath: 'cdl-kyc-verification',
       },
     });
   };

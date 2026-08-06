@@ -59,6 +59,46 @@ export const requiredAsset = (label = 'a file') =>
 export const requiredDate = (label = 'a date') =>
   z.string().min(1, `Please pick ${label}`);
 
+function ageFromIso(iso: string): number | null {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  const today = new Date();
+  let age = today.getFullYear() - d.getFullYear();
+  const monthDiff = today.getMonth() - d.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < d.getDate())) age -= 1;
+  return age;
+}
+
+/** Date of birth (ISO string from the date field) — applicant must be an adult. */
+export const dobAdultSchema = z
+  .string()
+  .min(1, 'Please pick a date of birth')
+  .refine((v) => {
+    const age = ageFromIso(v);
+    return age !== null && age >= 18;
+  }, 'Applicant must be at least 18 years old')
+  .refine((v) => {
+    const age = ageFromIso(v);
+    return age === null || age <= 100;
+  }, 'Date of birth seems incorrect — please check');
+
+/**
+ * Format rules per KYC ID type — for steps where one ID-number field serves a
+ * type selector. Returns an error message, or null when the number is valid.
+ */
+const ID_NUMBER_RULES: Record<string, { pattern: RegExp; message: string }> = {
+  pan: { pattern: /^[A-Z]{5}[0-9]{4}[A-Z]$/, message: 'Invalid PAN (e.g. ABCDE1234F)' },
+  aadhaar: { pattern: /^\d{12}$/, message: 'Aadhaar must be 12 digits' },
+  passport: { pattern: /^[A-Z][0-9]{7}$/, message: 'Invalid passport number (e.g. A1234567)' },
+  voter: { pattern: /^[A-Z]{3}[0-9]{7}$/, message: 'Invalid Voter ID (e.g. ABC1234567)' },
+};
+
+export const validateIdNumber = (idType: string, idNumber: string): string | null => {
+  const rule = ID_NUMBER_RULES[idType];
+  if (!rule) return null;
+  return rule.pattern.test(idNumber.trim().toUpperCase()) ? null : rule.message;
+};
+
 /** Positive currency amount, coerced from the text input. */
 export const amountSchema = (min = 1, message = 'Enter a valid amount') =>
   z.coerce.number({ invalid_type_error: message }).min(min, message);

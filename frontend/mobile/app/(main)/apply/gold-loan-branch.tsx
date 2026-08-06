@@ -37,7 +37,10 @@ const TIME_SLOTS = [
   { key: 'evening', label: 'Evening', time: '3:00 PM - 5:30 PM', icon: 'moon' as const },
 ];
 
+import { usePersistApplyStep } from '@/src/features/apply/useApplyDraft';
+
 export default function GoldLoanBranchScreen() {
+  usePersistApplyStep('gold');
   const params = useLocalSearchParams<Record<string, string>>();
   const { goldLoanService } = useServices();
   const dates = useMemo(() => getNext7Days(), []);

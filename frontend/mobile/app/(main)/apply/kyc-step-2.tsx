@@ -225,9 +225,9 @@ export default function KYCStep2Screen() {
             </View>
 
             <Button
-              title={params.nextPath === 'gold-loan-compliance' ? 'Continue to Compliance' : 'Continue to Address & Employment'}
+              title={params.nextPath === 'gold-loan-compliance' ? 'Continue to Compliance' : 'Continue'}
               onPress={() => router.push({
-                pathname: `/(main)/apply/${params.nextPath ?? 'loan-step-2'}` as any,
+                pathname: `/(main)/apply/${params.nextPath ?? 'cdl-kyc-verification'}` as any,
                 params,
               })}
             />

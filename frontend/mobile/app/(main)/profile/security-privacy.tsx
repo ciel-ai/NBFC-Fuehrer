@@ -19,6 +19,7 @@ import { Spacing, BorderRadius } from '@/src/core/theme/spacing';
 import { scale, verticalScale } from '@/src/core/utils/responsive';
 import { Header } from '@/src/shared/components/common/Header';
 import { resetAllStores } from '@/src/store/storeResetters';
+import { useServices } from '@/src/core/services/ServiceProvider';
 
 const SECURITY_SCORE = 75;
 
@@ -86,6 +87,8 @@ export default function SecurityPrivacyScreen() {
   const [marketingComms, setMarketingComms] = useState(true);
   const [analyticsShare, setAnalyticsShare] = useState(true);
   const [showCloseModal, setShowCloseModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const { profileService } = useServices();
 
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -125,13 +128,36 @@ export default function SecurityPrivacyScreen() {
 
   const onCloseAccount = () => setShowCloseModal(true);
 
-  const confirmCloseAccount = () => {
-    setShowCloseModal(false);
-    Alert.alert(
-      'Account closure requested',
-      'Your account closure request has been submitted. We will reach out within 7 business days.',
-      [{ text: 'OK', onPress: () => router.back() }],
-    );
+  const confirmCloseAccount = async () => {
+    if (isDeleting) return;
+    setIsDeleting(true);
+    try {
+      const result = await profileService.requestAccountDeletion();
+      setShowCloseModal(false);
+      // Deletion is server-recorded; end the local session so the device
+      // holds no credentials for an account pending deletion.
+      Alert.alert(
+        'Account deletion requested',
+        `${result.message} You will now be signed out on this device.`,
+        [
+          {
+            text: 'OK',
+            onPress: async () => {
+              await resetAllStores();
+              router.replace('/(auth)/landing');
+            },
+          },
+        ],
+      );
+    } catch {
+      setShowCloseModal(false);
+      Alert.alert(
+        'Could not submit the request',
+        'The deletion request did not reach our servers — your account is unchanged. Please try again or email us at the address in Help & Support.',
+      );
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   return (
@@ -259,12 +285,16 @@ export default function SecurityPrivacyScreen() {
               <Text style={styles.modalBtnCancelText}>Keep account</Text>
             </Pressable>
             <Pressable
-              style={[styles.modalBtn, styles.modalBtnConfirm]}
-              onPress={confirmCloseAccount}
+              style={[styles.modalBtn, styles.modalBtnConfirm, isDeleting && { opacity: 0.6 }]}
+              onPress={() => { void confirmCloseAccount(); }}
+              disabled={isDeleting}
               accessibilityRole="button"
+              accessibilityState={{ disabled: isDeleting, busy: isDeleting }}
               accessibilityLabel="Confirm account closure"
             >
-              <Text style={styles.modalBtnConfirmText}>Close account</Text>
+              <Text style={styles.modalBtnConfirmText}>
+                {isDeleting ? 'Submitting…' : 'Close account'}
+              </Text>
             </Pressable>
           </View>
         </View>

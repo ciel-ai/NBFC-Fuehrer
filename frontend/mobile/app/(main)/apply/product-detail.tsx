@@ -17,6 +17,7 @@ import { Typography, FontFamily, FontSize } from '@/src/core/theme/typography';
 import { Spacing, BorderRadius, Shadow } from '@/src/core/theme/spacing';
 import { Header } from '@/src/shared/components/common/Header';
 import { Button } from '@/src/shared/components/common/Button';
+import { useLoanConsent } from '@/src/features/loans/components/LoanConsentGate';
 
 import { calculateEMI } from '@/src/core/utils/formatters';
 import {
@@ -38,6 +39,7 @@ function formatPrice(n: number) {
 }
 
 export default function ProductDetailScreen() {
+  const { ensureConsent, consentGate } = useLoanConsent();
   const { productName, brand, mrp, loanAmount, iconBg, iconColor, icon } =
     useLocalSearchParams<{
       productId: string;
@@ -276,23 +278,26 @@ export default function ProductDetailScreen() {
         <Button
           title="Check Eligibility"
           onPress={() =>
-            router.push({
-              pathname: '/(main)/apply/kyc-form',
-              params: {
-                productName: productName ?? '',
-                productValue: mrpVal.toString(),
-                loanAmount: loanValue.toString(),
-                tenure: selectedTenure.toString(),
-                emi: emi.toString(),
-                interestRate: selectedRate.toString(),
-                employmentType: customerType,
-                processingFee: processingFee.toString(),
-              },
-            })
+            ensureConsent(() =>
+              router.push({
+                pathname: '/(main)/apply/kyc-form',
+                params: {
+                  productName: productName ?? '',
+                  productValue: mrpVal.toString(),
+                  loanAmount: loanValue.toString(),
+                  tenure: selectedTenure.toString(),
+                  emi: emi.toString(),
+                  interestRate: selectedRate.toString(),
+                  employmentType: customerType,
+                  processingFee: processingFee.toString(),
+                },
+              }),
+            )
           }
           disabled={loanValue < CDL_MIN_LOAN_AMOUNT}
         />
       </View>
+      {consentGate}
     </SafeAreaView>
   );
 }

@@ -23,6 +23,7 @@ import { useKycStore } from '@/src/store/kycStore';
 import { KycStatus } from '@/src/entities/kyc';
 import type { LoanStatus } from '@/src/entities/loan';
 import { SUPPORT_PHONE } from '@/src/core/utils/constants';
+import { useCustomerApplyDraft } from '@/src/features/apply/useApplyDraft';
 
 const ANDROID_STATUS_PAD =
   Platform.OS === 'android' ? RNStatusBar.currentHeight ?? 24 : 0;
@@ -267,6 +268,43 @@ function Stepper({ steps }: { steps: Step[] }) {
   );
 }
 
+/** "Resume application" card — shown only when a killed flow left a draft. */
+function ResumeCard() {
+  const { draft, resume, discard } = useCustomerApplyDraft();
+  if (!draft) return null;
+  return (
+    <View style={styles.section}>
+      <View style={styles.resumeCard}>
+        <View style={styles.resumeIcon}>
+          <Ionicons name="hourglass-outline" size={scale(22)} color={Colors.primary} />
+        </View>
+        <View style={styles.flex1}>
+          <Text style={styles.resumeTitle}>Resume your application</Text>
+          <Text style={styles.resumeSub} numberOfLines={1}>{draft.label}</Text>
+        </View>
+        <View style={styles.resumeActions}>
+          <Pressable
+            onPress={resume}
+            style={({ pressed }) => [styles.resumeBtn, pressed && styles.pressed]}
+            accessibilityRole="button"
+            accessibilityLabel="Resume application"
+          >
+            <Text style={styles.resumeBtnText}>Resume</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => void discard()}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Discard saved application"
+          >
+            <Ionicons name="close" size={scale(18)} color={Colors.textDisabled} />
+          </Pressable>
+        </View>
+      </View>
+    </View>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Screen
 // ---------------------------------------------------------------------------
@@ -379,6 +417,9 @@ export default function HomeScreen() {
             </View>
           </View>
         </View>
+
+        {/* Resume in-flight application (only renders when a draft exists) */}
+        <ResumeCard />
 
         {/* Quick Actions */}
         <View style={styles.section}>
@@ -668,6 +709,50 @@ const styles = StyleSheet.create({
   coinText: {
     fontFamily: FontFamily.bold,
     fontSize: scale(13),
+    color: Colors.textWhite,
+  },
+
+  // Resume application card
+  resumeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scale(12),
+    marginHorizontal: scale(20),
+    backgroundColor: Colors.primaryLight,
+    borderRadius: CARD_RADIUS,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+    padding: scale(14),
+  },
+  resumeIcon: {
+    width: scale(44),
+    height: scale(44),
+    borderRadius: scale(13),
+    backgroundColor: Colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  resumeTitle: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.base,
+    color: Colors.textPrimary,
+  },
+  resumeSub: {
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.sm,
+    color: Colors.textSecondary,
+    marginTop: 1,
+  },
+  resumeActions: { flexDirection: 'row', alignItems: 'center', gap: scale(8) },
+  resumeBtn: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: scale(14),
+    paddingVertical: verticalScale(8),
+    borderRadius: scale(10),
+  },
+  resumeBtnText: {
+    fontFamily: FontFamily.semiBold,
+    fontSize: scale(12),
     color: Colors.textWhite,
   },
 

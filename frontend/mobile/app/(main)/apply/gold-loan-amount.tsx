@@ -31,8 +31,12 @@ function calcEMI(principal: number, months: number): number {
   return (principal * r * Math.pow(1 + r, months)) / (Math.pow(1 + r, months) - 1);
 }
 
+import { usePersistApplyStep } from '@/src/features/apply/useApplyDraft';
+
 export default function GoldLoanAmountScreen() {
-  const { maxLoan, goldValue, goldType, karat, weight } = useLocalSearchParams<{
+  usePersistApplyStep('gold');
+  const { applicationId, maxLoan, goldValue, goldType, karat, weight } = useLocalSearchParams<{
+    applicationId: string;
     maxLoan: string;
     goldValue: string;
     goldType: string;
@@ -75,6 +79,7 @@ export default function GoldLoanAmountScreen() {
     router.push({
       pathname: '/(main)/apply/gold-loan-kyc',
       params: {
+        applicationId: applicationId ?? '',
         loanAmount: clampedLoan.toString(),
         tenure: tenure.toString(),
         repaymentType,

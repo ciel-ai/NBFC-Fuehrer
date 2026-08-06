@@ -12,11 +12,16 @@ import { Button } from '@/src/shared/components/common/Button';
 import { LoadingSpinner } from '@/src/shared/components/common/LoadingSpinner';
 import { formatCurrency } from '@/src/core/utils/formatters';
 import { useServices } from '@/src/core/services/ServiceProvider';
+import { useIdempotencyKey } from '@/src/core/api/idempotency';
 import type { CdlDisbursalResult } from '@/src/entities/consumerDurableLoan';
 
+import { useClearApplyDraft } from '@/src/features/apply/useApplyDraft';
+
 export default function CdlDisbursalScreen() {
+  useClearApplyDraft('cdl');
   const params = useLocalSearchParams<Record<string, string>>();
   const { consumerDurableLoanService } = useServices();
+  const { getKey } = useIdempotencyKey();
   const queryClient = useQueryClient();
   const [status, setStatus] = useState<CdlDisbursalResult | null>(null);
   const [loading, setLoading] = useState(true);
@@ -36,6 +41,7 @@ export default function CdlDisbursalScreen() {
         const disbursal = await consumerDurableLoanService.disburseToMerchant(
           params.applicationId ?? 'cdl_mock_application',
           { amount, merchantName },
+          getKey(),
         );
         // Activate the loan: creates the account + 12-month EMI schedule.
         await consumerDurableLoanService.activateLoan({

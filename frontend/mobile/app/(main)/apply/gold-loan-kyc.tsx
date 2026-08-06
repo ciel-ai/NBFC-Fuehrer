@@ -15,10 +15,14 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/src/core/theme/colors';
 import { FontFamily, FontSize } from '@/src/core/theme/typography';
-import { Spacing, BorderRadius, Shadow } from '@/src/core/theme/spacing';
+import { Spacing, BorderRadius } from '@/src/core/theme/spacing';
 import { Header } from '@/src/shared/components/common/Header';
 import { Button } from '@/src/shared/components/common/Button';
 import { NAME_REGEX } from '@/src/core/utils/validators';
+import { useServices } from '@/src/core/services/ServiceProvider';
+import { resolveGoldApplicationId } from '@/src/core/utils/goldApplication';
+import { useDocumentSlots } from '@/src/features/documents/useDocumentSlots';
+import { DocumentUploadField } from '@/src/features/documents/DocumentUploadField';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -157,121 +161,14 @@ const fi = StyleSheet.create({
   },
 });
 
-// ─── UploadField — same CDL-style component ───────────────────────────────────
-
-function UploadField({
-  label,
-  subtitle,
-  required,
-  uploaded,
-  onPress,
-}: {
-  label: string;
-  subtitle?: string;
-  required?: boolean;
-  uploaded: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      style={[uf.card, uploaded && uf.cardUploaded]}
-      onPress={onPress}
-      android_ripple={{ color: `${Colors.primary}20`, borderless: false }}
-      accessibilityRole="button"
-      accessibilityLabel={`${label}${required ? ', required' : ''}. ${uploaded ? 'Uploaded' : 'Tap to upload or capture'}`}
-    >
-      <View style={[uf.iconBox, uploaded && uf.iconBoxUploaded]}>
-        <Ionicons
-          name={uploaded ? 'checkmark-circle' : 'cloud-upload'}
-          size={22}
-          color={uploaded ? Colors.success : Colors.primary}
-        />
-      </View>
-      <View style={uf.info}>
-        <Text style={uf.label}>
-          {label}
-          {required && <Text style={uf.star}> *</Text>}
-        </Text>
-        {subtitle ? (
-          <Text style={uf.subtitle}>{subtitle}</Text>
-        ) : null}
-        <Text style={[uf.status, uploaded && uf.statusDone]}>
-          {uploaded ? 'Uploaded ✓' : 'Tap to upload or capture'}
-        </Text>
-      </View>
-      <View style={uf.actions}>
-        <Pressable
-          style={uf.actionBtn}
-          onPress={onPress}
-          android_ripple={{ color: `${Colors.primary}20`, borderless: true }}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          accessibilityLabel="Open camera"
-        >
-          <Ionicons name="camera" size={16} color={Colors.primary} />
-        </Pressable>
-        <Pressable
-          style={uf.actionBtn}
-          onPress={onPress}
-          android_ripple={{ color: `${Colors.primary}20`, borderless: true }}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          accessibilityLabel="Attach file"
-        >
-          <Ionicons name="attach" size={16} color={Colors.primary} />
-        </Pressable>
-      </View>
-    </Pressable>
-  );
-}
-
-const uf = StyleSheet.create({
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.md,
-    marginBottom: Spacing.md,
-    backgroundColor: Colors.background,
-    gap: Spacing.md,
-    ...Shadow.small,
-  },
-  cardUploaded: { borderColor: Colors.success, backgroundColor: Colors.successLight },
-  iconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: 10,
-    backgroundColor: Colors.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  iconBoxUploaded: { backgroundColor: Colors.successLight },
-  info: { flex: 1 },
-  label: { fontFamily: FontFamily.semiBold, fontSize: 13, color: Colors.textPrimary, marginBottom: 2 },
-  star: { color: Colors.error },
-  subtitle: {
-    fontFamily: FontFamily.regular,
-    fontSize: 11,
-    color: Colors.textDisabled,
-    marginBottom: 2,
-  },
-  status: { fontFamily: FontFamily.regular, fontSize: 11, color: Colors.textDisabled },
-  statusDone: { color: Colors.success },
-  actions: { flexDirection: 'row', gap: 6 },
-  actionBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: Colors.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
-
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
+import { usePersistApplyStep } from '@/src/features/apply/useApplyDraft';
+
 export default function GoldLoanKYCScreen() {
+  usePersistApplyStep('gold');
   const params = useLocalSearchParams<{
+    applicationId: string;
     loanAmount: string;
     tenure: string;
     repaymentType: string;
@@ -294,20 +191,31 @@ export default function GoldLoanKYCScreen() {
   const [emailError, setEmailError]   = useState('');
   const [genderError, setGenderError] = useState('');
 
-  // ── Upload state — gold-specific docs only ──
+  // ── Upload state — gold-specific docs only. ──
   // Aadhaar and PAN are handled by the shared pan-verify / aadhaar-otp screens.
-  // Selfie is captured in kyc-step-2.
-  const [docs, setDocs] = useState({
-    gold_photo_front:  false,   // required — clear front view of gold item(s)
-    gold_photo_detail: false,   // required — hallmark / weight tag close-up
-    bank_proof:        false,   // required — passbook first page or 3-month statement
-    address_proof:     false,   // optional — only if address differs from Aadhaar
-  });
+  // Selfie is captured in kyc-step-2. Each captured file is uploaded against the
+  // application id created at the estimator, so the flow works in mock and the
+  // real upload endpoint is exercised in live mode.
+  const { goldLoanService } = useServices();
+  const applicationId = resolveGoldApplicationId(params.applicationId) ?? '';
+  const REQUIRED_DOCS = ['gold_photo_front', 'gold_photo_detail', 'bank_proof'] as const;
+  const DOC_KEYS = [...REQUIRED_DOCS, 'address_proof'] as const;
+  const { slots, capture, retry, remove, allUploaded } = useDocumentSlots(
+    DOC_KEYS,
+    applicationId,
+    goldLoanService.uploadDocument,
+  );
 
-  const pickDoc = (key: keyof typeof docs) => {
+  const pickDoc = (key: string) => {
+    const slot = slots[key];
+    if (slot?.state === 'failed') {
+      // A failed upload keeps its file — retry rather than re-pick.
+      retry(key);
+      return;
+    }
     Alert.alert('Upload Document', 'Choose method', [
-      { text: 'Camera', onPress: () => setDocs((p) => ({ ...p, [key]: true })) },
-      { text: 'Gallery', onPress: () => setDocs((p) => ({ ...p, [key]: true })) },
+      { text: 'Camera', onPress: () => { void capture(key, 'camera'); } },
+      { text: 'Gallery', onPress: () => { void capture(key, 'library'); } },
       { text: 'Cancel', style: 'cancel' },
     ]);
   };
@@ -325,7 +233,7 @@ export default function GoldLoanKYCScreen() {
   };
 
   // ── Validation ──
-  const requiredDocsUploaded = docs.gold_photo_front && docs.gold_photo_detail && docs.bank_proof;
+  const requiredDocsUploaded = allUploaded(REQUIRED_DOCS);
 
   const handleContinue = () => {
     const nameErr  = validateName(fullName);
@@ -345,15 +253,15 @@ export default function GoldLoanKYCScreen() {
     if (!requiredDocsUploaded) {
       Alert.alert(
         'Required Documents Missing',
-        'Please upload both gold item photos and a bank proof document before continuing.',
+        'Please upload both gold item photos and a bank proof document (and wait for each upload to finish) before continuing.',
       );
       return;
     }
 
-    // Route into the shared CDL KYC flow (PAN → Aadhaar OTP → Selfie).
-    // nextPath tells kyc-step-2 to route to gold-loan-ownership instead of loan-step-2.
+    // Address & Employment first (CAM capture), then the shared KYC flow
+    // (PAN → Aadhaar OTP → Selfie). nextPath routes kyc-step-2 onward.
     router.push({
-      pathname: '/(main)/apply/pan-verify',
+      pathname: '/(main)/apply/address-employment',
       params: {
         ...params,
         fullName: fullName.trim(),
@@ -361,6 +269,10 @@ export default function GoldLoanKYCScreen() {
         phone,
         email: email.trim(),
         gender: gender ?? '',
+        goldPhotoFrontUri: slots.gold_photo_front?.uri ?? '',
+        goldPhotoDetailUri: slots.gold_photo_detail?.uri ?? '',
+        bankProofUri: slots.bank_proof?.uri ?? '',
+        addressProofUri: slots.address_proof?.uri ?? '',
         nextPath: 'gold-loan-compliance',
       },
     });
@@ -485,32 +397,36 @@ export default function GoldLoanKYCScreen() {
             Upload clear photos of your gold items and a bank proof. All four corners must be visible in document photos.
           </Text>
 
-          <UploadField
+          <DocumentUploadField
             label="Gold Item — Front View"
             subtitle="Clear photo of all gold pieces · JPG or PNG"
             required
-            uploaded={docs.gold_photo_front}
+            state={slots.gold_photo_front?.state ?? 'empty'}
             onPress={() => pickDoc('gold_photo_front')}
+            onRemove={() => remove('gold_photo_front')}
           />
-          <UploadField
+          <DocumentUploadField
             label="Gold Item — Hallmark / Weight Tag"
             subtitle="Close-up of hallmark stamp or weight tag"
             required
-            uploaded={docs.gold_photo_detail}
+            state={slots.gold_photo_detail?.state ?? 'empty'}
             onPress={() => pickDoc('gold_photo_detail')}
+            onRemove={() => remove('gold_photo_detail')}
           />
-          <UploadField
+          <DocumentUploadField
             label="Bank Proof"
             subtitle="Passbook first page or last 3-month statement · PDF or image"
             required
-            uploaded={docs.bank_proof}
+            state={slots.bank_proof?.state ?? 'empty'}
             onPress={() => pickDoc('bank_proof')}
+            onRemove={() => remove('bank_proof')}
           />
-          <UploadField
+          <DocumentUploadField
             label="Address Proof"
             subtitle="Only if address differs from Aadhaar — utility bill, rent agreement, etc."
-            uploaded={docs.address_proof}
+            state={slots.address_proof?.state ?? 'empty'}
             onPress={() => pickDoc('address_proof')}
+            onRemove={() => remove('address_proof')}
           />
 
           <View style={styles.secureNote}>
@@ -530,7 +446,7 @@ export default function GoldLoanKYCScreen() {
       </KeyboardAvoidingView>
 
       <View style={styles.footer}>
-        <Button title="Continue to PAN Verification" onPress={handleContinue} />
+        <Button title="Continue to Address & Employment" onPress={handleContinue} />
       </View>
     </SafeAreaView>
   );

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   ScrollView,
   Pressable,
   Alert,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,50 +15,75 @@ import { FontFamily, FontSize, Typography } from '@/src/core/theme/typography';
 import { Spacing, BorderRadius } from '@/src/core/theme/spacing';
 import { scale, verticalScale } from '@/src/core/utils/responsive';
 import { Header } from '@/src/shared/components/common/Header';
+import { LoadingSpinner } from '@/src/shared/components/common/LoadingSpinner';
+import { ErrorView } from '@/src/shared/components/common/ErrorView';
+import { EmptyState } from '@/src/shared/components/common/EmptyState';
 import { dialPhone } from '@/src/core/utils/linking';
-
-type MandateStatus = 'active' | 'pending';
-
-interface BankAccount {
-  id: string;
-  bank: string;
-  accountMasked: string;
-  type: 'Savings' | 'Current';
-  ifsc: string;
-  isPrimary: boolean;
-  mandate: MandateStatus;
-}
-
-const MOCK_ACCOUNTS: BankAccount[] = [
-  {
-    id: 'acc-hdfc',
-    bank: 'HDFC Bank',
-    accountMasked: 'XXXX XXXX 4521',
-    type: 'Savings',
-    ifsc: 'HDFC0001234',
-    isPrimary: true,
-    mandate: 'active',
-  },
-  {
-    id: 'acc-icici',
-    bank: 'ICICI Bank',
-    accountMasked: 'XXXX XXXX 8847',
-    type: 'Savings',
-    ifsc: 'ICIC0007722',
-    isPrimary: false,
-    mandate: 'pending',
-  },
-];
+import { useServices } from '@/src/core/services/ServiceProvider';
+import type { LinkedBankAccount, MandateState } from '@/src/entities/payment';
 
 const SUPPORT_PHONE = '+91 1800-200-7773';
 
-const MANDATE_TONE: Record<MandateStatus, { bg: string; fg: string; label: string }> = {
-  active: { bg: Colors.successLight, fg: Colors.success, label: 'Active' },
-  pending: { bg: '#F0F0F0', fg: Colors.textSecondary, label: 'Pending' },
+/* Every mandate state gets its own row treatment. The screen used to know only
+   "active" and "pending", which meant a revoked or bounced mandate rendered as
+   a calm grey "Pending" — the customer had no way to learn their auto-debit had
+   stopped working until the DPD showed up. */
+const MANDATE_TONE: Record<
+  MandateState,
+  { bg: string; fg: string; label: string; icon: keyof typeof Ionicons.glyphMap }
+> = {
+  active: { bg: Colors.successLight, fg: Colors.success, label: 'Active', icon: 'shield-checkmark' },
+  pending: { bg: Colors.warningLight, fg: Colors.warning, label: 'Pending', icon: 'time-outline' },
+  paused: { bg: Colors.warningLight, fg: Colors.warning, label: 'Paused', icon: 'pause-circle-outline' },
+  failed: { bg: Colors.errorLight, fg: Colors.error, label: 'Failed', icon: 'alert-circle-outline' },
+  cancelled: { bg: Colors.errorLight, fg: Colors.error, label: 'Cancelled', icon: 'close-circle-outline' },
+  expired: { bg: Colors.errorLight, fg: Colors.error, label: 'Expired', icon: 'calendar-outline' },
+  none: { bg: Colors.errorLight, fg: Colors.error, label: 'Not set up', icon: 'remove-circle-outline' },
 };
 
+const mandateState = (acc: LinkedBankAccount): MandateState => acc.mandate?.status ?? 'none';
+
 export default function BankAccountsScreen() {
-  const primary = MOCK_ACCOUNTS.find((a) => a.isPrimary) ?? MOCK_ACCOUNTS[0];
+  const { paymentService } = useServices();
+  const [accounts, setAccounts] = useState<LinkedBankAccount[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const isMountedRef = useRef(true);
+
+  const fetchAccounts = useCallback(async () => {
+    try {
+      setErrorMessage(null);
+      const rows = await paymentService.getBankAccounts();
+      if (!isMountedRef.current) return;
+      setAccounts(rows);
+    } catch {
+      /* A failed fetch shows nothing rather than stale or invented accounts —
+         a wrong mandate status here is worse than no screen at all. */
+      if (isMountedRef.current) {
+        setAccounts([]);
+        setErrorMessage('Could not load your bank accounts. Please check your connection.');
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
+    }
+  }, [paymentService]);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    void fetchAccounts();
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, [fetchAccounts]);
+
+  const onRefresh = useCallback(() => {
+    setIsRefreshing(true);
+    void fetchAccounts();
+  }, [fetchAccounts]);
 
   const onLinkNew = () => {
     Alert.alert(
@@ -70,13 +96,63 @@ export default function BankAccountsScreen() {
     );
   };
 
-  const onAccountPress = (acc: BankAccount) => {
-    Alert.alert(acc.bank, `${acc.accountMasked} · ${acc.type}\nIFSC: ${acc.ifsc}`);
+  const onAccountPress = (acc: LinkedBankAccount) => {
+    Alert.alert(
+      acc.bankName,
+      `${acc.accountMasked} · ${acc.accountType}\nIFSC: ${acc.ifsc}` +
+        (acc.mandate?.umrn ? `\nUMRN: ${acc.mandate.umrn}` : ''),
+    );
   };
 
   const onMandateHelp = () => {
     void dialPhone(SUPPORT_PHONE);
   };
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Header title="Bank Accounts" showBack />
+        <View style={styles.centered}>
+          <LoadingSpinner size={48} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (errorMessage) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Header title="Bank Accounts" showBack />
+        <ErrorView
+          title="Bank accounts unavailable"
+          message={errorMessage}
+          onRetry={() => {
+            setIsLoading(true);
+            void fetchAccounts();
+          }}
+        />
+      </SafeAreaView>
+    );
+  }
+
+  if (accounts.length === 0) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Header title="Bank Accounts" showBack />
+        <View style={styles.centered}>
+          <EmptyState
+            icon="card-outline"
+            title="No bank accounts linked"
+            subtitle="Link an account to receive disbursements and pay EMIs by auto-debit."
+            actionLabel="Link New Account"
+            onAction={onLinkNew}
+          />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const primary = accounts.find((a) => a.isPrimary) ?? accounts[0]!;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -85,6 +161,9 @@ export default function BankAccountsScreen() {
         style={styles.flex}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={Colors.primary} />
+        }
       >
         {/* Stat cards */}
         <View style={styles.statsRow}>
@@ -92,14 +171,14 @@ export default function BankAccountsScreen() {
             <View style={[styles.statIcon, { backgroundColor: Colors.primaryLight }]}>
               <Ionicons name="card" size={scale(18)} color={Colors.primary} />
             </View>
-            <Text style={styles.statValue}>{MOCK_ACCOUNTS.length}</Text>
+            <Text style={styles.statValue}>{accounts.length}</Text>
             <Text style={styles.statLabel}>Linked Accounts</Text>
           </View>
           <View style={styles.statCard}>
             <View style={[styles.statIcon, { backgroundColor: Colors.successLight }]}>
               <Ionicons name="star" size={scale(18)} color={Colors.success} />
             </View>
-            <Text style={styles.statValue} numberOfLines={1}>{primary.bank}</Text>
+            <Text style={styles.statValue} numberOfLines={1}>{primary.bankName}</Text>
             <Text style={styles.statLabel}>Primary Bank</Text>
           </View>
         </View>
@@ -115,21 +194,21 @@ export default function BankAccountsScreen() {
         {/* Linked accounts */}
         <Text style={styles.sectionLabel}>Linked Accounts</Text>
         <View style={styles.card}>
-          {MOCK_ACCOUNTS.map((acc, idx) => (
+          {accounts.map((acc, idx) => (
             <Pressable
               key={acc.id}
-              style={[styles.row, idx < MOCK_ACCOUNTS.length - 1 && styles.rowDivider]}
+              style={[styles.row, idx < accounts.length - 1 && styles.rowDivider]}
               onPress={() => onAccountPress(acc)}
               android_ripple={{ color: `${Colors.primary}10` }}
               accessibilityRole="button"
-              accessibilityLabel={`${acc.bank}, ${acc.accountMasked}, ${acc.type}${acc.isPrimary ? ', primary account' : ''}`}
+              accessibilityLabel={`${acc.bankName}, ${acc.accountMasked}, ${acc.accountType}${acc.isPrimary ? ', primary account' : ''}`}
             >
               <View style={[styles.iconBox, { backgroundColor: Colors.primaryLight }]}>
                 <Ionicons name="business" size={scale(18)} color={Colors.primary} />
               </View>
               <View style={styles.rowBody}>
                 <View style={styles.rowTitleLine}>
-                  <Text style={styles.rowValue} numberOfLines={1}>{acc.bank}</Text>
+                  <Text style={styles.rowValue} numberOfLines={1}>{acc.bankName}</Text>
                   {acc.isPrimary ? (
                     <View style={[styles.badge, { backgroundColor: Colors.primaryLight }]}>
                       <Text style={[styles.badgeText, { color: Colors.primary }]}>Primary</Text>
@@ -137,7 +216,7 @@ export default function BankAccountsScreen() {
                   ) : null}
                 </View>
                 <Text style={styles.rowDetail}>
-                  {acc.accountMasked} · {acc.type}
+                  {acc.accountMasked} · {acc.accountType}
                 </Text>
               </View>
               <Ionicons name="chevron-forward" size={scale(18)} color={Colors.textDisabled} />
@@ -148,20 +227,28 @@ export default function BankAccountsScreen() {
         {/* Mandate status */}
         <Text style={styles.sectionLabel}>Mandate Status</Text>
         <View style={styles.card}>
-          {MOCK_ACCOUNTS.map((acc, idx) => {
-            const tone = MANDATE_TONE[acc.mandate];
+          {accounts.map((acc, idx) => {
+            const state = mandateState(acc);
+            const tone = MANDATE_TONE[state];
             return (
-              <View key={acc.id} style={[styles.row, idx < MOCK_ACCOUNTS.length - 1 && styles.rowDivider]}>
+              <View
+                key={acc.id}
+                style={[styles.row, idx < accounts.length - 1 && styles.rowDivider]}
+                accessibilityLabel={`${acc.bankName} auto-debit mandate: ${tone.label}${acc.mandate?.failureReason ? `. ${acc.mandate.failureReason}` : ''}`}
+              >
                 <View style={[styles.iconBox, { backgroundColor: tone.bg }]}>
-                  <Ionicons
-                    name={acc.mandate === 'active' ? 'shield-checkmark' : 'time-outline'}
-                    size={scale(18)}
-                    color={tone.fg}
-                  />
+                  <Ionicons name={tone.icon} size={scale(18)} color={tone.fg} />
                 </View>
                 <View style={styles.rowBody}>
-                  <Text style={styles.rowValue} numberOfLines={1}>{acc.bank}</Text>
-                  <Text style={styles.rowDetail}>eNACH · {acc.accountMasked.slice(-4)}</Text>
+                  <Text style={styles.rowValue} numberOfLines={1}>{acc.bankName}</Text>
+                  <Text style={styles.rowDetail}>
+                    eNACH · {acc.accountMasked.slice(-4)}
+                  </Text>
+                  {/* The reason a mandate is failing is the only actionable part
+                      of this screen — never hide it behind a coloured chip. */}
+                  {acc.mandate?.failureReason ? (
+                    <Text style={styles.rowAlert}>{acc.mandate.failureReason}</Text>
+                  ) : null}
                 </View>
                 <View style={[styles.badge, { backgroundColor: tone.bg }]}>
                   <Text style={[styles.badgeText, { color: tone.fg }]}>{tone.label}</Text>
@@ -201,6 +288,7 @@ export default function BankAccountsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.backgroundLight },
   flex: { flex: 1 },
+  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.xl },
 
   content: {
     paddingTop: Spacing.md,
@@ -315,6 +403,11 @@ const styles = StyleSheet.create({
     ...Typography.caption,
     color: Colors.textSecondary,
     marginTop: 2,
+  },
+  rowAlert: {
+    ...Typography.caption,
+    color: Colors.error,
+    marginTop: 3,
   },
 
   badge: {

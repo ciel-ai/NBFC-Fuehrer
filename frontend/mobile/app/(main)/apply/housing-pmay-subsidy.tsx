@@ -11,11 +11,13 @@ import { Button } from '@/src/shared/components/common/Button';
 import { LoadingSpinner } from '@/src/shared/components/common/LoadingSpinner';
 import { formatCurrency } from '@/src/core/utils/formatters';
 import { useServices } from '@/src/core/services/ServiceProvider';
+import { useIdempotencyKey } from '@/src/core/api/idempotency';
 import type { HousingPmaySubsidyResult } from '@/src/entities/housingLoan';
 
 export default function HousingPmaySubsidyScreen() {
   const params = useLocalSearchParams<Record<string, string>>();
   const { housingLoanService } = useServices();
+  const { getKey } = useIdempotencyKey();
   const amount = Number(params.amount) || 0;
   const [result, setResult] = useState<HousingPmaySubsidyResult | null>(null);
   const [loading, setLoading] = useState(true);
@@ -23,7 +25,7 @@ export default function HousingPmaySubsidyScreen() {
   useEffect(() => {
     let mounted = true;
     housingLoanService
-      .applyPmaySubsidy(params.applicationId ?? 'hl_mock', { loanAmount: amount })
+      .applyPmaySubsidy(params.applicationId ?? 'hl_mock', { loanAmount: amount }, getKey())
       .then((d) => { if (mounted) setResult(d); })
       .catch(() => { if (mounted) Alert.alert('Subsidy unavailable', 'Please try again.'); })
       .finally(() => { if (mounted) setLoading(false); });

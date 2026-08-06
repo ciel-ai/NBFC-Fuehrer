@@ -20,6 +20,12 @@ import { Spacing, BorderRadius } from '@/src/core/theme/spacing';
 import { Header } from '@/src/shared/components/common/Header';
 import { Button } from '@/src/shared/components/common/Button';
 import { useScreenGuard } from '@/src/shared/hooks/useScreenGuard';
+import { useServices } from '@/src/core/services/ServiceProvider';
+import { resolveGoldApplicationId } from '@/src/core/utils/goldApplication';
+import { useDocumentSlots } from '@/src/features/documents/useDocumentSlots';
+import { DocumentUploadField } from '@/src/features/documents/DocumentUploadField';
+import { OrnamentList } from '@/src/features/sales/components/OrnamentList';
+import type { OrnamentEntry } from '@/src/features/sales/config/ornaments';
 
 function ProgressBar() {
   return (
@@ -82,96 +88,49 @@ const fi = StyleSheet.create({
   hint: { fontFamily: FontFamily.regular, fontSize: 11, color: Colors.textDisabled, marginTop: 4 },
 });
 
-function UploadField({ label, uploaded, onPress, optional }: {
-  label: string;
-  uploaded: boolean;
-  onPress: () => void;
-  optional?: boolean;
-}) {
-  return (
-    <Pressable
-      style={[uf.card, uploaded && uf.cardUploaded]}
-      onPress={onPress}
-      android_ripple={{ color: `${Colors.primary}20`, borderless: false }}
-      accessibilityRole="button"
-      accessibilityLabel={`${label}${optional ? ', optional' : ''}. ${uploaded ? 'Uploaded' : 'Tap to upload or capture'}`}
-    >
-      <View style={[uf.iconBox, uploaded && uf.iconBoxUploaded]}>
-        <Ionicons name={uploaded ? 'checkmark-circle' : 'cloud-upload'} size={22} color={uploaded ? Colors.success : Colors.primary} />
-      </View>
-      <View style={uf.info}>
-        <Text style={uf.label}>
-          {label}
-          {optional && <Text style={uf.optional}> (optional)</Text>}
-        </Text>
-        <Text style={[uf.status, uploaded && uf.statusDone]}>
-          {uploaded ? 'Uploaded ✓' : 'Tap to upload or capture'}
-        </Text>
-      </View>
-      <View style={uf.actions}>
-        <Pressable
-          style={uf.actionBtn}
-          onPress={onPress}
-          android_ripple={{ color: `${Colors.primary}20`, borderless: true }}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          accessibilityLabel="Open camera"
-        >
-          <Ionicons name="camera" size={16} color={Colors.primary} />
-        </Pressable>
-        <Pressable
-          style={uf.actionBtn}
-          onPress={onPress}
-          android_ripple={{ color: `${Colors.primary}20`, borderless: true }}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          accessibilityLabel="Attach file"
-        >
-          <Ionicons name="attach" size={16} color={Colors.primary} />
-        </Pressable>
-      </View>
-    </Pressable>
-  );
-}
-
-const uf = StyleSheet.create({
-  card: { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: Colors.border, borderRadius: BorderRadius.md, padding: Spacing.md, marginBottom: Spacing.sm, backgroundColor: Colors.background, gap: Spacing.md },
-  cardUploaded: { borderColor: Colors.success, backgroundColor: Colors.successEmphasis },
-  iconBox: { width: 44, height: 44, borderRadius: 10, backgroundColor: Colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
-  iconBoxUploaded: { backgroundColor: Colors.successLight },
-  info: { flex: 1 },
-  label: { fontFamily: FontFamily.semiBold, fontSize: 13, color: Colors.textPrimary, marginBottom: 2 },
-  optional: { fontFamily: FontFamily.regular, fontSize: 11, color: Colors.textDisabled },
-  status: { fontFamily: FontFamily.regular, fontSize: 11, color: Colors.textDisabled },
-  statusDone: { color: Colors.success },
-  actions: { flexDirection: 'row', gap: 6 },
-  actionBtn: { width: 32, height: 32, borderRadius: 8, backgroundColor: Colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
-});
+import { usePersistApplyStep } from '@/src/features/apply/useApplyDraft';
 
 export default function GoldLoanOwnershipScreen() {
+  usePersistApplyStep('gold');
   useScreenGuard();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<Record<string, string>>();
 
+  const { goldLoanService } = useServices();
+  const applicationId = resolveGoldApplicationId(params.applicationId) ?? '';
+
   const [selfOwned, setSelfOwned] = useState(false);
-  const [goldPhotos, setGoldPhotos] = useState({ angle1: false, angle2: false });
-  const [invoice, setInvoice] = useState(false);
+  const [ornaments, setOrnaments] = useState<OrnamentEntry[]>([]);
 
   const [accountName, setAccountName] = useState(params.fullName ?? '');
   const [bankName, setBankName] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
   const [ifsc, setIfsc] = useState('');
-  const [bankProof, setBankProof] = useState(false);
+  const [accountType, setAccountType] = useState<'Savings' | 'Current'>('Savings');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const simulateUpload = (cb: () => void) => {
+  // Bank proof (required) + purchase invoice (optional), uploaded against the
+  // application id threaded from the estimator.
+  const { slots, capture, retry, remove, allUploaded } = useDocumentSlots(
+    ['bank_proof', 'invoice'],
+    applicationId,
+    goldLoanService.uploadDocument,
+  );
+
+  const pickDoc = (key: string) => {
+    if (slots[key]?.state === 'failed') {
+      retry(key);
+      return;
+    }
     Alert.alert('Upload', 'Choose method', [
-      { text: 'Camera', onPress: cb },
-      { text: 'Gallery', onPress: cb },
+      { text: 'Camera', onPress: () => { void capture(key, 'camera'); } },
+      { text: 'Gallery', onPress: () => { void capture(key, 'library'); } },
       { text: 'Cancel', style: 'cancel' },
     ]);
   };
 
-  const canSubmit = selfOwned && goldPhotos.angle1 && goldPhotos.angle2
+  const canSubmit = selfOwned && ornaments.length >= 1 && allUploaded(['bank_proof'])
     && accountName.trim().length > 1 && bankName.trim().length > 1
     && accountNumber.trim().length >= 9 && ifsc.trim().length === 11;
 
@@ -185,7 +144,17 @@ export default function GoldLoanOwnershipScreen() {
     setIsSubmitting(false);
     router.push({
       pathname: '/(main)/apply/gold-loan-branch',
-      params,
+      params: {
+        ...params,
+        accountName: accountName.trim(),
+        bankName: bankName.trim(),
+        accountNumber,
+        ifsc,
+        accountType,
+        ornamentsJson: JSON.stringify(ornaments),
+        invoiceUri: slots.invoice?.uri ?? '',
+        bankProofUri: slots.bank_proof?.uri ?? '',
+      },
     });
   };
 
@@ -221,24 +190,18 @@ export default function GoldLoanOwnershipScreen() {
           />
         </View>
 
-        {/* Gold photos */}
-        <Text style={styles.subLabel}>UPLOAD PHOTOS OF GOLD ITEMS</Text>
-        <Text style={styles.subHint}>Minimum 2 angles required — camera preferred</Text>
+        {/* Ornament schedule — each pledged item, itemised with its own photo */}
+        <Text style={styles.subLabel}>YOUR GOLD ORNAMENTS</Text>
+        <Text style={styles.subHint}>Add each ornament with its weight, purity and a photo</Text>
 
-        <UploadField
-          label="Gold Photo — Angle 1"
-          uploaded={goldPhotos.angle1}
-          onPress={() => simulateUpload(() => setGoldPhotos((p) => ({ ...p, angle1: true })))}
-        />
-        <UploadField
-          label="Gold Photo — Angle 2"
-          uploaded={goldPhotos.angle2}
-          onPress={() => simulateUpload(() => setGoldPhotos((p) => ({ ...p, angle2: true })))}
-        />
-        <UploadField
+        <OrnamentList rows={ornaments} onChange={setOrnaments} accent={Colors.primary} />
+
+        <View style={{ height: Spacing.sm }} />
+        <DocumentUploadField
           label="Purchase Invoice / Receipt"
-          uploaded={invoice}
-          onPress={() => simulateUpload(() => setInvoice(true))}
+          state={slots.invoice?.state ?? 'empty'}
+          onPress={() => pickDoc('invoice')}
+          onRemove={() => remove('invoice')}
           optional
         />
 
@@ -277,12 +240,32 @@ export default function GoldLoanOwnershipScreen() {
           accessibilityHint="Enter 11-character IFSC code in capital letters"
         />
 
+        <Text style={styles.subLabel}>ACCOUNT TYPE</Text>
+        <View style={styles.accountTypeRow}>
+          {(['Savings', 'Current'] as const).map((t) => (
+            <Pressable
+              key={t}
+              style={[styles.accountTypeChip, accountType === t && styles.accountTypeChipActive]}
+              onPress={() => setAccountType(t)}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: accountType === t }}
+              accessibilityLabel={`${t} account`}
+            >
+              <Text style={[styles.accountTypeText, accountType === t && styles.accountTypeTextActive]}>
+                {t}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+
         <Text style={styles.subLabel}>BANK PROOF *</Text>
         <Text style={styles.subHint}>Cancelled cheque or passbook front page</Text>
-        <UploadField
+        <DocumentUploadField
           label="Cancelled Cheque / Passbook"
-          uploaded={bankProof}
-          onPress={() => simulateUpload(() => setBankProof(true))}
+          required
+          state={slots.bank_proof?.state ?? 'empty'}
+          onPress={() => pickDoc('bank_proof')}
+          onRemove={() => remove('bank_proof')}
         />
 
         <View style={styles.secureNote}>
@@ -366,6 +349,19 @@ const styles = StyleSheet.create({
     color: Colors.textDisabled,
     marginBottom: Spacing.sm,
   },
+  accountTypeRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.md },
+  accountTypeChip: {
+    flex: 1,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    backgroundColor: Colors.background,
+    alignItems: 'center',
+  },
+  accountTypeChipActive: { borderColor: Colors.primary, backgroundColor: Colors.primaryLight },
+  accountTypeText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.textSecondary },
+  accountTypeTextActive: { color: Colors.primary },
 
   secureNote: {
     flexDirection: 'row',

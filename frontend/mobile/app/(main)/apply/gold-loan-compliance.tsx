@@ -9,20 +9,27 @@ import { Spacing, BorderRadius, Shadow } from '@/src/core/theme/spacing';
 import { Header } from '@/src/shared/components/common/Header';
 import { Button } from '@/src/shared/components/common/Button';
 import { LoadingSpinner } from '@/src/shared/components/common/LoadingSpinner';
+import { ErrorView } from '@/src/shared/components/common/ErrorView';
 import { useServices } from '@/src/core/services/ServiceProvider';
+import { resolveGoldApplicationId } from '@/src/core/utils/goldApplication';
 import type { GoldLoanComplianceResult } from '@/src/entities/goldLoan';
 
+import { usePersistApplyStep } from '@/src/features/apply/useApplyDraft';
+
 export default function GoldLoanComplianceScreen() {
+  usePersistApplyStep('gold');
   const params = useLocalSearchParams<Record<string, string>>();
   const { goldLoanService } = useServices();
+  const applicationId = resolveGoldApplicationId(params.applicationId);
   const [result, setResult] = useState<GoldLoanComplianceResult | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(!!applicationId);
 
   useEffect(() => {
+    if (!applicationId) return;
     let mounted = true;
     const run = async () => {
       try {
-        const data = await goldLoanService.runCompliance(params.applicationId ?? 'gold_mock_application');
+        const data = await goldLoanService.runCompliance(applicationId);
         if (mounted) setResult(data);
       } catch {
         if (mounted) Alert.alert('Compliance check failed', 'Please try again.');
@@ -34,9 +41,23 @@ export default function GoldLoanComplianceScreen() {
     return () => {
       mounted = false;
     };
-  }, [goldLoanService, params.applicationId]);
+  }, [goldLoanService, applicationId]);
 
   const canContinue = result?.status === 'completed';
+
+  if (!applicationId) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Header title="Compliance Checks" showBack />
+        <ErrorView
+          title="Application reference missing"
+          message="We could not find your application reference. Please go back and restart the application."
+          retryLabel="Go Back"
+          onRetry={() => router.back()}
+        />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -59,21 +80,31 @@ export default function GoldLoanComplianceScreen() {
           </View>
         ) : (
           <View style={styles.card}>
-            {result?.checks.map((check, index) => (
-              <View key={check.label}>
-                <View style={styles.checkRow}>
-                  <View style={styles.checkIcon}>
-                    <Ionicons name="checkmark-circle" size={20} color={Colors.success} />
+            {result?.checks.map((check, index) => {
+              const failed = check.status === 'failed';
+              const pending = check.status === 'pending' || check.status === 'in_progress';
+              return (
+                <View key={check.label}>
+                  <View style={styles.checkRow}>
+                    <View style={styles.checkIcon}>
+                      <Ionicons
+                        name={failed ? 'close-circle' : pending ? 'time-outline' : 'checkmark-circle'}
+                        size={20}
+                        color={failed ? Colors.error : pending ? Colors.textSecondary : Colors.success}
+                      />
+                    </View>
+                    <View style={styles.checkInfo}>
+                      <Text style={styles.checkLabel}>{check.label}</Text>
+                      <Text style={styles.checkProvider}>{check.provider}</Text>
+                    </View>
+                    <Text style={[styles.doneText, failed && styles.failedText, pending && styles.pendingText]}>
+                      {failed ? 'Failed' : pending ? 'Pending' : 'Clear'}
+                    </Text>
                   </View>
-                  <View style={styles.checkInfo}>
-                    <Text style={styles.checkLabel}>{check.label}</Text>
-                    <Text style={styles.checkProvider}>{check.provider}</Text>
-                  </View>
-                  <Text style={styles.doneText}>Clear</Text>
+                  {index < result.checks.length - 1 && <View style={styles.divider} />}
                 </View>
-                {index < result.checks.length - 1 && <View style={styles.divider} />}
-              </View>
-            ))}
+              );
+            })}
           </View>
         )}
 
@@ -92,7 +123,7 @@ export default function GoldLoanComplianceScreen() {
           onPress={() =>
             router.push({
               pathname: '/(main)/apply/gold-loan-ownership',
-              params,
+              params: { ...params, applicationId: result?.applicationId ?? applicationId },
             })
           }
         />
@@ -148,6 +179,8 @@ const styles = StyleSheet.create({
   checkLabel: { fontFamily: FontFamily.semiBold, fontSize: FontSize.sm, color: Colors.textPrimary },
   checkProvider: { ...Typography.tiny, color: Colors.textSecondary, marginTop: 2 },
   doneText: { fontFamily: FontFamily.semiBold, fontSize: FontSize.xs, color: Colors.success },
+  failedText: { color: Colors.error },
+  pendingText: { color: Colors.textSecondary },
   divider: { height: 1, backgroundColor: Colors.border, marginLeft: 64 },
   infoBox: {
     flexDirection: 'row',

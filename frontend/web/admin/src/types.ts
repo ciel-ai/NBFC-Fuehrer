@@ -31,6 +31,7 @@ export type Role =
   // Backend roles
   | 'SUPER_ADMIN'
   | 'CREDIT_MANAGER'
+  | 'BRANCH_MANAGER'
   | 'OPS_EXECUTIVE'
   | 'FINANCE'
   | 'COLLECTION_AGENT'
@@ -130,6 +131,92 @@ export interface CreditDecision {
   approvedRate?: number;
   reason?: string;
   remarks: string;
+  /** Deviation ids that were OPEN→APPROVED and recorded on this sanction. */
+  approvedDeviationIds?: string[];
+}
+
+// ─── Deviations (Sprint-4) ───────────────────────────────────────────────────
+// Auto-derived + manually-raised policy exceptions. An APPROVED credit decision
+// is blocked while any deviation is OPEN — mirrors the server 409
+// OPEN_DEVIATIONS gate (see docs/GOLD_LOAN_S4_API_CONTRACTS.md §2).
+
+export type DeviationSeverity = 'L1' | 'L2'; // L1 → Branch Manager+; L2 → Credit Manager/Admin
+export type DeviationCategory = 'LTV' | 'PURITY' | 'KYC' | 'INCOME' | 'DOCUMENT' | 'BUREAU' | 'OTHER';
+export type DeviationStatus = 'OPEN' | 'APPROVED' | 'REJECTED' | 'WITHDRAWN';
+
+export interface Deviation {
+  id: string;
+  /** Machine code, e.g. LTV_ABOVE_CAP. */
+  code: string;
+  category: DeviationCategory;
+  severity: DeviationSeverity;
+  description: string;
+  /** 'SYSTEM' for auto-derived, else the raising officer's name. */
+  raisedBy: string;
+  /** Maker's justification — required to APPROVE the deviation. */
+  mitigant?: string;
+  status: DeviationStatus;
+  decidedBy?: string;
+  decidedRole?: string;
+  decidedRemarks?: string;
+  decidedAt?: string;
+  createdAt: string;
+}
+
+// ─── TVR — Tele-Verification (Sprint-4 §3) ───────────────────────────────────
+
+export type TvrAnswer = 'YES' | 'NO' | 'UNCLEAR' | 'NA';
+export type TvrOutcome = 'POSITIVE' | 'NEGATIVE' | 'INCONCLUSIVE';
+export type TvrCallStatus = 'COMPLETED' | 'NO_ANSWER' | 'WRONG_NUMBER';
+/** Derived roll-up shown on the application. */
+export type VerificationStatus = 'PENDING' | 'POSITIVE' | 'NEGATIVE' | 'INCONCLUSIVE' | 'WAIVED';
+
+export interface TvrChecklistItem {
+  key: string;
+  label: string;
+  answer: TvrAnswer;
+}
+
+export interface TvrRecord {
+  id: string;
+  applicationId: string;
+  attemptNo: number;
+  phoneCalled: string;
+  calledBy: string;
+  checklist: TvrChecklistItem[];
+  outcome: TvrOutcome;
+  remarks: string;
+  status: TvrCallStatus;
+  createdAt: string;
+}
+
+// ─── CPV — Contact-Point Verification (Sprint-4 §4) ──────────────────────────
+
+export type CpvType = 'RESIDENCE' | 'OFFICE';
+export type CpvRelation = 'SELF' | 'FAMILY' | 'NEIGHBOUR' | 'OTHER';
+export type CpvOutcome = 'POSITIVE' | 'NEGATIVE' | 'DOOR_LOCKED' | 'ADDRESS_NOT_FOUND';
+export type CpvVerificationStatus = 'PENDING' | 'POSITIVE' | 'NEGATIVE' | 'INCONCLUSIVE' | 'WAIVED';
+
+export interface CpvRecord {
+  id: string;
+  applicationId: string;
+  type: CpvType;
+  assignedTo: string;
+  visitDate: string;
+  addressVerified: boolean;
+  personMet: string;
+  relation: CpvRelation;
+  outcome: CpvOutcome;
+  remarks: string;
+  createdAt: string;
+}
+
+/** A TVR/CPV waiver — credit/admin only; auto-raises an L1 deviation. */
+export interface VerificationWaiver {
+  remarks: string;
+  by: string;
+  role: string;
+  at: string;
 }
 
 export interface BankDetails {
@@ -168,9 +255,11 @@ export interface FeeBreakup {
 }
 
 export interface GoldCollateral {
-  netWeightGrams: number;
+  netWeightGrams: number; // derived: (gross − stone) × (1 − impurity%/100)
   grossWeightGrams: number;
-  purityKarat: 18 | 20 | 22;
+  stoneWeightGrams?: number;
+  impurityPct?: number;
+  purityKarat: 18 | 20 | 22 | 24;
   ratePerGram: number;
   valuation: number;
   ltv: number; // %
@@ -235,6 +324,14 @@ export interface LoanApplication {
   createdAt: string;
   updatedAt: string;
   creditDecision?: CreditDecision;
+  /** Policy deviations — lazily initialised (auto-derived) when first needed. */
+  deviations?: Deviation[];
+  /** Tele-verification attempts (newest first) + optional waiver. */
+  tvr?: TvrRecord[];
+  tvrWaiver?: VerificationWaiver;
+  /** Contact-point verification visits + optional waiver. */
+  cpv?: CpvRecord[];
+  cpvWaiver?: VerificationWaiver;
   finance?: {
     fees: FeeBreakup;
     netDisbursement: number;
@@ -293,6 +390,20 @@ export interface LoanCharge {
 export type LoanStatus = 'ACTIVE' | 'OVERDUE' | 'NPA' | 'CLOSED';
 export type CollectionStatus = 'NORMAL' | 'FOLLOW_UP' | 'PTP' | 'FIELD_VISIT' | 'LEGAL';
 
+/**
+ * Balanced account of where one payment went. All amounts are INTEGER PAISE.
+ *
+ * Invariant, enforced by utils/payments.ts and asserted in payments.test.ts:
+ *   settledPaise + closingAdvancePaise === openingAdvancePaise + tenderPaise
+ */
+export interface PaymentAllocation {
+  tenderPaise: number;
+  openingAdvancePaise: number;
+  settledPaise: number;
+  closingAdvancePaise: number;
+  settledSeqs: number[];
+}
+
 export interface LoanAccount {
   loanNumber: string;
   applicationId: string;
@@ -316,8 +427,138 @@ export interface LoanAccount {
   collectionNotes: { at: string; by: string; note: string; ptpDate?: string }[];
   lastPaymentDate?: string;
   lastPaymentAmount?: number;
+  /**
+   * Unapplied money held against this account, in INTEGER PAISE. Absent/undefined
+   * means zero — every existing record and every mock row is therefore valid
+   * without a migration.
+   *
+   * A payment that cannot cover a whole instalment, or that overshoots the last
+   * one, leaves the difference here rather than dropping it; the next payment
+   * picks it up automatically. See docs/PAYMENT_LOGIC_DECISIONS.md.
+   */
+  advanceBalancePaise?: number;
+  /** Balanced breakdown of the most recent payment (integer paise). */
+  lastAllocation?: PaymentAllocation;
   branch: string;
   schedule: EmiRow[];
+  /**
+   * Live e-NACH mandate for this account. Undefined = the server did not send one
+   * (older payload, or the mandate module is unreachable) — which is NOT the same
+   * as "no mandate exists", so the UI must say "unknown" rather than "not set up".
+   */
+  mandate?: LoanMandate;
+  /** Set only on accounts brought over by the legacy-book migration. */
+  migratedFrom?: MigrationOrigin;
+}
+
+/** Provenance stamp written by the data migration. Absent on natively-originated loans. */
+export interface MigrationOrigin {
+  /** Legacy system the record came from, e.g. 'Finnone'. */
+  system: string;
+  legacyLoanNumber: string;
+  migratedOn: string;
+  /** Migration run that carried this record — for tracing a bad batch. */
+  batchRef?: string;
+}
+
+// ─── e-NACH mandates & recurring debits ─────────────────────────────────────
+
+export type MandateStatus =
+  | 'ACTIVE'
+  | 'PENDING'
+  | 'PAUSED'
+  | 'CANCELLED'
+  | 'FAILED'
+  | 'EXPIRED'
+  | 'NOT_SETUP';
+
+export interface LoanMandate {
+  /** Unique Mandate Reference Number issued by NPCI. Absent until registration completes. */
+  umrn?: string;
+  status: MandateStatus;
+  bankName: string;
+  accountMasked: string;
+  ifsc?: string;
+  /** Ceiling the mandate authorises per debit. */
+  maxAmount: number;
+  /** Day of month the debit is presented. */
+  debitDay?: number;
+  registeredOn?: string;
+  validTill?: string;
+  lastDebitOn?: string;
+  lastDebitStatus?: 'SUCCESS' | 'FAILED' | 'PENDING';
+  /** NPCI return reason on the last failed presentation. */
+  failureReason?: string;
+  /** Consecutive failed presentations — the signal for "this mandate is dying". */
+  consecutiveFailures: number;
+}
+
+export type NachItemStatus = 'SUCCESS' | 'FAILED' | 'RETRYING' | 'PENDING';
+
+/** One EMI presented in a NACH batch. */
+export interface NachDebitItem {
+  id: string;
+  batchId: string;
+  loanNumber: string;
+  customerName: string;
+  loanType: LoanType;
+  umrn?: string;
+  bankName: string;
+  emiSeq?: number;
+  amount: number;
+  status: NachItemStatus;
+  /** NPCI return code on failure, e.g. '02' insufficient funds. */
+  returnCode?: string;
+  returnReason?: string;
+  /** 1 = first presentation; >1 = a retry. */
+  attempt: number;
+  utr?: string;
+  nextRetryOn?: string;
+  presentedAt: string;
+}
+
+export interface NachBatch {
+  id: string;
+  presentationDate: string;
+  cycle: 'PRESENTATION' | 'RETRY';
+  status: 'COMPLETED' | 'RUNNING' | 'PARTIAL' | 'SCHEDULED';
+  sponsorBank: string;
+  fileRef: string;
+  totalCount: number;
+  totalAmount: number;
+  successCount: number;
+  successAmount: number;
+  failedCount: number;
+  failedAmount: number;
+  retryingCount: number;
+  pendingCount: number;
+  startedAt: string;
+  completedAt?: string;
+}
+
+export type ReconStatus =
+  /** Book and bank agree. */
+  | 'MATCHED'
+  /** LMS recorded it; the bank file has no matching credit. */
+  | 'UNMATCHED_IN_BOOK'
+  /** The bank credited us; nothing in the book claims it. */
+  | 'UNMATCHED_IN_BANK'
+  /** Both sides have the txn, the amounts differ. */
+  | 'AMOUNT_MISMATCH';
+
+export interface ReconciliationRow {
+  id: string;
+  date: string;
+  loanNumber?: string;
+  customerName?: string;
+  channel: Repayment['mode'];
+  reference: string;
+  /** What the LMS ledger says. */
+  bookAmount: number;
+  /** What the bank/NPCI settlement file says. */
+  bankAmount: number;
+  status: ReconStatus;
+  note?: string;
 }
 
 // ─── Platform ───────────────────────────────────────────────────────────────

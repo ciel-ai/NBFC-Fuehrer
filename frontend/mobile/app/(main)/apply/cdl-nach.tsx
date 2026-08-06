@@ -10,6 +10,7 @@ import { Header } from '@/src/shared/components/common/Header';
 import { Button } from '@/src/shared/components/common/Button';
 import { formatCurrency } from '@/src/core/utils/formatters';
 import { useServices } from '@/src/core/services/ServiceProvider';
+import { useIdempotencyKey } from '@/src/core/api/idempotency';
 import {
   cdlAutoDebitLabel,
   CDL_AUTO_DEBIT_DATES,
@@ -17,9 +18,13 @@ import {
   type CdlNachResult,
 } from '@/src/entities/consumerDurableLoan';
 
+import { usePersistApplyStep } from '@/src/features/apply/useApplyDraft';
+
 export default function CdlNachScreen() {
+  usePersistApplyStep('cdl');
   const params = useLocalSearchParams<Record<string, string>>();
   const { consumerDurableLoanService } = useServices();
+  const { getKey } = useIdempotencyKey();
   const [accountNumber, setAccountNumber] = useState('');
   const [confirmAccount, setConfirmAccount] = useState('');
   const [ifsc, setIfsc] = useState('');
@@ -41,6 +46,7 @@ export default function CdlNachScreen() {
       const data = await consumerDurableLoanService.registerNachMandate(
         params.applicationId ?? 'cdl_mock_application',
         { emi, bankAccount: `****${accountNumber.slice(-4)}`, autoDebitDate: debitDate },
+        getKey(),
       );
       setResult(data);
     } catch {

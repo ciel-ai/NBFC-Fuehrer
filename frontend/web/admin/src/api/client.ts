@@ -3,8 +3,9 @@ import axios from 'axios';
 import type { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { useAuthStore } from '../store/authStore';
 import { staffAuthApi } from './staffAuth.api';
+import { API_URL } from '../config';
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api/v1';
+const BASE_URL = API_URL;
 
 export const apiClient = axios.create({
   baseURL: BASE_URL,
@@ -41,6 +42,29 @@ async function tryRefresh(): Promise<string | null> {
   }
 }
 
+/**
+ * Single-flight refresh.
+ *
+ * Every concurrent 401 awaits the SAME promise, and the slot is cleared exactly
+ * once — in a `finally` on the promise itself, not by each waiter after its own
+ * `await`. The previous form (`refreshing = refreshing ?? tryRefresh(); await
+ * refreshing; refreshing = null;`) cleared the slot per-waiter, so a 401 landing
+ * just after the first one resolved would start a *second* refresh against a
+ * refresh token the server had already rotated away — the second call fails, and
+ * the user is logged out mid-approval.
+ *
+ * The `finally` cannot clobber a newer refresh: a new promise can only be
+ * created once the slot is null, and only this callback nulls it.
+ */
+function refreshOnce(): Promise<string | null> {
+  if (!refreshing) {
+    refreshing = tryRefresh().finally(() => {
+      refreshing = null;
+    });
+  }
+  return refreshing;
+}
+
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
@@ -49,18 +73,25 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401 && original && !original._retry) {
       original._retry = true;
 
-      refreshing = refreshing ?? tryRefresh();
-      const newToken = await refreshing;
-      refreshing = null;
+      const newToken = await refreshOnce();
 
       if (newToken) {
         original.headers.Authorization = `Bearer ${newToken}`;
         return apiClient(original);
       }
 
-      // Refresh failed — end the session
+      // Refresh failed — end the session. Leave a note so /login can explain
+      // why the user landed there and send them back where they were.
       useAuthStore.getState().logout();
-      window.location.href = '/login';
+      try {
+        sessionStorage.setItem(
+          'fuehrer.sessionEnded',
+          JSON.stringify({ at: Date.now(), from: window.location.pathname + window.location.search }),
+        );
+      } catch {
+        /* private mode / storage disabled — non-fatal */
+      }
+      if (window.location.pathname !== '/login') window.location.href = '/login';
     }
     return Promise.reject(error);
   },

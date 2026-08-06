@@ -1,9 +1,11 @@
 import { mockDelay } from '../../api/api';
+import type { DocumentUploadResult } from '@/src/entities/document';
 import type { IGoldLoanService } from '../interfaces/IGoldLoanService';
 import type {
   GoldEligibility,
   GoldEligibilityRequest,
   GoldLoanAgreementResult,
+  GoldLoanApplicationRef,
   GoldLoanAppraisalResult,
   GoldLoanAppointment,
   GoldLoanAppointmentRequest,
@@ -69,6 +71,30 @@ export const mockGoldLoanService: IGoldLoanService = {
       ratePerGram: RATE,
       source: 'IBJA mock',
     }, 700);
+  },
+
+  async createApplication(): Promise<GoldLoanApplicationRef> {
+    return mockDelay({
+      applicationId: 'GLA-' + Date.now().toString().slice(-8),
+      status: 'in_progress',
+      createdAt: new Date().toISOString(),
+    }, 600);
+  },
+
+  async uploadDocument(
+    applicationId: string,
+    uri: string,
+    type: string,
+  ): Promise<DocumentUploadResult> {
+    return mockDelay({
+      documentId: 'DOC-' + Date.now().toString().slice(-8),
+      applicationId,
+      type,
+      // Echo a fake hosted URL; in mock the local uri is what actually renders.
+      url: 'https://mock.fuehrer.in/docs/' + applicationId + '/' + type + '.jpg',
+      status: 'uploaded',
+      uploadedAt: new Date().toISOString(),
+    }, 900);
   },
 
   async runCompliance(applicationId: string): Promise<GoldLoanComplianceResult> {

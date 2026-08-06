@@ -13,6 +13,7 @@ import { Colors } from '@/src/core/theme/colors';
 import { FontFamily, FontSize, Typography } from '@/src/core/theme/typography';
 import { Spacing, BorderRadius, Shadow } from '@/src/core/theme/spacing';
 import { Button } from '@/src/shared/components/common/Button';
+import { StatusAnimation } from '@/src/shared/components/common/StatusAnimation';
 import { scale } from '@/src/core/utils/responsive';
 
 interface NextStep {
@@ -70,11 +71,11 @@ export default function LoanApprovedScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.heroSection}>
-          <View style={styles.heroCircle}>
-            <View style={styles.heroRing}>
-              <Ionicons name="checkmark" size={scale(52)} color={Colors.textWhite} />
-            </View>
-          </View>
+          <StatusAnimation
+            name="loanApproved"
+            size={scale(132)}
+            accessibilityLabel="Loan approved"
+          />
           <Text style={styles.heroTitle}>Loan Approved!</Text>
           <Text style={styles.heroSubtitle}>
             Congratulations! Your loan application has been approved. Complete the steps below to receive your funds.

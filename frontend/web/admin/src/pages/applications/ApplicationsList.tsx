@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Button, Card, DatePicker, Input, Select, Table } from 'antd';
+import { Button, Card, DatePicker, Input, Select } from 'antd';
 import type { TableProps } from 'antd';
 import { DownloadOutlined, EyeOutlined, SearchOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
@@ -12,28 +12,55 @@ import { LoanTypeTag, StatusTag } from '../../components/StatusTag';
 import { exportCsv } from '../../utils/csv';
 import { fmtDate, inr } from '../../utils/format';
 import type { AppStatus, LoanApplication, LoanType } from '../../types';
+import DataTable from '../../components/DataTable';
+import DataSourceNotice from '../../components/DataSourceNotice';
 
 const { RangePicker } = DatePicker;
 
 export type ListPreset = 'all' | 'submitted' | 'credit-pending' | 'finance-pending' | 'disbursed';
 
-const PRESET_META: Record<ListPreset, { title: string; subtitle: string; statuses?: AppStatus[] }> = {
-  all: { title: 'All Applications', subtitle: 'Every application sourced across channels' },
-  submitted: { title: 'Submitted Applications', subtitle: 'Fresh applications awaiting credit pickup', statuses: ['SUBMITTED'] },
-  'credit-pending': { title: 'Credit Pending', subtitle: 'Applications in the underwriting queue', statuses: ['CREDIT_PENDING'] },
-  'finance-pending': { title: 'Finance Pending', subtitle: 'Credit-approved applications in finance processing', statuses: ['CREDIT_APPROVED', 'FINANCE_PENDING', 'EMANDATE_PENDING'] },
-  disbursed: { title: 'Disbursed Applications', subtitle: 'Applications converted into live loan accounts', statuses: ['DISBURSED', 'ACTIVE', 'CLOSED'] },
-};
+const PRESET_META: Record<ListPreset, { title: string; subtitle: string; statuses?: AppStatus[] }> =
+  {
+    all: { title: 'All Applications', subtitle: 'Every application sourced across channels' },
+    submitted: {
+      title: 'Submitted Applications',
+      subtitle: 'Fresh applications awaiting credit pickup',
+      statuses: ['SUBMITTED'],
+    },
+    'credit-pending': {
+      title: 'Credit Pending',
+      subtitle: 'Applications in the underwriting queue',
+      statuses: ['CREDIT_PENDING'],
+    },
+    'finance-pending': {
+      title: 'Finance Pending',
+      subtitle: 'Credit-approved applications in finance processing',
+      statuses: ['CREDIT_APPROVED', 'FINANCE_PENDING', 'EMANDATE_PENDING'],
+    },
+    disbursed: {
+      title: 'Disbursed Applications',
+      subtitle: 'Applications converted into live loan accounts',
+      statuses: ['DISBURSED', 'ACTIVE', 'CLOSED'],
+    },
+  };
 
 const ALL_STATUSES: AppStatus[] = [
-  'SUBMITTED', 'CREDIT_PENDING', 'CREDIT_APPROVED', 'CREDIT_REJECTED', 'CREDIT_RETURNED',
-  'FINANCE_PENDING', 'EMANDATE_PENDING', 'DISBURSED', 'ACTIVE', 'CLOSED',
+  'SUBMITTED',
+  'CREDIT_PENDING',
+  'CREDIT_APPROVED',
+  'CREDIT_REJECTED',
+  'CREDIT_RETURNED',
+  'FINANCE_PENDING',
+  'EMANDATE_PENDING',
+  'DISBURSED',
+  'ACTIVE',
+  'CLOSED',
 ];
 
 const ApplicationsList: React.FC<{ preset: ListPreset }> = ({ preset }) => {
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user)!;
-  const { applications, live, loading } = useApplications();
+  const { applications, loading, source, error, reload } = useApplications();
   const scope = scopedLoanType(user.role);
   const meta = PRESET_META[preset];
 
@@ -54,7 +81,8 @@ const ApplicationsList: React.FC<{ preset: ListPreset }> = ({ preset }) => {
       if (range?.[0] && dayjs(a.createdAt).isBefore(range[0].startOf('day'))) return false;
       if (range?.[1] && dayjs(a.createdAt).isAfter(range[1].endOf('day'))) return false;
       if (q) {
-        const hay = `${a.appNumber} ${a.customer.name} ${a.customer.mobile} ${a.createdBy}`.toLowerCase();
+        const hay =
+          `${a.appNumber} ${a.customer.name} ${a.customer.mobile} ${a.createdBy}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
@@ -68,7 +96,7 @@ const ApplicationsList: React.FC<{ preset: ListPreset }> = ({ preset }) => {
       title: 'Application No.',
       dataIndex: 'appNumber',
       width: 175,
-      render: (v: string) => <span style={{ fontWeight: 600, color: '#0284c7', fontSize: 12.5 }}>{v}</span>,
+      render: (v: string) => <span className="u-semibold u-accent u-sm">{v}</span>,
       sorter: (a, b) => a.appNumber.localeCompare(b.appNumber),
     },
     {
@@ -76,30 +104,40 @@ const ApplicationsList: React.FC<{ preset: ListPreset }> = ({ preset }) => {
       dataIndex: ['customer', 'name'],
       render: (_: string, r) => (
         <div>
-          <div style={{ fontWeight: 600, color: '#1e293b' }}>{r.customer.name}</div>
-          <div style={{ fontSize: 11.5, color: '#94a3b8' }}>+91 {r.customer.mobile}</div>
+          <div className="u-semibold u-ink-900">{r.customer.name}</div>
+          <div className="u-xs u-ink-400">+91 {r.customer.mobile}</div>
         </div>
       ),
       sorter: (a, b) => a.customer.name.localeCompare(b.customer.name),
     },
-    { title: 'Loan Type', dataIndex: 'loanType', width: 100, render: (t: LoanType) => <LoanTypeTag type={t} /> },
+    {
+      title: 'Loan Type',
+      dataIndex: 'loanType',
+      width: 100,
+      render: (t: LoanType) => <LoanTypeTag type={t} />,
+    },
     {
       title: 'Amount',
       dataIndex: ['loan', 'amount'],
       align: 'right',
       width: 130,
-      render: (v: number) => <span className="tnum" style={{ fontWeight: 600 }}>{inr(v)}</span>,
+      render: (v: number) => <span className="tnum u-semibold">{inr(v)}</span>,
       sorter: (a, b) => a.loan.amount - b.loan.amount,
     },
-    { title: 'Source', dataIndex: 'source', width: 110, render: (v: string) => <span style={{ color: '#64748b', fontSize: 12.5 }}>{v}</span> },
+    {
+      title: 'Source',
+      dataIndex: 'source',
+      width: 110,
+      render: (v: string) => <span className="u-ink-500 u-sm">{v}</span>,
+    },
     {
       title: 'Created By',
       dataIndex: 'createdBy',
       width: 150,
       render: (v: string, r) => (
         <div>
-          <div style={{ fontSize: 12.5, color: '#475569' }}>{v}</div>
-          <div style={{ fontSize: 11, color: '#a3aec2' }}>{r.createdByCode}</div>
+          <div className="u-sm u-ink-600">{v}</div>
+          <div className="u-xs u-ink-400">{r.createdByCode}</div>
         </div>
       ),
     },
@@ -107,16 +145,20 @@ const ApplicationsList: React.FC<{ preset: ListPreset }> = ({ preset }) => {
       title: 'Created Date',
       dataIndex: 'createdAt',
       width: 125,
-      render: (v: string) => <span style={{ color: '#64748b', fontSize: 12.5 }}>{fmtDate(v)}</span>,
+      render: (v: string) => <span className="u-ink-500 u-sm">{fmtDate(v)}</span>,
       sorter: (a, b) => dayjs(a.createdAt).valueOf() - dayjs(b.createdAt).valueOf(),
       defaultSortOrder: 'descend',
     },
-    { title: 'Status', dataIndex: 'status', width: 155, render: (s: string) => <StatusTag status={s} /> },
+    {
+      title: 'Status',
+      dataIndex: 'status',
+      width: 155,
+      render: (s: string) => <StatusTag status={s} />,
+    },
     {
       title: 'Action',
       key: 'action',
       width: 90,
-      fixed: 'right',
       render: (_, r) => (
         <Button
           size="small"
@@ -135,10 +177,27 @@ const ApplicationsList: React.FC<{ preset: ListPreset }> = ({ preset }) => {
   const handleExport = (): void => {
     exportCsv(
       `applications-${preset}-${dayjs().format('YYYYMMDD')}`,
-      ['Application No', 'Customer', 'Mobile', 'Loan Type', 'Amount', 'Source', 'Created By', 'Created Date', 'Status'],
+      [
+        'Application No',
+        'Customer',
+        'Mobile',
+        'Loan Type',
+        'Amount',
+        'Source',
+        'Created By',
+        'Created Date',
+        'Status',
+      ],
       rows.map((a) => [
-        a.appNumber, a.customer.name, a.customer.mobile, a.loanType, a.loan.amount,
-        a.source, a.createdBy, fmtDate(a.createdAt), a.status,
+        a.appNumber,
+        a.customer.name,
+        a.customer.mobile,
+        a.loanType,
+        a.loan.amount,
+        a.source,
+        a.createdBy,
+        fmtDate(a.createdAt),
+        a.status,
       ]),
     );
   };
@@ -147,7 +206,7 @@ const ApplicationsList: React.FC<{ preset: ListPreset }> = ({ preset }) => {
     <div>
       <PageHeader
         title={meta.title}
-        subtitle={`${meta.subtitle} · ${rows.length} records · ${inr(totalAmount)} requested${live ? '' : ' · sample data (live API unreachable)'}`}
+        subtitle={`${meta.subtitle} · ${rows.length} records · ${inr(totalAmount)} requested`}
         extra={
           <Button icon={<DownloadOutlined />} onClick={handleExport}>
             Export CSV
@@ -155,10 +214,20 @@ const ApplicationsList: React.FC<{ preset: ListPreset }> = ({ preset }) => {
         }
       />
 
-      <Card variant="borderless" style={{ boxShadow: 'var(--shadow-card)' }} styles={{ body: { padding: 0 } }}>
-        <div style={{ display: 'flex', gap: 10, padding: '16px 18px', flexWrap: 'wrap', borderBottom: '1px solid #eef1f7' }}>
+      <DataSourceNotice source={source} error={error} onRetry={reload} />
+
+      <Card styles={{ body: { padding: 0 } }}>
+        <div
+          style={{
+            display: 'flex',
+            gap: 10,
+            padding: '16px 18px',
+            flexWrap: 'wrap',
+            borderBottom: '1px solid var(--ink-100)',
+          }}
+        >
           <Input
-            prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
+            prefix={<SearchOutlined className="u-ink-400" />}
             placeholder="Search app no, customer, mobile, agent…"
             allowClear
             style={{ width: 290 }}
@@ -167,6 +236,7 @@ const ApplicationsList: React.FC<{ preset: ListPreset }> = ({ preset }) => {
           />
           {!scope && (
             <Select
+              aria-label="Loan Type"
               placeholder="Loan Type"
               allowClear
               style={{ width: 170 }}
@@ -181,6 +251,7 @@ const ApplicationsList: React.FC<{ preset: ListPreset }> = ({ preset }) => {
           )}
           {preset === 'all' && (
             <Select
+              aria-label="Status"
               placeholder="Status"
               allowClear
               style={{ width: 180 }}
@@ -190,16 +261,24 @@ const ApplicationsList: React.FC<{ preset: ListPreset }> = ({ preset }) => {
             />
           )}
           <Select
+            aria-label="Source"
             placeholder="Source"
             allowClear
             style={{ width: 140 }}
             value={sourceFilter}
             onChange={setSourceFilter}
-            options={['Mobile App', 'Branch', 'DSA', 'Website'].map((s) => ({ value: s, label: s }))}
+            options={['Mobile App', 'Branch', 'DSA', 'Website'].map((s) => ({
+              value: s,
+              label: s,
+            }))}
           />
-          <RangePicker value={range as any} onChange={(v) => setRange(v as any)} style={{ width: 250 }} />
+          <RangePicker
+            value={range as any}
+            onChange={(v) => setRange(v as any)}
+            style={{ width: 250 }}
+          />
         </div>
-        <Table<LoanApplication>
+        <DataTable<LoanApplication>
           loading={loading}
           dataSource={rows}
           columns={columns}

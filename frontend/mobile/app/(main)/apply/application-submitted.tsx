@@ -16,6 +16,8 @@ import Animated, {
 import { Colors } from '@/src/core/theme/colors';
 import { Spacing, BorderRadius, Shadow } from '@/src/core/theme/spacing';
 import { Button } from '@/src/shared/components/common/Button';
+import { StatusAnimation } from '@/src/shared/components/common/StatusAnimation';
+import { flowFromProductName, removeApplyDraft } from '@/src/features/apply/customerDraft';
 
 function generateRef() {
   const n = Math.floor(10000 + Math.random() * 90000);
@@ -25,10 +27,18 @@ function generateRef() {
 const REF_NUMBER = generateRef();
 
 export default function ApplicationSubmittedScreen() {
-  const { productName, loanAmount } = useLocalSearchParams<{
+  const params = useLocalSearchParams<Record<string, string>>();
+  const { productName, loanAmount } = params as {
     productName: string;
     loanAmount: string;
-  }>();
+  };
+
+  // The application is submitted — retire any resume draft for this product so
+  // it no longer appears on the home screen.
+  useEffect(() => {
+    const flow = flowFromProductName(productName);
+    if (flow) void removeApplyDraft(flow);
+  }, [productName]);
 
   // Animations
   const circleScale = useSharedValue(0);
@@ -108,11 +118,12 @@ export default function ApplicationSubmittedScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        {/* Success icon */}
-        <Animated.View style={[styles.iconOuter, circleStyle]}>
-          <Animated.View style={[styles.iconInner, checkStyle]}>
-            <Ionicons name="checkmark" size={52} color={Colors.textWhite} />
-          </Animated.View>
+        <Animated.View style={circleStyle}>
+          <StatusAnimation
+            name="applicationSubmitted"
+            size={132}
+            accessibilityLabel="Application submitted"
+          />
         </Animated.View>
 
         <Text style={styles.title}>Application{'\n'}Submitted!</Text>
@@ -212,6 +223,16 @@ export default function ApplicationSubmittedScreen() {
             </View>
           </View>
         )}
+        <Button
+          title="View CAM Summary"
+          variant="outline"
+          onPress={() =>
+            router.push({
+              pathname: '/(main)/apply/application-summary',
+              params: { ...params, flow: 'cdl' },
+            })
+          }
+        />
         <Button
           title="Track Application"
           onPress={() => router.replace('/(main)/(tabs)/loans')}

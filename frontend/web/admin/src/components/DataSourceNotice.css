@@ -1,0 +1,38 @@
+/* Provenance marker. Sits directly under the page header, above the data. */
+
+.source-note {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+}
+
+.source-note__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+/* Mock mode: a statement of fact, not a warning. Neutral, quiet, ignorable —
+   it is expected in a demo and should not compete with the data. */
+.source-note--mock {
+  background: var(--ink-50);
+  border: 1px solid var(--ink-150);
+  color: var(--ink-500);
+}
+
+/* Fallback: the API failed and the numbers are fake. This one must interrupt. */
+.source-note--fallback {
+  background: var(--status-warning-tint);
+  border: 1px solid var(--status-warning-fg);
+  color: var(--status-warning-fg);
+}
+
+.source-note--fallback strong {
+  font-weight: var(--weight-semibold);
+}

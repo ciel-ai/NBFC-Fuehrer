@@ -1,27 +1,88 @@
 import { useCallback, useEffect, useState } from 'react';
 import { onlineManager, useQueryClient } from '@tanstack/react-query';
-import { useServices } from '@/src/core/services/ServiceProvider';
+import { useServices, type Services } from '@/src/core/services/ServiceProvider';
 import {
   readQueue,
   removeMutation,
+  type MoneyOp,
+  type QueuedOperation,
+  type SalesSubmitOp,
 } from '@/src/features/sales/api/offlineQueue';
 import { salesKeys } from '@/src/features/sales/queries/useSalesQueries';
 
 let isFlushingQueue = false;
 
+/** Replay one queued money-movement op against its service (idempotency-keyed). */
+async function runMoneyOp(services: Services, op: MoneyOp): Promise<void> {
+  const { applicationId, idempotencyKey, payload } = op;
+  const p = (payload ?? {}) as Record<string, unknown>;
+  switch (op.op) {
+    case 'gold-nach':
+      await services.goldLoanService.initiateNach(applicationId, idempotencyKey);
+      return;
+    case 'cdl-nach':
+      await services.consumerDurableLoanService.registerNachMandate(
+        applicationId,
+        p as { emi: number; bankAccount: string; autoDebitDate?: number },
+        idempotencyKey,
+      );
+      return;
+    case 'cdl-disburse':
+      await services.consumerDurableLoanService.disburseToMerchant(
+        applicationId,
+        p as { amount: number; merchantName: string },
+        idempotencyKey,
+      );
+      return;
+    case 'housing-nach':
+      await services.housingLoanService.registerNach(
+        applicationId,
+        p as { emi: number; bankAccount: string },
+        idempotencyKey,
+      );
+      return;
+    case 'housing-disburse':
+      await services.housingLoanService.disburseToBuilder(
+        applicationId,
+        p as { amount: number; builderName: string },
+        idempotencyKey,
+      );
+      return;
+    case 'gold-disburse':
+      // Gold disbursal is backend-owned confirmation only; nothing to replay.
+      return;
+    default:
+      return;
+  }
+}
+
 /**
- * Drains the offline submission queue whenever connectivity is (re)gained.
+ * Drains the offline operation queue whenever connectivity is (re)gained.
+ * Handles both agent submits and customer money-movement ops (one queue).
  * Returns the count of items still pending so a screen can surface an
- * "X applications waiting to sync" banner.
+ * "X items waiting to sync" banner.
  */
 export function useOfflineFlush() {
-  const { salesService } = useServices();
+  const services = useServices();
   const queryClient = useQueryClient();
   const [pending, setPending] = useState(0);
 
   const refreshPending = useCallback(async () => {
     setPending((await readQueue()).length);
   }, []);
+
+  const runOne = useCallback(
+    async (item: QueuedOperation): Promise<void> => {
+      if (item.kind === 'money') {
+        await runMoneyOp(services, item);
+        return;
+      }
+      const submit = item as SalesSubmitOp;
+      await services.salesService.submitApplication(submit.product, submit.data);
+      void queryClient.invalidateQueries({ queryKey: salesKeys.counts(submit.product) });
+    },
+    [services, queryClient],
+  );
 
   const flush = useCallback(async () => {
     if (!onlineManager.isOnline()) return;
@@ -34,9 +95,8 @@ export function useOfflineFlush() {
     try {
       for (const item of items) {
         try {
-          await salesService.submitApplication(item.product, item.data);
+          await runOne(item);
           await removeMutation(item.id);
-          void queryClient.invalidateQueries({ queryKey: salesKeys.counts(item.product) });
         } catch {
           // Leave the item queued; the next online event retries it.
           break;
@@ -46,7 +106,7 @@ export function useOfflineFlush() {
       isFlushingQueue = false;
       await refreshPending();
     }
-  }, [salesService, queryClient, refreshPending]);
+  }, [runOne, refreshPending]);
 
   useEffect(() => {
     void refreshPending();

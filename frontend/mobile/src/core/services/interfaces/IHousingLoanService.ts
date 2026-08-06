@@ -1,3 +1,4 @@
+import type { DocumentUploadResult } from '@/src/entities/document';
 import type { EMISchedule, Loan } from '@/src/entities/loan';
 import type {
   HousingAgreementResult,
@@ -22,6 +23,8 @@ import type {
 export interface IHousingLoanService {
   // LOS
   submitApplication(input: HousingApplicationInput): Promise<HousingApplicationResult>;
+  /** Uploads a captured KYC/income/property document against the application. */
+  uploadDocument(applicationId: string, uri: string, type: string): Promise<DocumentUploadResult>;
   runKyc(applicationId: string, applicant: HousingApplicant): Promise<HousingKycResult>;
   runCompliance(applicationId: string): Promise<HousingComplianceResult>;
   runIncomeAssessment(
@@ -48,11 +51,20 @@ export interface IHousingLoanService {
     input: { amount: number; tenure: number; emi: number },
   ): Promise<HousingAgreementResult>;
   eSign(applicationId: string, applicant: HousingApplicant): Promise<HousingAgreementResult>;
-  registerNach(applicationId: string, input: { emi: number; bankAccount: string }): Promise<HousingNachResult>;
-  applyPmaySubsidy(applicationId: string, input: { loanAmount: number }): Promise<HousingPmaySubsidyResult>;
+  registerNach(
+    applicationId: string,
+    input: { emi: number; bankAccount: string },
+    idempotencyKey?: string,
+  ): Promise<HousingNachResult>;
+  applyPmaySubsidy(
+    applicationId: string,
+    input: { loanAmount: number },
+    idempotencyKey?: string,
+  ): Promise<HousingPmaySubsidyResult>;
   disburseToBuilder(
     applicationId: string,
     input: { amount: number; builderName: string },
+    idempotencyKey?: string,
   ): Promise<HousingDisbursalResult>;
 
   // LMS

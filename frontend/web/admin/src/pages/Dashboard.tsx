@@ -1,32 +1,61 @@
 import React, { useMemo } from 'react';
-import { Avatar, Button, Table } from 'antd';
+import { Button } from 'antd';
 import type { TableProps } from 'antd';
 import {
-  ArrowRightOutlined, BankOutlined, CalendarOutlined, CheckCircleOutlined,
-  FileTextOutlined, PhoneOutlined, SafetyCertificateOutlined, ThunderboltOutlined,
+  ArrowRightOutlined,
+  BankOutlined,
+  CheckCircleOutlined,
+  FileTextOutlined,
+  PhoneOutlined,
+  SafetyCertificateOutlined,
+  ThunderboltOutlined,
   WarningOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
-import {
-  Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis,
-} from 'recharts';
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useAppStore } from '../store/appStore';
 import { useAuthStore } from '../store/authStore';
 import { useDashboardSummary } from '../hooks/useDashboard';
-import { ROLE_META, scopedLoanType, LOAN_TYPE_META } from '../auth/rbac';
-import ChartCard, { tooltipStyle, tooltipItemStyle, tooltipLabelStyle } from '../components/ChartCard';
+import { LOAN_TYPE_META, ROLE_META, scopedLoanType } from '../auth/rbac';
+import ChartCard, {
+  axisProps,
+  gridProps,
+  tooltipItemStyle,
+  tooltipLabelStyle,
+  tooltipStyle,
+} from '../components/ChartCard';
+import DataTable, { useDensity } from '../components/DataTable';
+import { MetricBand } from '../components/KpiCard';
+import type { Metric } from '../components/KpiCard';
 import PageHeader from '../components/PageHeader';
+import Panel from '../components/Panel';
 import { LoanTypeTag, StatusTag } from '../components/StatusTag';
-import { CHART_COLORS } from '../theme';
-import { fmtTimeAgo, inr, inrCompact, initials } from '../utils/format';
-import { approvalStats, collectionPerformance, monthlyDisbursement, recoveryThisMonth } from '../utils/analytics';
+import { chart, radius } from '../theme/tokens';
+import type { StatusTone } from '../theme/tokens';
+import { fmtTimeAgo, initials, inr, inrCompact } from '../utils/format';
+import {
+  approvalStats,
+  collectionPerformance,
+  monthlyDisbursement,
+  recoveryThisMonth,
+} from '../utils/analytics';
 import type { AuditLog, LoanApplication } from '../types';
+import DataSourceNotice from '../components/DataSourceNotice';
+import './Dashboard.css';
 
 const isToday = (iso?: string): boolean => !!iso && dayjs(iso).isSame(dayjs(), 'day');
 
-interface Metric { label: string; value: React.ReactNode; sub?: React.ReactNode; to: string; danger?: boolean }
-interface ActionItem { icon: React.ReactNode; title: string; sub: string; to: string; tone: string }
+/** A worklist item — something a human must act on. Tone is semantic. */
+interface ActionItem {
+  icon: React.ReactNode;
+  title: string;
+  sub: string;
+  to: string;
+  tone: StatusTone;
+}
+
+const BAR_RADIUS: [number, number, number, number] = [radius.sm, radius.sm, 0, 0];
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -35,19 +64,35 @@ const Dashboard: React.FC = () => {
   const loans = useAppStore((s) => s.loans);
   const auditLogs = useAppStore((s) => s.auditLogs);
   const repayments = useAppStore((s) => s.repayments);
+  const [density] = useDensity();
 
   const scope = scopedLoanType(user.role);
   const meta = ROLE_META[user.role];
 
-  const apps = useMemo(() => applications.filter((a) => !scope || a.loanType === scope), [applications, scope]);
+  /* Branch on role FAMILY, not on the literal 'ADMIN' role. The API also issues
+     SUPER_ADMIN, which is an admin in every respect — comparing against the
+     string 'ADMIN' silently dropped it into the finance branch and then
+     dereferenced its (undefined) loan-type scope. */
+  const isAdmin = meta.family === 'ADMIN';
+
+  const apps = useMemo(
+    () => applications.filter((a) => !scope || a.loanType === scope),
+    [applications, scope],
+  );
   const lns = useMemo(() => loans.filter((l) => !scope || l.loanType === scope), [loans, scope]);
 
   const counts = useMemo(() => {
     const c = (s: string[]): number => apps.filter((a) => s.includes(a.status)).length;
-    const approvedToday = apps.filter((a) => a.creditDecision?.decision === 'APPROVED' && isToday(a.creditDecision.decidedAt)).length;
-    const rejectedToday = apps.filter((a) => a.creditDecision?.decision === 'REJECTED' && isToday(a.creditDecision.decidedAt)).length;
+    const approvedToday = apps.filter(
+      (a) => a.creditDecision?.decision === 'APPROVED' && isToday(a.creditDecision.decidedAt),
+    ).length;
+    const rejectedToday = apps.filter(
+      (a) => a.creditDecision?.decision === 'REJECTED' && isToday(a.creditDecision.decidedAt),
+    ).length;
     const disbursedToday = apps.filter((a) => isToday(a.finance?.disbursement?.date));
-    const dueToday = lns.filter((l) => l.status !== 'CLOSED' && l.nextDueDate === dayjs().format('YYYY-MM-DD'));
+    const dueToday = lns.filter(
+      (l) => l.status !== 'CLOSED' && l.nextDueDate === dayjs().format('YYYY-MM-DD'),
+    );
     const overdueAmt = lns.reduce((s, l) => s + l.overdueAmount, 0);
     return {
       total: apps.length,
@@ -59,146 +104,291 @@ const Dashboard: React.FC = () => {
       approvedToday,
       rejectedToday,
       disbursedToday: disbursedToday.length,
-      disbursedTodayAmt: disbursedToday.reduce((s, a) => s + (a.finance?.disbursement?.amount ?? 0), 0),
+      disbursedTodayAmt: disbursedToday.reduce(
+        (s, a) => s + (a.finance?.disbursement?.amount ?? 0),
+        0,
+      ),
       activeLoans: lns.filter((l) => l.status !== 'CLOSED').length,
       collectionDue: dueToday.reduce((s, l) => s + l.emi, 0) + overdueAmt,
       dueTodayCount: dueToday.length,
       overdueAmt,
       npa: lns.filter((l) => l.status === 'NPA').length,
-      npaOutstanding: lns.filter((l) => l.status === 'NPA').reduce((s, l) => s + l.outstandingPrincipal, 0),
+      npaOutstanding: lns
+        .filter((l) => l.status === 'NPA')
+        .reduce((s, l) => s + l.outstandingPrincipal, 0),
       recovered: recoveryThisMonth(repayments.filter((r) => !scope || r.loanType === scope)),
-      bookSize: lns.filter((l) => l.status !== 'CLOSED').reduce((s, l) => s + l.outstandingPrincipal, 0),
+      bookSize: lns
+        .filter((l) => l.status !== 'CLOSED')
+        .reduce((s, l) => s + l.outstandingPrincipal, 0),
     };
   }, [apps, lns, repayments, scope]);
 
-  // ── live summary (real API) with labelled sample-data fallback ──
-  const { summary: liveSummary, live } = useDashboardSummary();
+  // ── live summary (real API) with labelled sample-data fallback ──────────────
+  const { summary: liveSummary, live, source, error, reload } = useDashboardSummary();
 
-  const approval = useMemo(() => (
-    live && liveSummary
-      ? { ratio: liveSummary.approvalRatio.approvalRate, approved: liveSummary.approvalRatio.approved, rejected: liveSummary.approvalRatio.rejected }
-      : approvalStats(apps)
-  ), [live, liveSummary, apps]);
+  const approval = useMemo(
+    () =>
+      live && liveSummary
+        ? {
+            ratio: liveSummary.approvalRatio.approvalRate,
+            approved: liveSummary.approvalRatio.approved,
+            rejected: liveSummary.approvalRatio.rejected,
+          }
+        : approvalStats(apps),
+    [live, liveSummary, apps],
+  );
 
-  const disbTrend = useMemo(() => (
-    live && liveSummary
-      ? liveSummary.disbursementTrend.map((m) => ({ month: m.month, amount: m.amount / 100 }))
-      : monthlyDisbursement(lns)
-  ), [live, liveSummary, lns]);
+  const disbTrend = useMemo(
+    () =>
+      live && liveSummary
+        ? liveSummary.disbursementTrend.map((m) => ({ month: m.month, amount: m.amount / 100 }))
+        : monthlyDisbursement(lns),
+    [live, liveSummary, lns],
+  );
 
-  const collPerf = useMemo(() => (
-    live && liveSummary
-      // Backend trend has collected amounts only — demand series omitted
-      ? liveSummary.collectionPerformance.map((m) => ({ month: m.month, collected: m.amount / 100 }))
-      : collectionPerformance(lns)
-  ), [live, liveSummary, lns]);
+  const collPerf = useMemo(
+    () =>
+      live && liveSummary
+        ? liveSummary.collectionPerformance.map((m) => ({
+            month: m.month,
+            collected: m.amount / 100,
+          }))
+        : collectionPerformance(lns),
+    [live, liveSummary, lns],
+  );
 
-  const recentApps = useMemo<LoanApplication[]>(() => (
-    live && liveSummary
-      ? liveSummary.recentApplications.map((r) => ({
-          id: r.id,
-          appNumber: `FHR-${new Date(r.applied_at).getFullYear()}-${r.id.replace(/-/g, '').slice(-5).toUpperCase()}`,
-          loanType: 'CDL',
-          status: r.status,
-          customer: { name: r.user?.full_name ?? '—' },
-          loan: { amount: Number(r.approved_amount ?? r.amount_requested) / 100 }, // paise -> rupees
-          createdAt: r.applied_at,
-        } as unknown as LoanApplication))
-      : apps.slice(0, 7)
-  ), [live, liveSummary, apps]);
+  const recentApps = useMemo<LoanApplication[]>(
+    () =>
+      live && liveSummary
+        ? liveSummary.recentApplications.map(
+            (r) =>
+              ({
+                id: r.id,
+                appNumber: `FHR-${new Date(r.applied_at).getFullYear()}-${r.id.replace(/-/g, '').slice(-5).toUpperCase()}`,
+                loanType: 'CDL',
+                status: r.status,
+                customer: { name: r.user?.full_name ?? '—' },
+                loan: { amount: Number(r.approved_amount ?? r.amount_requested) / 100 },
+                createdAt: r.applied_at,
+              }) as unknown as LoanApplication,
+          )
+        : apps.slice(0, 7),
+    [live, liveSummary, apps],
+  );
 
-  const activities = useMemo<AuditLog[]>(() => (
-    live && liveSummary
-      ? liveSummary.recentActivities.map((a) => ({
-          id: a.id,
-          user: a.role ?? 'System',
-          role: a.role ?? 'SYSTEM',
-          module: a.entity_type ?? '—',
-          action: a.action.replace(/_/g, ' '),
-          entity: a.entity_type ?? '—',
-          at: a.created_at,
-          ip: '',
-        } as AuditLog))
-      : auditLogs.slice(0, 7)
-  ), [live, liveSummary, auditLogs]);
+  const activities = useMemo<AuditLog[]>(
+    () =>
+      live && liveSummary
+        ? liveSummary.recentActivities.map(
+            (a) =>
+              ({
+                id: a.id,
+                user: a.role ?? 'System',
+                role: a.role ?? 'SYSTEM',
+                module: a.entity_type ?? '—',
+                action: a.action.replace(/_/g, ' '),
+                entity: a.entity_type ?? '—',
+                at: a.created_at,
+                ip: '',
+              }) as AuditLog,
+          )
+        : auditLogs.slice(0, 7),
+    [live, liveSummary, auditLogs],
+  );
 
-  // ── role-aware metric band ──
+  // ── role-aware metric band ─────────────────────────────────────────────────
   const metrics = useMemo<Metric[]>(() => {
-    if (user.role === 'ADMIN') {
+    if (isAdmin) {
       return [
-        { label: 'Open Applications', value: counts.total - counts.disbursedToday, sub: `${counts.submitted} new today`, to: '/applications' },
-        { label: 'Credit Queue', value: counts.creditPending, sub: 'awaiting underwriting', to: '/applications/credit-pending' },
-        { label: 'Finance Queue', value: counts.financePending, sub: `${counts.emandatePending} at e-mandate`, to: '/applications/finance-pending' },
-        { label: 'Disbursed Today', value: inrCompact(counts.disbursedTodayAmt), sub: `${counts.disbursedToday} loans`, to: '/finance/disbursed' },
-        { label: 'Live Book', value: inrCompact(counts.bookSize), sub: `${counts.activeLoans} active loans`, to: '/lms/accounts' },
-        { label: 'NPA', value: counts.npa, sub: `${inrCompact(counts.npaOutstanding)} at risk`, to: '/collections/npa', danger: counts.npa > 0 },
+        {
+          label: 'Open applications',
+          value: counts.total - counts.disbursedToday,
+          sub: `${counts.submitted} new today`,
+          onClick: () => navigate('/applications'),
+        },
+        {
+          label: 'Credit queue',
+          value: counts.creditPending,
+          sub: 'Awaiting underwriting',
+          onClick: () => navigate('/applications/credit-pending'),
+        },
+        {
+          label: 'Finance queue',
+          value: counts.financePending,
+          sub: `${counts.emandatePending} at e-mandate`,
+          onClick: () => navigate('/applications/finance-pending'),
+        },
+        {
+          label: 'Disbursed today',
+          value: inrCompact(counts.disbursedTodayAmt),
+          sub: `${counts.disbursedToday} loans`,
+          onClick: () => navigate('/finance/disbursed'),
+        },
+        {
+          label: 'Live book',
+          value: inrCompact(counts.bookSize),
+          sub: `${counts.activeLoans} active loans`,
+          onClick: () => navigate('/lms/accounts'),
+        },
+        {
+          label: 'NPA',
+          value: counts.npa,
+          sub: `${inrCompact(counts.npaOutstanding)} at risk`,
+          onClick: () => navigate('/collections/npa'),
+        },
       ];
     }
     if (meta.family === 'CREDIT') {
       return [
-        { label: 'Pending Reviews', value: counts.creditPending, sub: `${counts.submitted} just submitted`, to: '/credit/pending' },
-        { label: 'Approved Today', value: counts.approvedToday, sub: 'moved to finance', to: '/credit/approved' },
-        { label: 'Rejected Today', value: counts.rejectedToday, sub: 'policy declines', to: '/credit/rejected' },
-        { label: 'Returned', value: counts.returned, sub: 'sent back to sales', to: '/credit/returned' },
-        { label: 'Approval Ratio', value: `${approval.ratio}%`, sub: 'on completed reviews', to: '/credit/approved' },
+        {
+          label: 'Pending reviews',
+          value: counts.creditPending,
+          sub: `${counts.submitted} just submitted`,
+          onClick: () => navigate('/credit/pending'),
+        },
+        {
+          label: 'Approved today',
+          value: counts.approvedToday,
+          sub: 'Moved to finance',
+          onClick: () => navigate('/credit/approved'),
+        },
+        {
+          label: 'Rejected today',
+          value: counts.rejectedToday,
+          sub: 'Policy declines',
+          onClick: () => navigate('/credit/rejected'),
+        },
+        {
+          label: 'Returned',
+          value: counts.returned,
+          sub: 'Sent back to sales',
+          onClick: () => navigate('/credit/returned'),
+        },
+        {
+          label: 'Approval ratio',
+          value: `${approval.ratio}%`,
+          sub: 'On completed reviews',
+          onClick: () => navigate('/credit/approved'),
+        },
       ];
     }
     return [
-      { label: 'Pending Disbursement', value: counts.financePending, sub: 'approved by credit', to: '/finance/pending' },
-      { label: 'E-Mandate Pending', value: counts.emandatePending, sub: 'NPCI registration', to: '/finance/emandates' },
-      { label: 'Disbursed Today', value: inrCompact(counts.disbursedTodayAmt), sub: `${counts.disbursedToday} loans`, to: '/finance/disbursed' },
-      { label: 'Live Book', value: inrCompact(counts.bookSize), sub: `${counts.activeLoans} active loans`, to: '/lms/accounts' },
+      {
+        label: 'Pending disbursement',
+        value: counts.financePending,
+        sub: 'Approved by credit',
+        onClick: () => navigate('/finance/pending'),
+      },
+      {
+        label: 'E-mandate pending',
+        value: counts.emandatePending,
+        sub: 'NPCI registration',
+        onClick: () => navigate('/finance/emandates'),
+      },
+      {
+        label: 'Disbursed today',
+        value: inrCompact(counts.disbursedTodayAmt),
+        sub: `${counts.disbursedToday} loans`,
+        onClick: () => navigate('/finance/disbursed'),
+      },
+      {
+        label: 'Live book',
+        value: inrCompact(counts.bookSize),
+        sub: `${counts.activeLoans} active loans`,
+        onClick: () => navigate('/lms/accounts'),
+      },
     ];
-  }, [user.role, meta.family, counts, approval.ratio]);
+  }, [isAdmin, meta.family, counts, approval.ratio, navigate]);
 
-  // ── needs-action worklist ──
+  // ── needs-action worklist ──────────────────────────────────────────────────
   const actions = useMemo<ActionItem[]>(() => {
-    // Live queue counts from the summary endpoint — mapped onto frontend routes
     if (live && liveSummary) {
-      const metaByType: Record<string, Omit<ActionItem, 'title'> & { title: (n: number) => string }> = {
+      const byType: Record<string, Omit<ActionItem, 'title'> & { title: (n: number) => string }> = {
         CREDIT_REVIEW: {
           icon: <SafetyCertificateOutlined />,
           title: (n) => `${n} application${n > 1 ? 's' : ''} awaiting credit review`,
           sub: 'Underwriting complete — pending decision',
           to: meta.family === 'CREDIT' ? '/credit/pending' : '/applications/credit-pending',
-          tone: '#b26a00',
+          tone: 'warning',
         },
         FINANCE_DISBURSEMENT: {
           icon: <BankOutlined />,
           title: (n) => `${n} approval${n > 1 ? 's' : ''} awaiting disbursement`,
           sub: 'Approved by credit — pending fund release',
           to: meta.family === 'FINANCE' ? '/finance/pending' : '/applications/finance-pending',
-          tone: '#3949ab',
+          tone: 'info',
         },
       };
       return liveSummary.pendingActions
-        .filter((a) => metaByType[a.type])
+        .filter((a) => byType[a.type])
         .map((a) => {
-          const m = metaByType[a.type]!;
+          const m = byType[a.type]!;
           return { icon: m.icon, title: m.title(a.count), sub: m.sub, to: m.to, tone: m.tone };
         });
     }
 
     const list: ActionItem[] = [];
     if (meta.family !== 'FINANCE') {
-      if (counts.submitted) list.push({ icon: <FileTextOutlined />, title: `${counts.submitted} new application${counts.submitted > 1 ? 's' : ''} awaiting credit pickup`, sub: 'Sourced via the mobile sales app', to: '/applications/submitted', tone: '#0284c7' });
-      if (counts.creditPending) list.push({ icon: <SafetyCertificateOutlined />, title: `${counts.creditPending} application${counts.creditPending > 1 ? 's' : ''} in the credit review queue`, sub: 'KYC, bureau & document checks pending', to: meta.family === 'CREDIT' ? '/credit/pending' : '/applications/credit-pending', tone: '#b26a00' });
+      if (counts.submitted)
+        list.push({
+          icon: <FileTextOutlined />,
+          title: `${counts.submitted} new application${counts.submitted > 1 ? 's' : ''} awaiting credit pickup`,
+          sub: 'Sourced via the mobile sales app',
+          to: '/applications/submitted',
+          tone: 'info',
+        });
+      if (counts.creditPending)
+        list.push({
+          icon: <SafetyCertificateOutlined />,
+          title: `${counts.creditPending} application${counts.creditPending > 1 ? 's' : ''} in the credit review queue`,
+          sub: 'KYC, bureau and document checks pending',
+          to: meta.family === 'CREDIT' ? '/credit/pending' : '/applications/credit-pending',
+          tone: 'warning',
+        });
     }
     if (meta.family !== 'CREDIT') {
       const financeOnly = counts.financePending - counts.emandatePending;
-      if (financeOnly > 0) list.push({ icon: <BankOutlined />, title: `${financeOnly} approval${financeOnly > 1 ? 's' : ''} awaiting finance processing`, sub: 'Verify fees, bank details & penny-drop', to: meta.family === 'FINANCE' ? '/finance/pending' : '/applications/finance-pending', tone: '#3949ab' });
-      if (counts.emandatePending) list.push({ icon: <ThunderboltOutlined />, title: `${counts.emandatePending} e-mandate${counts.emandatePending > 1 ? 's' : ''} in NACH registration`, sub: 'Awaiting NPCI authentication', to: meta.family === 'FINANCE' ? '/finance/emandates' : '/applications', tone: '#0e7490' });
+      if (financeOnly > 0)
+        list.push({
+          icon: <BankOutlined />,
+          title: `${financeOnly} approval${financeOnly > 1 ? 's' : ''} awaiting finance processing`,
+          sub: 'Verify fees, bank details and penny-drop',
+          to: meta.family === 'FINANCE' ? '/finance/pending' : '/applications/finance-pending',
+          tone: 'info',
+        });
+      if (counts.emandatePending)
+        list.push({
+          icon: <ThunderboltOutlined />,
+          title: `${counts.emandatePending} e-mandate${counts.emandatePending > 1 ? 's' : ''} in NACH registration`,
+          sub: 'Awaiting NPCI authentication',
+          to: meta.family === 'FINANCE' ? '/finance/emandates' : '/applications',
+          tone: 'violet',
+        });
     }
-    if (user.role === 'ADMIN') {
-      if (counts.dueTodayCount) list.push({ icon: <PhoneOutlined />, title: `${counts.dueTodayCount} EMI${counts.dueTodayCount > 1 ? 's' : ''} due for collection today`, sub: `${inr(counts.collectionDue)} collectible incl. overdue`, to: '/collections/due-today', tone: '#1d7a46' });
-      if (counts.npa) list.push({ icon: <WarningOutlined />, title: `${counts.npa} NPA account${counts.npa > 1 ? 's' : ''} under recovery`, sub: `${inrCompact(counts.npaOutstanding)} outstanding`, to: '/collections/npa', tone: '#c0392b' });
+    if (isAdmin) {
+      if (counts.dueTodayCount)
+        list.push({
+          icon: <PhoneOutlined />,
+          title: `${counts.dueTodayCount} EMI${counts.dueTodayCount > 1 ? 's' : ''} due for collection today`,
+          sub: `${inr(counts.collectionDue)} collectible including overdue`,
+          to: '/collections/due-today',
+          tone: 'success',
+        });
+      if (counts.npa)
+        list.push({
+          icon: <WarningOutlined />,
+          title: `${counts.npa} NPA account${counts.npa > 1 ? 's' : ''} under recovery`,
+          sub: `${inrCompact(counts.npaOutstanding)} outstanding`,
+          to: '/collections/npa',
+          tone: 'danger',
+        });
     }
     return list;
-  }, [live, liveSummary, counts, meta.family, user.role]);
+  }, [live, liveSummary, counts, meta.family, isAdmin]);
 
-  // ── portfolio / summary panel ──
+  // ── portfolio panel ────────────────────────────────────────────────────────
   const summary = useMemo<{ label: string; value: React.ReactNode }[]>(() => {
-    if (user.role === 'ADMIN') {
+    if (isAdmin) {
       return [
         { label: 'Live book size', value: inrCompact(counts.bookSize) },
         { label: 'Disbursed today', value: inrCompact(counts.disbursedTodayAmt) },
@@ -224,7 +414,7 @@ const Dashboard: React.FC = () => {
       { label: 'Live book size', value: inrCompact(counts.bookSize) },
       { label: 'Active loans', value: counts.activeLoans },
     ];
-  }, [user.role, meta.family, counts, approval.ratio]);
+  }, [isAdmin, meta.family, counts, approval.ratio]);
 
   const cols: TableProps<LoanApplication>['columns'] = [
     {
@@ -232,166 +422,231 @@ const Dashboard: React.FC = () => {
       dataIndex: 'appNumber',
       render: (v: string, r) => (
         <div>
-          <div style={{ fontWeight: 600, fontSize: 12.5, color: '#0284c7' }}>{v}</div>
-          <div style={{ fontSize: 12, color: '#5a6675' }}>{r.customer.name}</div>
+          <div className="cell-ref">{v}</div>
+          <div className="cell-sub">{r.customer.name}</div>
         </div>
       ),
     },
-    { title: 'Product', dataIndex: 'loanType', width: 130, render: (t) => <LoanTypeTag type={t} full /> },
-    { title: 'Amount', dataIndex: ['loan', 'amount'], align: 'right' as const, width: 130, render: (v: number) => <span className="tnum" style={{ fontWeight: 700, color: '#10202f' }}>{inr(v)}</span> },
-    { title: 'Stage', dataIndex: 'status', width: 150, render: (s: string) => <StatusTag status={s} /> },
-    { title: 'Age', dataIndex: 'createdAt', width: 110, render: (v: string) => <span style={{ color: '#5a6675', fontSize: 12.5 }}>{fmtTimeAgo(v)}</span> },
+    {
+      title: 'Product',
+      dataIndex: 'loanType',
+      width: 130,
+      render: (t) => <LoanTypeTag type={t} full />,
+    },
+    {
+      title: 'Amount',
+      dataIndex: ['loan', 'amount'],
+      width: 130,
+      className: 'col-num',
+      render: (v: number) => <span className="cell-money">{inr(v)}</span>,
+    },
+    {
+      title: 'Stage',
+      dataIndex: 'status',
+      width: 160,
+      render: (s: string) => <StatusTag status={s} />,
+    },
+    {
+      title: 'Age',
+      dataIndex: 'createdAt',
+      width: 110,
+      render: (v: string) => <span className="cell-sub">{fmtTimeAgo(v)}</span>,
+    },
   ];
 
-  const pageTitle = user.role === 'ADMIN' ? 'Operations Dashboard' : meta.family === 'CREDIT' ? 'Credit Workbench' : 'Finance Operations';
+  const pageTitle = isAdmin
+    ? 'Operations'
+    : meta.family === 'CREDIT'
+      ? 'Credit Workbench'
+      : 'Finance Operations';
+
   const needAction = actions.length;
   const subtitle = `${
     needAction > 0
-      ? `${needAction} item${needAction > 1 ? 's' : ''} need your attention${user.role === 'ADMIN' ? ` · ${inrCompact(counts.collectionDue)} collectible today` : ''}`
+      ? `${needAction} item${needAction > 1 ? 's' : ''} need your attention${
+          isAdmin ? ` · ${inrCompact(counts.collectionDue)} collectible today` : ''
+        }`
       : 'You are all caught up — nothing needs action right now'
-  }${live ? '' : ' · sample data (live API unreachable)'}`;
+  }`;
 
-  const showCharts = user.role === 'ADMIN' || meta.family === 'FINANCE';
+  const showCharts = isAdmin || meta.family === 'FINANCE';
 
   return (
-    <div>
+    <div className="page">
       <PageHeader
         title={pageTitle}
         subtitle={subtitle}
-        extra={
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 38, padding: '0 13px', borderRadius: 10, border: '1px solid #e1e6ee', background: '#fff', color: '#3d4a59', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}>
-            <CalendarOutlined style={{ color: '#94a3b8' }} />
-            {dayjs().format('ddd, DD MMM YYYY')}
-          </div>
-        }
+        extra={<span className="t-meta tnum">{dayjs().format('ddd, DD MMM YYYY')}</span>}
       />
 
-      {/* dense metric band */}
-      <div className="metric-band">
-        {metrics.map((m) => (
-          <div key={m.label} className="metric-cell" onClick={() => navigate(m.to)}>
-            <div className="metric-label">{m.label}</div>
-            <div className="metric-value" style={m.danger ? { color: '#c0392b' } : undefined}>{m.value}</div>
-            {m.sub && <div className="metric-sub">{m.sub}</div>}
-          </div>
-        ))}
-      </div>
+      <DataSourceNotice source={source} error={error} onRetry={reload} />
 
-      {/* action center + portfolio */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.9fr) minmax(0, 1fr)', gap: 16, marginTop: 16, alignItems: 'start' }}>
-        <div className="panel">
-          <div className="panel-head">
-            <span className="panel-title">
-              Needs Action
-              <span className={`count-chip${needAction === 0 ? ' count-chip--muted' : ''}`}>{needAction}</span>
-            </span>
-            <span style={{ fontSize: 12, color: '#94a3b8' }}>live</span>
-          </div>
+      <MetricBand metrics={metrics} />
+
+      <div className="dash-split">
+        <Panel
+          title="Needs action"
+          count={needAction}
+          countTone={needAction > 0 ? 'attention' : 'neutral'}
+          flush
+        >
           {needAction === 0 ? (
-            <div style={{ padding: '34px 18px', textAlign: 'center', color: '#7c8896' }}>
-              <CheckCircleOutlined style={{ fontSize: 26, color: '#1d7a46' }} />
-              <div style={{ marginTop: 10, fontSize: 13.5, fontWeight: 600, color: '#1d2733' }}>All clear</div>
-              <div style={{ fontSize: 12.5, marginTop: 3 }}>No applications or accounts are waiting on you.</div>
+            <div className="state-view">
+              <span className="state-view__icon u-success">
+                <CheckCircleOutlined style={{ fontSize: 28 }} />
+              </span>
+              <p className="state-view__title">All clear</p>
+              <p className="state-view__detail">No applications or accounts are waiting on you.</p>
             </div>
           ) : (
             actions.map((a) => (
-              <div key={a.title} className="action-row" onClick={() => navigate(a.to)}>
-                <div className="action-ico" style={{ background: `${a.tone}14`, color: a.tone }}>{a.icon}</div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="action-title">{a.title}</div>
-                  <div className="action-sub">{a.sub}</div>
-                </div>
-                <ArrowRightOutlined style={{ color: '#b6c2d6', fontSize: 13 }} />
-              </div>
+              <button
+                key={a.title}
+                type="button"
+                className="work-row"
+                onClick={() => navigate(a.to)}
+              >
+                <span className={`work-row__slot tone-${a.tone}`}>{a.icon}</span>
+                <span className="grow">
+                  <span className="work-row__title">{a.title}</span>
+                  <span className="work-row__sub">{a.sub}</span>
+                </span>
+                <ArrowRightOutlined className="work-row__go" />
+              </button>
             ))
           )}
-        </div>
+        </Panel>
 
-        <div className="panel">
-          <div className="panel-head">
-            <span className="panel-title">{user.role === 'ADMIN' ? 'Portfolio' : 'Summary'}</span>
-            <span style={{ fontSize: 12, color: '#94a3b8' }}>{user.role === 'ADMIN' ? 'all products' : LOAN_TYPE_META[scope!].short}</span>
-          </div>
+        <Panel
+          title={isAdmin ? 'Portfolio' : 'Summary'}
+          extra={
+            <span className="t-meta">{scope ? LOAN_TYPE_META[scope].short : 'All products'}</span>
+          }
+          flush
+        >
           {summary.map((s) => (
             <div key={s.label} className="stat-row">
-              <span className="stat-label">{s.label}</span>
-              <span className="stat-val">{s.value}</span>
+              <span className="stat-row__label">{s.label}</span>
+              <span className="stat-row__value">{s.value}</span>
             </div>
           ))}
-        </div>
+        </Panel>
       </div>
 
-      {/* operational table */}
-      <div className="panel" style={{ marginTop: 16 }}>
-        <div className="panel-head">
-          <span className="panel-title">Recent Applications</span>
-          <Button type="link" size="small" style={{ fontWeight: 600 }} onClick={() => navigate('/applications')}>
-            View all <ArrowRightOutlined style={{ fontSize: 11 }} />
+      <Panel
+        title="Recent applications"
+        extra={
+          <Button type="link" size="small" onClick={() => navigate('/applications')}>
+            View all <ArrowRightOutlined />
           </Button>
-        </div>
-        <Table<LoanApplication>
+        }
+        flush
+      >
+        <DataTable<LoanApplication>
+          density={density}
           dataSource={recentApps}
           columns={cols}
           rowKey="id"
-          size="middle"
           pagination={false}
           className="row-link"
           onRow={(r) => ({ onClick: () => navigate(`/applications/view/${r.id}`) })}
         />
-      </div>
+      </Panel>
 
-      {/* supporting trends + activity */}
-      <div style={{ display: 'grid', gridTemplateColumns: user.role === 'ADMIN' ? 'minmax(0, 1.9fr) minmax(0, 1fr)' : '1fr', gap: 16, marginTop: 16, alignItems: 'start' }}>
-        {showCharts && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-            <ChartCard title="Disbursement" subtitle="Monthly principal — last 6 months" height={210}>
-              <ResponsiveContainer>
-                <BarChart data={disbTrend} margin={{ top: 6, right: 8, left: -8, bottom: 0 }}>
-                  <CartesianGrid stroke={CHART_COLORS.grid} vertical={false} />
-                  <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#7c8896' }} axisLine={false} tickLine={false} />
-                  <YAxis tickFormatter={(v: number) => inrCompact(v)} tick={{ fontSize: 11, fill: '#7c8896' }} axisLine={false} tickLine={false} width={58} />
-                  <Tooltip contentStyle={tooltipStyle} itemStyle={tooltipItemStyle} labelStyle={tooltipLabelStyle} formatter={(v) => inr(Number(v))} />
-                  <Bar dataKey="amount" name="Disbursed" fill={CHART_COLORS.CDL} radius={[5, 5, 0, 0]} maxBarSize={38} />
-                </BarChart>
-              </ResponsiveContainer>
-            </ChartCard>
-            <ChartCard title="Collections" subtitle="Demand vs collected" height={210}>
-              <ResponsiveContainer>
-                <BarChart data={collPerf} margin={{ top: 6, right: 8, left: -8, bottom: 0 }} barGap={3}>
-                  <CartesianGrid stroke={CHART_COLORS.grid} vertical={false} />
-                  <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#7c8896' }} axisLine={false} tickLine={false} />
-                  <YAxis tickFormatter={(v: number) => inrCompact(v)} tick={{ fontSize: 11, fill: '#7c8896' }} axisLine={false} tickLine={false} width={58} />
-                  <Tooltip contentStyle={tooltipStyle} itemStyle={tooltipItemStyle} labelStyle={tooltipLabelStyle} formatter={(v) => inr(Number(v))} />
-                  <Bar dataKey="due" name="Demand" fill="#cdd9f3" radius={[5, 5, 0, 0]} maxBarSize={22} />
-                  <Bar dataKey="collected" name="Collected" fill={CHART_COLORS.green} radius={[5, 5, 0, 0]} maxBarSize={22} />
-                </BarChart>
-              </ResponsiveContainer>
-            </ChartCard>
-          </div>
-        )}
+      {(showCharts || isAdmin) && (
+        <div className={isAdmin ? 'dash-split' : ''}>
+          {showCharts && (
+            <div className="dash-charts">
+              <ChartCard
+                title="Disbursement"
+                subtitle="Monthly principal — last 6 months"
+                height={200}
+              >
+                <ResponsiveContainer>
+                  <BarChart data={disbTrend} margin={{ top: 4, right: 4, left: -12, bottom: 0 }}>
+                    <CartesianGrid {...gridProps} />
+                    <XAxis dataKey="month" {...axisProps} />
+                    <YAxis tickFormatter={(v: number) => inrCompact(v)} width={56} {...axisProps} />
+                    <Tooltip
+                      cursor={{ fill: 'var(--ink-50)' }}
+                      contentStyle={tooltipStyle}
+                      itemStyle={tooltipItemStyle}
+                      labelStyle={tooltipLabelStyle}
+                      formatter={(v) => inr(Number(v))}
+                    />
+                    <Bar
+                      dataKey="amount"
+                      name="Disbursed"
+                      fill={chart.CDL}
+                      radius={BAR_RADIUS}
+                      maxBarSize={32}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartCard>
 
-        {user.role === 'ADMIN' && (
-          <div className="panel">
-            <div className="panel-head">
-              <span className="panel-title">Recent Activity</span>
-              <Button type="link" size="small" style={{ fontWeight: 600 }} onClick={() => navigate('/audit')}>Audit log</Button>
+              <ChartCard title="Collections" subtitle="Demand vs collected" height={200}>
+                <ResponsiveContainer>
+                  <BarChart
+                    data={collPerf}
+                    margin={{ top: 4, right: 4, left: -12, bottom: 0 }}
+                    barGap={2}
+                  >
+                    <CartesianGrid {...gridProps} />
+                    <XAxis dataKey="month" {...axisProps} />
+                    <YAxis tickFormatter={(v: number) => inrCompact(v)} width={56} {...axisProps} />
+                    <Tooltip
+                      cursor={{ fill: 'var(--ink-50)' }}
+                      contentStyle={tooltipStyle}
+                      itemStyle={tooltipItemStyle}
+                      labelStyle={tooltipLabelStyle}
+                      formatter={(v) => inr(Number(v))}
+                    />
+                    <Bar
+                      dataKey="due"
+                      name="Demand"
+                      fill={chart.grid}
+                      radius={BAR_RADIUS}
+                      maxBarSize={18}
+                    />
+                    <Bar
+                      dataKey="collected"
+                      name="Collected"
+                      fill={chart.positive}
+                      radius={BAR_RADIUS}
+                      maxBarSize={18}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartCard>
             </div>
-            <div style={{ padding: '4px 0' }}>
+          )}
+
+          {isAdmin && (
+            <Panel
+              title="Recent activity"
+              extra={
+                <Button type="link" size="small" onClick={() => navigate('/audit')}>
+                  Audit log
+                </Button>
+              }
+              flush
+            >
               {activities.map((item) => (
-                <div key={item.id} style={{ display: 'flex', gap: 11, alignItems: 'center', padding: '9px 18px' }}>
-                  <Avatar size={30} style={{ background: '#e0f2fe', color: '#0284c7', fontWeight: 700, fontSize: 11, minWidth: 30 }}>
-                    {initials(item.user)}
-                  </Avatar>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 12.5, fontWeight: 600, color: '#1d2733', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.action}</div>
-                    <div style={{ fontSize: 11.5, color: '#8a97a6' }}>{item.user} · {item.entity} · {fmtTimeAgo(item.at)}</div>
+                <div key={item.id} className="activity-row">
+                  <span className="activity-row__who">{initials(item.user)}</span>
+                  <div className="grow">
+                    <div className="work-row__title truncate">{item.action}</div>
+                    <div className="work-row__sub">
+                      {item.user} · {item.entity} · {fmtTimeAgo(item.at)}
+                    </div>
                   </div>
                 </div>
               ))}
-            </div>
-          </div>
-        )}
-      </div>
+            </Panel>
+          )}
+        </div>
+      )}
     </div>
   );
 };

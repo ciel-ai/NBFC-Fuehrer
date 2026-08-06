@@ -1,0 +1,618 @@
+/* ============================================================================
+   Sign in — "the register".
+
+   ONE idea: the page is a ruled record, not a card. A single vertical hairline
+   (the ledger gutter) divides an editorial identity column from the sign-in
+   mechanism. No card, no gradient, no blur, no illustration — structure and
+   type do the work. The accent (sky) is spent in exactly three structural
+   places: the sliding desk indicator, the input focus line, and the button.
+
+   GRID   full-bleed masthead / two-pane record / full-bleed footer, all three
+          aligned to one --auth-max container so the edges line up like a page.
+   TYPE   Georgia display headline (reserved for this screen only) against
+          Inter uppercase micro-caps; real scale contrast, tabular OTP/phone.
+   COLOR  ink neutrals + hairlines; sky is the sole accent, used sparingly.
+   MOTION functional only — a ≤180ms fade on step change, a sliding indicator;
+          both disabled under prefers-reduced-motion.
+   ========================================================================== */
+
+.auth {
+  --auth-max: 1160px;
+  --auth-pad: clamp(24px, 5vw, 72px);
+  --auth-serif: Georgia, 'Times New Roman', serif;
+  --auth-display: clamp(2.25rem, 1.5rem + 3.1vw, 3.5rem);
+
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  background: var(--ink-50);
+  color: var(--ink-900);
+  font-family: var(--font-family);
+}
+
+/* ---- Full-bleed bars, container-aligned content --------------------------- */
+
+.auth__bar-inner {
+  width: 100%;
+  max-width: var(--auth-max);
+  margin: 0 auto;
+  padding: 0 var(--auth-pad);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.auth__masthead {
+  padding-block: var(--space-4);
+  background: var(--ink-0);
+  border-bottom: 1px solid var(--ink-150);
+}
+
+.auth__wordmark {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  gap: var(--space-3);
+  font-size: var(--text-md);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.02em;
+  color: var(--ink-900);
+}
+
+.auth__logo {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+/* The mark is a raster; a small saturation lift keeps it crisp at 32px on white.
+   No drop-shadow — a glow would fight the flat, institutional surface. */
+.auth__logo img {
+  filter: saturate(1.2) contrast(1.03);
+}
+
+.auth__masthead-note {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-500);
+  white-space: nowrap;
+}
+
+/* ---- The record: two panes divided by the gutter hairline ----------------- */
+
+.auth__main {
+  display: grid;
+  align-items: stretch;
+}
+
+.auth__split {
+  width: 100%;
+  max-width: var(--auth-max);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 464px);
+}
+
+.auth__identity,
+.auth__form-pane {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  padding-block: clamp(40px, 7vh, 88px);
+}
+
+.auth__identity {
+  padding-inline: var(--auth-pad) clamp(40px, 5vw, 80px);
+}
+
+/* The single vertical rule — the whole concept in one declaration. */
+.auth__form-pane {
+  padding-inline: clamp(40px, 5vw, 80px) var(--auth-pad);
+  border-left: 1px solid var(--ink-150);
+}
+
+/* ---- Identity column ------------------------------------------------------ */
+
+.auth__identity-inner {
+  max-width: 440px;
+}
+
+.auth__eyebrow {
+  margin: 0 0 var(--space-4);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-500);
+}
+
+.auth__title {
+  margin: 0;
+  font-family: var(--auth-serif);
+  font-size: var(--auth-display);
+  font-weight: 400;
+  line-height: 1.03;
+  letter-spacing: -0.02em;
+  color: var(--ink-900);
+  text-wrap: balance;
+}
+
+.auth__lead {
+  margin: var(--space-5) 0 0;
+  max-width: 40ch;
+  font-size: var(--text-md);
+  line-height: var(--leading-relaxed);
+  color: var(--ink-600);
+}
+
+/* Regulated-entity plate — a description list, because that is what it is. */
+.auth__entity {
+  margin: clamp(32px, 6vh, 56px) 0 0;
+  padding-top: var(--space-4);
+  max-width: 40ch;
+  border-top: 1px solid var(--ink-150);
+}
+
+.auth__entity dt {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-400);
+}
+
+.auth__entity dd {
+  margin: 0;
+}
+
+.auth__entity-name {
+  margin-top: var(--space-2);
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  color: var(--ink-800);
+}
+
+.auth__entity-note {
+  margin-top: 2px;
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  color: var(--ink-500);
+}
+
+/* ---- Form pane ------------------------------------------------------------ */
+
+.auth__form-inner {
+  width: 100%;
+  max-width: 384px;
+}
+
+.auth__label {
+  display: block;
+  margin-bottom: var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-500);
+}
+
+/* Desk register — a baseline rule with a sliding sky indicator. The indicator
+   position is driven by --desk-i (0|1|2) set on the tablist, so it is pure CSS
+   translate with no measurement. */
+.auth__desk {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-bottom: 1px solid var(--ink-150);
+}
+
+.auth__tab {
+  min-height: 44px;
+  padding: 0 var(--space-2) var(--space-3);
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.01em;
+  color: var(--ink-500);
+  transition: color var(--motion-fast) var(--ease);
+}
+
+.auth__tab:hover {
+  color: var(--ink-900);
+}
+
+.auth__tab[aria-selected='true'] {
+  color: var(--ink-900);
+  font-weight: var(--weight-semibold);
+}
+
+.auth__tab:focus-visible {
+  outline: none;
+  color: var(--ink-900);
+  border-radius: var(--radius-sm);
+  box-shadow: inset 0 0 0 2px var(--sky-line);
+}
+
+.auth__desk-ind {
+  position: absolute;
+  left: 0;
+  bottom: -1px;
+  width: calc(100% / 3);
+  height: 2px;
+  background: var(--sky);
+  transform: translateX(calc(var(--desk-i, 0) * 100%));
+  transition: transform var(--motion-base) var(--ease);
+}
+
+/* Reserved height: the hint runs one line (Admin) or two (OTP sent) — reserving
+   the taller case means switching desks never reflows the form below it. */
+.auth__hint {
+  margin: var(--space-4) 0 var(--space-6);
+  min-height: 40px;
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  color: var(--ink-600);
+}
+
+.auth__panel-region {
+  position: relative;
+}
+
+.auth__anim {
+  animation: auth-fade var(--motion-base) var(--ease-out) both;
+}
+
+@keyframes auth-fade {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ---- Fields: underline inputs, floated errors (no layout shift) ------------ */
+
+.auth__fields .ant-form-item {
+  position: relative;
+  margin-bottom: var(--space-6);
+}
+
+.auth__fields .ant-form-item-label {
+  padding-bottom: var(--space-1);
+}
+
+.auth__fields .ant-form-item-label > label {
+  height: auto;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-500);
+}
+
+/* The explain message is taken out of flow and floated into the item's reserved
+   bottom margin — so an appearing error never pushes the button down. */
+.auth__fields .ant-form-item-explain {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: var(--space-1);
+  font-size: var(--text-xs);
+  line-height: 1.4;
+}
+
+.auth__fields .ant-input,
+.auth__fields .ant-input-affix-wrapper,
+.auth__fields .ant-input-outlined {
+  height: 46px;
+  padding-inline: 0;
+  border: none;
+  border-bottom: 1px solid var(--ink-200);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  transition:
+    border-color var(--motion-base) var(--ease),
+    box-shadow var(--motion-base) var(--ease);
+}
+
+.auth__fields .ant-input-lg {
+  font-size: var(--text-lg);
+  padding-block: 8px;
+}
+
+.auth__fields .ant-input::placeholder {
+  color: var(--ink-300);
+}
+
+.auth__fields .ant-input:hover,
+.auth__fields .ant-input-affix-wrapper:hover {
+  border-bottom-color: var(--ink-500);
+}
+
+.auth__fields .ant-input:focus,
+.auth__fields .ant-input-focused,
+.auth__fields .ant-input-affix-wrapper:focus,
+.auth__fields .ant-input-affix-wrapper-focused {
+  border-bottom-color: var(--sky);
+  box-shadow: 0 1px 0 0 var(--sky);
+}
+
+.auth__fields .ant-input-status-error,
+.auth__fields .ant-input-affix-wrapper-status-error {
+  border-bottom-color: var(--status-danger-fg) !important;
+  box-shadow: none !important;
+}
+
+/* The affix wrapper (phone +91 prefix) owns the underline; its inner input must
+   not draw a second one. */
+.auth__fields .ant-input-affix-wrapper > input.ant-input {
+  height: auto;
+  border-bottom: none;
+  box-shadow: none;
+}
+
+.auth__dial {
+  padding-right: var(--space-3);
+  margin-right: var(--space-3);
+  border-right: 1px solid var(--ink-200);
+  color: var(--ink-600);
+  font-variant-numeric: tabular-nums;
+}
+
+.auth__back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-bottom: var(--space-5);
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--ink-600);
+  transition:
+    gap var(--motion-fast) var(--ease),
+    color var(--motion-fast) var(--ease);
+}
+
+.auth__back:hover {
+  color: var(--sky);
+  gap: var(--space-2);
+}
+
+.auth__back:focus-visible {
+  outline: 2px solid var(--sky-line);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.auth__fields .ant-otp {
+  width: 100%;
+  display: flex;
+  gap: var(--space-3);
+}
+
+.auth__fields .ant-otp .ant-input {
+  flex: 1;
+  min-width: 0;
+  height: 56px;
+  text-align: center;
+  font-size: var(--text-xl);
+  font-variant-numeric: tabular-nums;
+  border-bottom-width: 1px;
+}
+
+/* ---- Submit --------------------------------------------------------------- */
+
+.auth__submit {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-4);
+  margin-top: var(--space-6);
+}
+
+.auth .ant-btn-primary.auth__go {
+  height: 48px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--sky);
+  box-shadow: none;
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.01em;
+  transition:
+    background var(--motion-fast) var(--ease),
+    transform var(--motion-fast) var(--ease);
+}
+
+.auth .ant-btn-primary.auth__go:not(:disabled):hover {
+  background: var(--sky-hover) !important;
+  transform: translateY(-1px);
+}
+
+.auth .ant-btn-primary.auth__go:not(:disabled):active {
+  background: var(--sky-press) !important;
+  transform: none;
+}
+
+.auth .ant-btn-primary.auth__go:focus-visible {
+  outline: none;
+  box-shadow: var(--sky-focus-ring) !important;
+}
+
+.auth__link {
+  align-self: center;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--ink-600);
+  transition: color var(--motion-fast) var(--ease);
+}
+
+.auth__link:hover {
+  color: var(--sky);
+}
+
+.auth__link:focus-visible {
+  outline: 2px solid var(--sky-line);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.auth__link.is-muted {
+  color: var(--ink-500);
+  cursor: default;
+}
+
+.auth__tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+.auth__reveal {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sky);
+}
+
+.auth__reveal:hover {
+  color: var(--sky-hover);
+}
+
+.auth__reveal:focus-visible {
+  outline: 2px solid var(--sky-line);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.auth__label-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  width: 100%;
+  gap: var(--space-3);
+}
+
+/* ---- Footer --------------------------------------------------------------- */
+
+.auth__foot {
+  padding-block: var(--space-4);
+  background: var(--ink-0);
+  border-top: 1px solid var(--ink-150);
+}
+
+.auth__foot .auth__bar-inner {
+  font-size: var(--text-xs);
+  color: var(--ink-500);
+}
+
+.auth__foot-legal {
+  min-width: 0;
+}
+
+.auth__foot-links {
+  display: flex;
+  gap: var(--space-5);
+}
+
+.auth__foot-links a {
+  color: var(--ink-500);
+  cursor: pointer;
+  transition: color var(--motion-fast) var(--ease);
+}
+
+.auth__foot-links a:hover {
+  color: var(--sky);
+}
+
+.auth__foot-links a:focus-visible {
+  outline: 2px solid var(--sky-line);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* ---- Responsive ----------------------------------------------------------- *
+   ≤920px  the gutter turns 90°: the two panes stack, the vertical rule becomes
+           a horizontal one, and both panes top-align in a single 560px column.
+   ≤560px  masthead note drops, footer stacks; the display headline keeps
+           shrinking on its own clamp. No horizontal scroll at any width. */
+
+@media (max-width: 920px) {
+  .auth__split {
+    grid-template-columns: 1fr;
+    max-width: 560px;
+  }
+
+  .auth__identity {
+    justify-content: flex-start;
+    padding-block: clamp(32px, 6vh, 56px) var(--space-6);
+    padding-inline: var(--auth-pad);
+  }
+
+  .auth__form-pane {
+    justify-content: flex-start;
+    padding-block: var(--space-6) clamp(32px, 6vh, 56px);
+    padding-inline: var(--auth-pad);
+    border-left: none;
+    border-top: 1px solid var(--ink-150);
+  }
+
+  .auth__identity-inner {
+    max-width: none;
+  }
+
+  .auth__form-inner {
+    max-width: 420px;
+    margin-inline: auto;
+  }
+}
+
+@media (max-width: 560px) {
+  .auth__masthead-note {
+    display: none;
+  }
+
+  .auth__foot .auth__bar-inner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-2);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth__anim {
+    animation: none;
+  }
+
+  .auth__desk-ind {
+    transition: none;
+  }
+
+  .auth .ant-btn-primary.auth__go:not(:disabled):hover {
+    transform: none;
+  }
+
+  .auth__back:hover {
+    gap: var(--space-1);
+  }
+}

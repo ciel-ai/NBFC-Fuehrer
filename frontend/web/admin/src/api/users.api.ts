@@ -66,4 +66,12 @@ export const usersApi = {
     const res = await apiClient.post(`/users/${id}/deactivate`);
     return res.data;
   },
+
+  // Backend: POST /users/:id/reset-password → resets the user's credential and
+  // returns the temporary password it actually set. The UI must display only
+  // this value — never a client-generated one, which would never authenticate.
+  resetPassword: async (id: string): Promise<{ temporaryPassword: string }> => {
+    const res = await apiClient.post(`/users/${id}/reset-password`);
+    return res.data.data;
+  },
 };

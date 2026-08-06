@@ -1,54 +1,32 @@
-import React, { useEffect, useState } from 'react';
-import { App, Button, Checkbox, Form, Input } from 'antd';
-import {
-  ArrowLeftOutlined, BankOutlined, DownOutlined, SafetyCertificateOutlined, UserOutlined,
-} from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { App, Button, Form, Input } from 'antd';
+import { ArrowLeftOutlined } from '@ant-design/icons';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { staffAuthApi, staffAuthError } from '../api/staffAuth.api';
 import type { StaffAuthResult, StaffPortal } from '../api/staffAuth.api';
 import { USE_MOCK } from '../config';
+import { BRAND } from '../theme/tokens';
+import { LogoMark } from '../components/Logo';
+import './Login.css';
+
+/* ============================================================================
+ * Staff sign-in — "the register".
+ *
+ * A ruled record, not a card: one vertical hairline (the ledger gutter) splits
+ * an editorial identity column from the sign-in mechanism. Three access paths
+ * live behind one desk switcher — Admin (username + password) and the Credit /
+ * Finance desks (registered-mobile → OTP). One accent (sky) is spent in exactly
+ * three structural places: the desk indicator, the input focus line, the button.
+ * ==========================================================================*/
 
 type Portal = 'Admin' | 'Credit Team' | 'Finance Team';
 
-const TABS: { label: string; value: Portal; icon: React.ReactNode }[] = [
-  { label: 'Admin', value: 'Admin', icon: <UserOutlined /> },
-  { label: 'Credit', value: 'Credit Team', icon: <SafetyCertificateOutlined /> },
-  { label: 'Finance', value: 'Finance Team', icon: <BankOutlined /> },
+const PORTALS: { value: Portal; tab: string; label: string }[] = [
+  { value: 'Admin', tab: 'Admin', label: 'Administration' },
+  { value: 'Credit Team', tab: 'Credit', label: 'the Credit desk' },
+  { value: 'Finance Team', tab: 'Finance', label: 'the Finance desk' },
 ];
-
-/** Floating dashboard-preview cards for the brand panel — pure shapes, always crisp. */
-const HeroCards: React.FC = () => (
-  <div className="wl-hero" aria-hidden="true">
-    <div className="wl-ring" />
-    <div className="wl-ring wl-ring--sm" />
-
-    {/* main stat card */}
-    <div className="wl-mock wl-mock--main">
-      <div className="wl-mock-label">Live Book</div>
-      <div className="wl-mock-value">₹2.4 Cr</div>
-      <div className="wl-mock-bars">
-        <span style={{ height: 16 }} /><span style={{ height: 26 }} /><span style={{ height: 20 }} />
-        <span style={{ height: 34 }} /><span style={{ height: 27 }} /><span style={{ height: 42 }} />
-      </div>
-    </div>
-
-    {/* secondary row card */}
-    <div className="wl-mock wl-mock--row">
-      <span className="wl-mock-dot" />
-      <div>
-        <div className="wl-mock-label">EMI collected</div>
-        <div className="wl-mock-strong">₹4,82,300</div>
-      </div>
-      <span className="wl-mock-pill">+12.4%</span>
-    </div>
-
-    {/* small chip card */}
-    <div className="wl-mock wl-mock--chip">
-      <span className="wl-mock-check">✓</span> Disbursal approved
-    </div>
-  </div>
-);
 
 const Login: React.FC = () => {
   const { message } = App.useApp();
@@ -59,15 +37,47 @@ const Login: React.FC = () => {
   const [portal, setPortal] = useState<Portal>('Admin');
   const [otpStage, setOtpStage] = useState<'phone' | 'otp'>('phone');
   const [phone, setPhone] = useState('');
+  const [showPw, setShowPw] = useState(false);
   const [resendIn, setResendIn] = useState(0);
   const [loading, setLoading] = useState(false);
   const [adminForm] = Form.useForm();
   const [phoneForm] = Form.useForm();
   const [otpForm] = Form.useForm();
 
+  /* Where to land after sign-in. Defaults to the dashboard, but a session that
+     expired mid-task leaves a return path (see api/client.ts) so we can drop the
+     user back where they were interrupted. */
+  const [landing, setLanding] = useState('/dashboard');
+
+  const activeIndex = PORTALS.findIndex((p) => p.value === portal);
+  const active = PORTALS[activeIndex] ?? PORTALS[0];
+
+  /* Roving focus for the desk tablist, tracked separately from the selected
+     desk (ARIA manual-activation: arrows move focus, Enter/Space commits). */
+  const [focusIndex, setFocusIndex] = useState(activeIndex);
+  const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  useEffect(() => setFocusIndex(activeIndex), [activeIndex]);
+
   useEffect(() => {
     if (user) navigate('/dashboard', { replace: true });
   }, [user, navigate]);
+
+  /* The "Session Expired" state: if we arrived here from an expired session,
+     say so once and remember where to return. */
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem('fuehrer.sessionEnded');
+      if (!raw) return;
+      sessionStorage.removeItem('fuehrer.sessionEnded');
+      const info = JSON.parse(raw) as { from?: string };
+      if (info.from && info.from !== '/login') setLanding(info.from);
+      message.info('Your session expired. Please sign in again.');
+    } catch {
+      /* malformed note — ignore */
+    }
+    // Read once on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (resendIn <= 0) return;
@@ -76,8 +86,8 @@ const Login: React.FC = () => {
   }, [resendIn]);
 
   const portalFamily: StaffPortal = portal === 'Credit Team' ? 'CREDIT' : 'FINANCE';
+  const year = useMemo(() => new Date().getFullYear(), []);
 
-  /** Persist the authenticated session (user + real JWT pair) and enter the portal. */
   const finishLogin = (result: StaffAuthResult): void => {
     const u = result.user;
     login(
@@ -93,21 +103,27 @@ const Login: React.FC = () => {
       { accessToken: result.accessToken, refreshToken: result.refreshToken },
     );
     message.success(`Welcome back, ${u.name.split(' ')[0]}`);
-    navigate('/dashboard', { replace: true });
+    navigate(landing, { replace: true });
   };
 
   const handleAdmin = async (values: { username: string; password: string }): Promise<void> => {
     setLoading(true);
     if (USE_MOCK) {
-      // Mock mode — bypass real API, sign in instantly as SUPER_ADMIN
       await new Promise((r) => setTimeout(r, 400));
       login(
-        { id: 'mock-admin-1', name: 'Mock Administrator', role: 'SUPER_ADMIN',
-          email: 'admin@mock.dev', phone: '9999900000', branch: 'Head Office', loginAt: new Date().toISOString() },
+        {
+          id: 'mock-admin-1',
+          name: 'Mock Administrator',
+          role: 'SUPER_ADMIN',
+          email: 'admin@mock.dev',
+          phone: '9999900000',
+          branch: 'Head Office',
+          loginAt: new Date().toISOString(),
+        },
         { accessToken: 'mock-access-token', refreshToken: 'mock-refresh-token' },
       );
       message.success('Signed in (mock mode)');
-      navigate('/dashboard', { replace: true });
+      navigate(landing, { replace: true });
       setLoading(false);
       return;
     }
@@ -137,10 +153,11 @@ const Login: React.FC = () => {
       setPhone(toPhone);
       setOtpStage('otp');
       setResendIn(30);
-      // devOtp is only returned by non-production builds of the API
-      message.success(r.devOtp
-        ? `OTP sent to +91 ${toPhone} (dev OTP: ${r.devOtp})`
-        : `OTP sent to +91 ${toPhone}`);
+      message.success(
+        r.devOtp
+          ? `OTP sent to +91 ${toPhone} (dev OTP: ${r.devOtp})`
+          : `OTP sent to +91 ${toPhone}`,
+      );
     } catch (err) {
       message.error(staffAuthError(err));
     } finally {
@@ -148,22 +165,28 @@ const Login: React.FC = () => {
     }
   };
 
-  const sendOtp = (values: { phone: string }): void => { void requestOtp(values.phone); };
-
   const verifyOtp = async (values: { otp: string }): Promise<void> => {
     setLoading(true);
     if (USE_MOCK) {
       await new Promise((r) => setTimeout(r, 400));
-      const roleMap: Record<string, string> = { 'Credit Team': 'CREDIT_CDL', 'Finance Team': 'FINANCE_CDL' };
+      const roleMap: Record<string, string> = {
+        'Credit Team': 'CREDIT_CDL',
+        'Finance Team': 'FINANCE_CDL',
+      };
       login(
-        { id: `mock-${portal.toLowerCase().replace(' ', '-')}-1`, name: `Mock ${portal}`,
+        {
+          id: `mock-${portal.toLowerCase().replace(' ', '-')}-1`,
+          name: `Mock ${portal}`,
           role: (roleMap[portal] ?? 'CREDIT_CDL') as never,
-          email: `mock@${portal.toLowerCase().replace(' ', '')}.dev`, phone,
-          branch: 'Head Office', loginAt: new Date().toISOString() },
+          email: `mock@${portal.toLowerCase().replace(' ', '')}.dev`,
+          phone,
+          branch: 'Head Office',
+          loginAt: new Date().toISOString(),
+        },
         { accessToken: 'mock-access-token', refreshToken: 'mock-refresh-token' },
       );
       message.success(`Signed in as ${portal} (mock mode)`);
-      navigate('/dashboard', { replace: true });
+      navigate(landing, { replace: true });
       setLoading(false);
       return;
     }
@@ -180,120 +203,297 @@ const Login: React.FC = () => {
   const switchPortal = (p: Portal): void => {
     setPortal(p);
     setOtpStage('phone');
+    setShowPw(false);
   };
 
-  const resetOtpFlow = (): void => {
-    setOtpStage('phone');
-    otpForm.resetFields();
+  /* ARIA authoring practice: roving tabindex + manual activation. */
+  const onTabKeyDown = (e: React.KeyboardEvent<HTMLDivElement>): void => {
+    let next = focusIndex;
+    switch (e.key) {
+      case 'ArrowRight':
+      case 'ArrowDown':
+        next = (focusIndex + 1) % PORTALS.length;
+        break;
+      case 'ArrowLeft':
+      case 'ArrowUp':
+        next = (focusIndex - 1 + PORTALS.length) % PORTALS.length;
+        break;
+      case 'Home':
+        next = 0;
+        break;
+      case 'End':
+        next = PORTALS.length - 1;
+        break;
+      case 'Enter':
+      case ' ':
+        e.preventDefault();
+        switchPortal(PORTALS[focusIndex].value);
+        return;
+      default:
+        return;
+    }
+    e.preventDefault();
+    setFocusIndex(next);
+    tabRefs.current[next]?.focus();
   };
+
+  const hint =
+    portal === 'Admin'
+      ? 'Enter your administrator username and password.'
+      : otpStage === 'phone'
+        ? `We'll send a one-time code to the mobile registered against ${active.label}.`
+        : `Enter the six-digit code sent to +91 ${phone}.`;
 
   return (
-    <div className="wl-page">
-      <div className="wl-card auth-rise">
+    <div className="auth">
+      <header className="auth__masthead">
+        <div className="auth__bar-inner">
+          <span className="auth__wordmark">
+            <LogoMark size={32} className="auth__logo" />
+            {BRAND.wordmark}
+          </span>
+          <span className="auth__masthead-note">{BRAND.product} &middot; Staff access</span>
+        </div>
+      </header>
 
-        {/* ── brand panel ── */}
-        <aside className="wl-left">
-          <div className="wl-brand">Fuehrer</div>
-          <div className="wl-tag">
-            Lending operations, beautifully unified — origination to collections in one portal.
-          </div>
-          <HeroCards />
-        </aside>
-
-        {/* ── form panel ── */}
-        <section className="wl-right">
-          <div className="wl-lang">ENGLISH (IN) <DownOutlined style={{ fontSize: 9 }} /></div>
-
-          <div className="wl-body">
-            <h1 className="wl-title">
-              {portal === 'Admin' ? 'Sign in to Fuehrer' : `${portal} sign in`}
-            </h1>
-            <div className="wl-sub">Staff access · secure &amp; RBI-compliant.</div>
-
-            {/* portal switcher — same three roles, restyled as outlined chips */}
-            <div className="wl-portals">
-              {TABS.map((t) => (
-                <button
-                  key={t.value}
-                  type="button"
-                  className={`wl-portal${portal === t.value ? ' active' : ''}`}
-                  onClick={() => switchPortal(t.value)}
-                >
-                  {t.icon} {t.label}
-                </button>
-              ))}
+      <main className="auth__main">
+        <section className="auth__split">
+          <div className="auth__identity">
+            <div className="auth__identity-inner">
+              <p className="auth__eyebrow">Staff sign-in</p>
+              <h1 className="auth__title">The lending operations console.</h1>
+              <p className="auth__lead">
+                Originate, underwrite, and service the loan book from a single desk.
+              </p>
+              <dl className="auth__entity">
+                <dt>Regulated entity</dt>
+                <dd className="auth__entity-name">{BRAND.legalName}</dd>
+                <dd className="auth__entity-note">
+                  Non-Banking Financial Company &middot; Regulated by the Reserve Bank of India
+                </dd>
+              </dl>
             </div>
+          </div>
 
-            {portal === 'Admin' ? (
-              <Form form={adminForm} layout="vertical" onFinish={handleAdmin} requiredMark={false}>
-                <Form.Item name="username" rules={[{ required: true, message: 'Enter your username' }]} className="wl-item">
-                  <Input className="u-input" variant="borderless" placeholder="Username" autoFocus />
-                </Form.Item>
-                <Form.Item name="password" rules={[{ required: true, message: 'Enter your password' }]} className="wl-item">
-                  <Input.Password className="u-input" variant="borderless" placeholder="Password" />
-                </Form.Item>
-                <div className="wl-row">
-                  <Checkbox defaultChecked><span className="wl-muted">Remember me</span></Checkbox>
-                  <Button type="link" size="small" style={{ padding: 0, fontWeight: 600 }}
-                    onClick={() => message.info('Contact your administrator to reset your password.')}>
-                    Forgot password?
-                  </Button>
-                </div>
-                <Button className="wl-btn" type="primary" htmlType="submit" block loading={loading}>
-                  Sign In
-                </Button>
-              </Form>
-            ) : otpStage === 'phone' ? (
-              <Form form={phoneForm} layout="vertical" onFinish={sendOtp} requiredMark={false}>
-                <Form.Item
-                  name="phone"
-                  rules={[
-                    { required: true, message: 'Enter your mobile number' },
-                    { pattern: /^[6-9]\d{9}$/, message: 'Enter a valid 10-digit mobile number' },
-                  ]}
-                  className="wl-item"
-                >
-                  <Input
-                    className="u-input"
-                    variant="borderless"
-                    prefix={<span className="wl-prefix">+91</span>}
-                    placeholder="Phone Number"
-                    maxLength={10}
-                    autoFocus
-                  />
-                </Form.Item>
-                <Button className="wl-btn" type="primary" htmlType="submit" block loading={loading} style={{ marginTop: 26 }}>
-                  Send OTP
-                </Button>
-              </Form>
-            ) : (
-              <Form form={otpForm} layout="vertical" onFinish={verifyOtp} requiredMark={false}>
-                <Button type="link" size="small" icon={<ArrowLeftOutlined />} onClick={resetOtpFlow} style={{ paddingLeft: 0 }}>
-                  Change number
-                </Button>
-                <div className="wl-muted" style={{ margin: '6px 0 16px' }}>
-                  Enter the 6-digit OTP sent to <strong>+91 {phone}</strong>
-                </div>
-                <Form.Item name="otp" rules={[{ required: true, message: 'Enter the OTP' }, { len: 6, message: 'OTP is 6 digits' }]}>
-                  <Input.OTP length={6} size="large" autoFocus style={{ width: '100%' }} />
-                </Form.Item>
-                <Button className="wl-btn" type="primary" htmlType="submit" block loading={loading}>
-                  Verify &amp; Sign In
-                </Button>
-                <div className="wl-muted" style={{ textAlign: 'center', marginTop: 14 }}>
-                  {resendIn > 0
-                    ? <>Resend OTP in 00:{String(resendIn).padStart(2, '0')}</>
-                    : <Button type="link" size="small" onClick={() => { void requestOtp(phone); }}>Resend OTP</Button>}
-                </div>
-              </Form>
-            )}
+          <div className="auth__form-pane">
+            <div className="auth__form-inner">
+              <span className="auth__label" id="desk-label">
+                Desk
+              </span>
+              <div
+                className="auth__desk"
+                role="tablist"
+                aria-labelledby="desk-label"
+                onKeyDown={onTabKeyDown}
+                style={{ ['--desk-i' as string]: activeIndex } as React.CSSProperties}
+              >
+                {PORTALS.map((p, i) => (
+                  <button
+                    key={p.value}
+                    ref={(el) => {
+                      tabRefs.current[i] = el;
+                    }}
+                    id={`desk-tab-${p.value}`}
+                    type="button"
+                    role="tab"
+                    aria-selected={portal === p.value}
+                    aria-controls="desk-panel"
+                    tabIndex={focusIndex === i ? 0 : -1}
+                    className="auth__tab"
+                    onClick={() => switchPortal(p.value)}
+                  >
+                    {p.tab}
+                  </button>
+                ))}
+                <span className="auth__desk-ind" aria-hidden="true" />
+              </div>
 
-            <div className="wl-foot">
-              Trouble signing in? <a onClick={() => message.info('Reach your administrator or ops desk.')}>Contact administrator</a>
+              <p className="auth__hint">{hint}</p>
+
+              <div
+                id="desk-panel"
+                role="tabpanel"
+                aria-labelledby={`desk-tab-${portal}`}
+                className="auth__panel-region"
+              >
+                <div className="auth__anim" key={`${portal}-${otpStage}`}>
+                  {portal === 'Admin' ? (
+                    <Form
+                      form={adminForm}
+                      layout="vertical"
+                      onFinish={handleAdmin}
+                      requiredMark={false}
+                      className="auth__fields"
+                    >
+                      <Form.Item
+                        name="username"
+                        label="Username"
+                        rules={[{ required: true, message: 'Enter your username' }]}
+                      >
+                        <Input size="large" autoFocus autoComplete="username" placeholder="you" />
+                      </Form.Item>
+
+                      <Form.Item
+                        name="password"
+                        label={
+                          <span className="auth__label-row">
+                            Password
+                            <button
+                              type="button"
+                              className="auth__reveal"
+                              aria-pressed={showPw}
+                              onClick={() => setShowPw((v) => !v)}
+                            >
+                              {showPw ? 'Hide' : 'Show'}
+                            </button>
+                          </span>
+                        }
+                        rules={[{ required: true, message: 'Enter your password' }]}
+                      >
+                        <Input
+                          size="large"
+                          type={showPw ? 'text' : 'password'}
+                          autoComplete="current-password"
+                          placeholder="Your password"
+                        />
+                      </Form.Item>
+
+                      <div className="auth__submit">
+                        <Button
+                          type="primary"
+                          htmlType="submit"
+                          className="auth__go"
+                          block
+                          loading={loading}
+                        >
+                          Sign in
+                        </Button>
+                        <button
+                          type="button"
+                          className="auth__link"
+                          onClick={() =>
+                            message.info('Contact your administrator to reset your password.')
+                          }
+                        >
+                          Forgot password?
+                        </button>
+                      </div>
+                    </Form>
+                  ) : otpStage === 'phone' ? (
+                    <Form
+                      form={phoneForm}
+                      layout="vertical"
+                      onFinish={(v: { phone: string }) => void requestOtp(v.phone)}
+                      requiredMark={false}
+                      className="auth__fields"
+                    >
+                      <Form.Item
+                        name="phone"
+                        label="Registered mobile number"
+                        rules={[
+                          { required: true, message: 'Enter your mobile number' },
+                          { pattern: /^[6-9]\d{9}$/, message: 'Enter a valid 10-digit mobile number' },
+                        ]}
+                      >
+                        <Input
+                          size="large"
+                          prefix={<span className="auth__dial">+91</span>}
+                          maxLength={10}
+                          inputMode="numeric"
+                          autoFocus
+                          autoComplete="tel-national"
+                          placeholder="00000 00000"
+                        />
+                      </Form.Item>
+
+                      <div className="auth__submit">
+                        <Button
+                          type="primary"
+                          htmlType="submit"
+                          className="auth__go"
+                          block
+                          loading={loading}
+                        >
+                          Send code
+                        </Button>
+                      </div>
+                    </Form>
+                  ) : (
+                    <Form
+                      form={otpForm}
+                      layout="vertical"
+                      onFinish={verifyOtp}
+                      requiredMark={false}
+                      className="auth__fields"
+                    >
+                      <button
+                        type="button"
+                        className="auth__back"
+                        onClick={() => {
+                          setOtpStage('phone');
+                          otpForm.resetFields();
+                        }}
+                      >
+                        <ArrowLeftOutlined /> Change number
+                      </button>
+
+                      <Form.Item
+                        name="otp"
+                        label={`Code sent to +91 ${phone}`}
+                        rules={[
+                          { required: true, message: 'Enter the code' },
+                          { len: 6, message: 'The code is 6 digits' },
+                        ]}
+                      >
+                        <Input.OTP length={6} size="large" autoFocus />
+                      </Form.Item>
+
+                      <div className="auth__submit">
+                        <Button
+                          type="primary"
+                          htmlType="submit"
+                          className="auth__go"
+                          block
+                          loading={loading}
+                        >
+                          Verify and continue
+                        </Button>
+                        {resendIn > 0 ? (
+                          <span className="auth__link is-muted auth__tnum">
+                            Resend code in 0:{String(resendIn).padStart(2, '0')}
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            className="auth__link"
+                            onClick={() => void requestOtp(phone)}
+                          >
+                            Resend code
+                          </button>
+                        )}
+                      </div>
+                    </Form>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </section>
-      </div>
+      </main>
+
+      <footer className="auth__foot">
+        <div className="auth__bar-inner">
+          <span className="auth__foot-legal">
+            &copy; {year} {BRAND.legalName} &middot; Access is monitored and logged
+          </span>
+          <nav className="auth__foot-links">
+            <Link to="/legal/privacy">Privacy</Link>
+            <Link to="/legal/terms">Terms</Link>
+            <Link to="/legal/refund">Refund</Link>
+            <Link to="/legal/cookies">Cookies</Link>
+          </nav>
+        </div>
+      </footer>
     </div>
   );
 };

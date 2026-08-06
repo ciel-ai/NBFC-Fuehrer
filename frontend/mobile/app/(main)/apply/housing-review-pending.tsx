@@ -14,6 +14,7 @@ import { Colors } from '@/src/core/theme/colors';
 import { FontFamily, FontSize, Typography } from '@/src/core/theme/typography';
 import { Spacing, BorderRadius, Shadow } from '@/src/core/theme/spacing';
 import { Button } from '@/src/shared/components/common/Button';
+import { StatusAnimation } from '@/src/shared/components/common/StatusAnimation';
 import { scale } from '@/src/core/utils/responsive';
 import { formatCurrency } from '@/src/core/utils/formatters';
 
@@ -49,11 +50,11 @@ export default function HousingReviewPendingScreen() {
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.heroSection}>
-          <View style={styles.heroCircle}>
-            <View style={styles.heroRing}>
-              <Ionicons name="document-text" size={scale(40)} color={Colors.textWhite} />
-            </View>
-          </View>
+          <StatusAnimation
+            name="pending"
+            size={scale(124)}
+            accessibilityLabel="Manual review pending"
+          />
           <Text style={styles.heroTitle}>Submitted for{'\n'}Manual Review</Text>
           <Text style={styles.heroSubtitle}>
             Your housing loan application is now with our credit committee. Housing loans always require

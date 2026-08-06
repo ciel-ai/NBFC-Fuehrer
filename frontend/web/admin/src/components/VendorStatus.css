@@ -1,0 +1,62 @@
+/* Third-party check rows. Hairline-separated, dense, scannable top-to-bottom. */
+
+.vendor-rail {
+  display: flex;
+  flex-direction: column;
+}
+
+.vendor-check {
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--ink-100);
+}
+.vendor-check:first-child {
+  padding-top: 0;
+}
+.vendor-check:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.vendor-check__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.vendor-check__label {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+  color: var(--ink-900);
+}
+
+/* Provenance: who actually performed the check. Subordinate to the check itself. */
+.vendor-check__vendor {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-regular);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--ink-400);
+}
+
+.vendor-check__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  margin-top: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--ink-500);
+}
+
+.vendor-check__ref {
+  color: var(--ink-700);
+}
+
+.vendor-check__at {
+  color: var(--ink-400);
+  margin-left: auto;
+}

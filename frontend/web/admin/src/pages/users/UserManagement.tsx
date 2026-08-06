@@ -1,11 +1,25 @@
 import React, { useMemo, useState } from 'react';
 import {
-  App, Avatar, Button, Card, Col, Drawer, Form, Input, Row, Select, Switch, Table, Tag, Typography,
+  App,
+  Avatar,
+  Button,
+  Card,
+  Drawer,
+  Form,
+  Input,
+  Select,
+  Switch,
+  Tag,
+  Typography,
 } from 'antd';
 import type { TableProps } from 'antd';
 import {
-  KeyOutlined, PlusOutlined, SearchOutlined, TeamOutlined, UserAddOutlined,
-  UserSwitchOutlined, SafetyCertificateOutlined, BankOutlined, EditOutlined,
+  KeyOutlined,
+  PlusOutlined,
+  SearchOutlined,
+  UserAddOutlined,
+  BankOutlined,
+  EditOutlined,
 } from '@ant-design/icons';
 import { useAppStore } from '../../store/appStore';
 import { useStaffUsers } from '../../hooks/useStaffUsers';
@@ -13,22 +27,30 @@ import { usersApi } from '../../api/users.api';
 import { useAuthStore } from '../../store/authStore';
 import { ROLE_META } from '../../auth/rbac';
 import PageHeader from '../../components/PageHeader';
-import KpiCard from '../../components/KpiCard';
-import { StatusTag } from '../../components/StatusTag';
+import { MetricBand } from '../../components/KpiCard';
+import { RoleTag, StatusTag, roleTone } from '../../components/StatusTag';
 import { fmtDate, fmtTimeAgo, initials } from '../../utils/format';
 import type { PortalUser, Role } from '../../types';
+import DataTable from '../../components/DataTable';
+import DataSourceNotice from '../../components/DataSourceNotice';
 
 const ASSIGNABLE_ROLES: Role[] = [
   'ADMIN',
-  'SALES_CDL', 'SALES_GOLD', 'SALES_HOUSING',
-  'CREDIT_CDL', 'CREDIT_GOLD', 'CREDIT_HOUSING',
-  'FINANCE_CDL', 'FINANCE_GOLD', 'FINANCE_HOUSING',
+  'SALES_CDL',
+  'SALES_GOLD',
+  'SALES_HOUSING',
+  'CREDIT_CDL',
+  'CREDIT_GOLD',
+  'CREDIT_HOUSING',
+  'FINANCE_CDL',
+  'FINANCE_GOLD',
+  'FINANCE_HOUSING',
 ];
 
 const UserManagement: React.FC = () => {
   const { message, modal } = App.useApp();
   const sessionUser = useAuthStore((s) => s.user)!;
-  const { users, live, loading, reload } = useStaffUsers();
+  const { users, live, loading, reload, source, error } = useStaffUsers();
   const branches = useAppStore((s) => s.branches);
   const addUser = useAppStore((s) => s.addUser);
   const updateUser = useAppStore((s) => s.updateUser);
@@ -46,7 +68,8 @@ const UserManagement: React.FC = () => {
     const q = search.trim().toLowerCase();
     return users.filter((u) => {
       if (roleFilter && u.role !== roleFilter) return false;
-      if (q && !`${u.name} ${u.email} ${u.phone} ${u.branch}`.toLowerCase().includes(q)) return false;
+      if (q && !`${u.name} ${u.email} ${u.phone} ${u.branch}`.toLowerCase().includes(q))
+        return false;
       return true;
     });
   }, [users, search, roleFilter]);
@@ -60,7 +83,14 @@ const UserManagement: React.FC = () => {
 
   const openEdit = (u: PortalUser): void => {
     setEditing(u);
-    form.setFieldsValue({ name: u.name, phone: u.phone, email: u.email, branch: u.branch, role: u.role, status: u.status === 'ACTIVE' });
+    form.setFieldsValue({
+      name: u.name,
+      phone: u.phone,
+      email: u.email,
+      branch: u.branch,
+      role: u.role,
+      status: u.status === 'ACTIVE',
+    });
     setDrawerOpen(true);
   };
 
@@ -71,13 +101,19 @@ const UserManagement: React.FC = () => {
       try {
         if (editing) {
           await usersApi.update(editing.id, {
-            name: values.name, phone: values.phone, email: values.email,
-            role: values.role, status: values.status ? 'ACTIVE' : 'INACTIVE',
+            name: values.name,
+            phone: values.phone,
+            email: values.email,
+            role: values.role,
+            status: values.status ? 'ACTIVE' : 'INACTIVE',
           });
           message.success(`${values.name} updated`);
         } else {
           await usersApi.create({
-            name: values.name, phone: values.phone, email: values.email, role: values.role,
+            name: values.name,
+            phone: values.phone,
+            email: values.email,
+            role: values.role,
           });
           const isSales = ROLE_META[values.role as Role].family === 'SALES';
           message.success(
@@ -96,16 +132,31 @@ const UserManagement: React.FC = () => {
     }
 
     if (editing) {
-      updateUser(editing.id, {
-        name: values.name, phone: values.phone, email: values.email,
-        branch: values.branch, role: values.role, status: values.status ? 'ACTIVE' : 'INACTIVE',
-      }, actor);
+      updateUser(
+        editing.id,
+        {
+          name: values.name,
+          phone: values.phone,
+          email: values.email,
+          branch: values.branch,
+          role: values.role,
+          status: values.status ? 'ACTIVE' : 'INACTIVE',
+        },
+        actor,
+      );
       message.success(`${values.name} updated`);
     } else {
-      addUser({
-        name: values.name, phone: values.phone, email: values.email,
-        branch: values.branch, role: values.role, status: values.status ? 'ACTIVE' : 'INACTIVE',
-      }, actor);
+      addUser(
+        {
+          name: values.name,
+          phone: values.phone,
+          email: values.email,
+          branch: values.branch,
+          role: values.role,
+          status: values.status ? 'ACTIVE' : 'INACTIVE',
+        },
+        actor,
+      );
       const isSales = ROLE_META[values.role as Role].family === 'SALES';
       message.success(
         isSales
@@ -116,20 +167,55 @@ const UserManagement: React.FC = () => {
     setDrawerOpen(false);
   };
 
-  const resetPassword = (u: PortalUser): void => {
-    const temp = `Fnbfc@${Math.floor(1000 + Math.random() * 9000)}`;
+  const resetPassword = async (u: PortalUser): Promise<void> => {
+    // Live: the backend resets the credential and returns the password it set —
+    // show exactly that, never a client-invented one (that would never log in).
+    // A local temp is legitimate only in the mock/demo fallback where there is
+    // no backend to authoritatively reset anything.
+    let temp: string;
+    if (live) {
+      try {
+        const res = await usersApi.resetPassword(u.id);
+        temp = res.temporaryPassword;
+      } catch (err) {
+        const e = err as { response?: { data?: { message?: string } } };
+        message.error(e.response?.data?.message ?? 'Could not reset the password — please retry.');
+        return;
+      }
+    } else {
+      temp = `Fnbfc@${Math.floor(1000 + Math.random() * 9000)}`;
+    }
     modal.success({
       title: `Credentials reset for ${u.name}`,
       content: (
         <div>
-          <p style={{ marginBottom: 8 }}>A temporary password has been generated. The user must change it at next login.</p>
-          <Typography.Paragraph copyable={{ text: temp }} style={{ fontSize: 17, fontWeight: 700, fontFamily: 'monospace', background: '#f4f6fb', padding: '8px 14px', borderRadius: 8, display: 'inline-block' }}>
+          <p style={{ marginBottom: 8 }}>
+            A temporary password has been generated. The user must change it at next login.
+          </p>
+          <Typography.Paragraph
+            copyable={{ text: temp }}
+            style={{
+              fontSize: 17,
+              fontWeight: 700,
+              fontFamily: 'monospace',
+              background: 'var(--ink-50)',
+              padding: '8px 14px',
+              borderRadius: 8,
+              display: 'inline-block',
+            }}
+          >
             {temp}
           </Typography.Paragraph>
         </div>
       ),
     });
-    useAppStore.getState().logAudit({ user: actor.name, role: String(actor.role), module: 'User Management', action: 'Password Reset', entity: u.email });
+    useAppStore.getState().logAudit({
+      user: actor.name,
+      role: String(actor.role),
+      module: 'User Management',
+      action: 'Password Reset',
+      entity: u.email,
+    });
   };
 
   const columns: TableProps<PortalUser>['columns'] = [
@@ -137,20 +223,26 @@ const UserManagement: React.FC = () => {
       title: 'User',
       dataIndex: 'name',
       render: (v: string, r) => {
-        const meta = ROLE_META[r.role];
         return (
           <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-            <Avatar size={38} style={{ background: `${meta.color}18`, color: meta.color, fontWeight: 700, fontSize: 13 }}>{initials(v)}</Avatar>
+            <Avatar size={28} className={`avatar-tone tone-${roleTone(r.role)}`}>
+              {initials(v)}
+            </Avatar>
             <div>
-              <div style={{ fontWeight: 600, color: '#1e293b' }}>{v}</div>
-              <div style={{ fontSize: 11.5, color: '#94a3b8' }}>{r.email}</div>
+              <div className="u-semibold u-ink-900">{v}</div>
+              <div className="u-xs u-ink-400">{r.email}</div>
             </div>
           </div>
         );
       },
       sorter: (a, b) => a.name.localeCompare(b.name),
     },
-    { title: 'Phone', dataIndex: 'phone', width: 130, render: (v: string) => <span className="tnum" style={{ fontSize: 12.5, color: '#475569' }}>+91 {v}</span> },
+    {
+      title: 'Phone',
+      dataIndex: 'phone',
+      width: 130,
+      render: (v: string) => <span className="tnum u-sm u-ink-600">+91 {v}</span>,
+    },
     {
       title: 'Role',
       dataIndex: 'role',
@@ -159,11 +251,19 @@ const UserManagement: React.FC = () => {
         const meta = ROLE_META[r];
         return (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-            <Tag style={{ margin: 0, borderRadius: 999, fontWeight: 600, fontSize: 11.5, padding: '2px 11px', color: meta.color, background: `${meta.color}10`, borderColor: `${meta.color}30` }}>
-              {meta.label}
-            </Tag>
+            <RoleTag role={r} />
             {meta.family === 'SALES' && (
-              <Tag style={{ margin: 0, borderRadius: 999, fontSize: 10.5, padding: '1px 8px', color: '#64748b', background: '#f1f5f9', borderColor: '#e2e8f0' }}>
+              <Tag
+                style={{
+                  margin: 0,
+                  borderRadius: 999,
+                  fontSize: 10.5,
+                  padding: '1px 8px',
+                  color: 'var(--ink-500)',
+                  background: 'var(--ink-50)',
+                  borderColor: 'var(--ink-150)',
+                }}
+              >
                 Mobile App
               </Tag>
             )}
@@ -173,27 +273,58 @@ const UserManagement: React.FC = () => {
       filters: Object.entries(ROLE_META).map(([k, m]) => ({ text: m.label, value: k })),
       onFilter: (v, r) => r.role === v,
     },
-    { title: 'Branch', dataIndex: 'branch', width: 190, render: (v: string) => <span style={{ fontSize: 12.5, color: '#64748b' }}><BankOutlined style={{ marginRight: 6 }} />{v}</span> },
-    { title: 'Last Login', dataIndex: 'lastLoginAt', width: 125, render: (v?: string) => <span style={{ fontSize: 12.5, color: '#64748b' }}>{v ? fmtTimeAgo(v) : 'never'}</span> },
-    { title: 'Since', dataIndex: 'createdAt', width: 115, render: (v: string) => <span style={{ fontSize: 12.5, color: '#94a3b8' }}>{fmtDate(v)}</span> },
-    { title: 'Status', dataIndex: 'status', width: 95, render: (s: string) => <StatusTag status={s} /> },
+    {
+      title: 'Branch',
+      dataIndex: 'branch',
+      width: 190,
+      render: (v: string) => (
+        <span className="u-sm u-ink-500">
+          <BankOutlined style={{ marginRight: 6 }} />
+          {v}
+        </span>
+      ),
+    },
+    {
+      title: 'Last Login',
+      dataIndex: 'lastLoginAt',
+      width: 125,
+      render: (v?: string) => <span className="u-sm u-ink-500">{v ? fmtTimeAgo(v) : 'never'}</span>,
+    },
+    {
+      title: 'Since',
+      dataIndex: 'createdAt',
+      width: 115,
+      render: (v: string) => <span className="u-sm u-ink-400">{fmtDate(v)}</span>,
+    },
+    {
+      title: 'Status',
+      dataIndex: 'status',
+      width: 95,
+      render: (s: string) => <StatusTag status={s} />,
+    },
     {
       title: 'Actions',
       key: 'actions',
       width: 230,
-      fixed: 'right',
       render: (_, r) => (
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(r)}>Edit</Button>
-          <Button size="small" icon={<KeyOutlined />} onClick={() => resetPassword(r)}>Reset</Button>
+          <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(r)}>
+            Edit
+          </Button>
+          <Button size="small" icon={<KeyOutlined />} onClick={() => resetPassword(r)}>
+            Reset
+          </Button>
           <Switch
             size="small"
+            aria-label={`${r.status === 'ACTIVE' ? 'Deactivate' : 'Activate'} ${r.name}`}
             checked={r.status === 'ACTIVE'}
             disabled={r.role === 'ADMIN'}
             onChange={async () => {
               if (live) {
                 try {
-                  await (r.status === 'ACTIVE' ? usersApi.deactivate(r.id) : usersApi.activate(r.id));
+                  await (r.status === 'ACTIVE'
+                    ? usersApi.deactivate(r.id)
+                    : usersApi.activate(r.id));
                   reload();
                 } catch {
                   message.error('Could not change user status — please retry.');
@@ -219,21 +350,41 @@ const UserManagement: React.FC = () => {
     <div>
       <PageHeader
         title="User Management"
-        subtitle={`Provision credit & finance users, assign roles and control access${live ? '' : ' · sample data (live API unreachable)'}`}
-        extra={<Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>Create User</Button>}
+        subtitle={`Provision credit & finance users, assign roles and control access`}
+        extra={
+          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+            Create User
+          </Button>
+        }
       />
 
-      <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-        <Col xs={24} sm={12} xl={6}><KpiCard label="Total Users" value={users.length} sub={`${active} active · ${users.length - active} deactivated`} icon={<TeamOutlined />} tint="#0284c7" /></Col>
-        <Col xs={24} sm={12} xl={6}><KpiCard label="Sales Team" value={salesCount} sub="mobile app field agents" icon={<UserSwitchOutlined />} tint="#0e7490" /></Col>
-        <Col xs={24} sm={12} xl={6}><KpiCard label="Credit Team" value={creditCount} sub="underwriters across products" icon={<SafetyCertificateOutlined />} tint="#d97706" /></Col>
-        <Col xs={24} sm={12} xl={6}><KpiCard label="Finance Team" value={financeCount} sub="disbursement officers" icon={<BankOutlined />} tint="#047857" /></Col>
-      </Row>
+      <DataSourceNotice source={source} error={error} onRetry={reload} />
 
-      <Card variant="borderless" style={{ boxShadow: 'var(--shadow-card)' }} styles={{ body: { padding: 0 } }}>
-        <div style={{ display: 'flex', gap: 10, padding: '16px 18px', flexWrap: 'wrap', borderBottom: '1px solid #eef1f7' }}>
+      <MetricBand
+        metrics={[
+          {
+            label: 'Total Users',
+            value: users.length,
+            sub: `${active} active · ${users.length - active} deactivated`,
+          },
+          { label: 'Sales Team', value: salesCount, sub: 'mobile app field agents' },
+          { label: 'Credit Team', value: creditCount, sub: 'underwriters across products' },
+          { label: 'Finance Team', value: financeCount, sub: 'disbursement officers' },
+        ]}
+      />
+
+      <Card styles={{ body: { padding: 0 } }}>
+        <div
+          style={{
+            display: 'flex',
+            gap: 10,
+            padding: '16px 18px',
+            flexWrap: 'wrap',
+            borderBottom: '1px solid var(--ink-100)',
+          }}
+        >
           <Input
-            prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
+            prefix={<SearchOutlined className="u-ink-400" />}
             placeholder="Search name, email, phone, branch…"
             allowClear
             style={{ width: 300 }}
@@ -241,6 +392,7 @@ const UserManagement: React.FC = () => {
             onChange={(e) => setSearch(e.target.value)}
           />
           <Select
+            aria-label="Role"
             placeholder="Role"
             allowClear
             style={{ width: 230 }}
@@ -249,7 +401,7 @@ const UserManagement: React.FC = () => {
             options={Object.entries(ROLE_META).map(([k, m]) => ({ value: k, label: m.label }))}
           />
         </div>
-        <Table<PortalUser>
+        <DataTable<PortalUser>
           dataSource={rows}
           columns={columns}
           rowKey="id"
@@ -263,23 +415,29 @@ const UserManagement: React.FC = () => {
       <Drawer
         title={
           <span>
-            <UserAddOutlined style={{ marginRight: 8, color: '#0284c7' }} />
+            <UserAddOutlined style={{ marginRight: 8, color: 'var(--accent)' }} />
             {editing ? `Edit User — ${editing.name}` : 'Create User'}
           </span>
         }
-        width={460}
+        size={460}
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         destroyOnHidden
         footer={
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
             <Button onClick={() => setDrawerOpen(false)}>Cancel</Button>
-            <Button type="primary" onClick={() => form.submit()}>{editing ? 'Save Changes' : 'Create User'}</Button>
+            <Button type="primary" onClick={() => form.submit()}>
+              {editing ? 'Save Changes' : 'Create User'}
+            </Button>
           </div>
         }
       >
         <Form form={form} layout="vertical" onFinish={onSubmit} requiredMark={false}>
-          <Form.Item label="Full Name" name="name" rules={[{ required: true, message: 'Enter the full name' }]}>
+          <Form.Item
+            label="Full Name"
+            name="name"
+            rules={[{ required: true, message: 'Enter the full name' }]}
+          >
             <Input placeholder="e.g. Ramesh Iyer" />
           </Form.Item>
           <Form.Item
@@ -292,11 +450,24 @@ const UserManagement: React.FC = () => {
           >
             <Input addonBefore="+91" maxLength={10} placeholder="98XXXXXXXX" />
           </Form.Item>
-          <Form.Item label="Email" name="email" rules={[{ required: true, type: 'email', message: 'Valid email required' }]}>
+          <Form.Item
+            label="Email"
+            name="email"
+            rules={[{ required: true, type: 'email', message: 'Valid email required' }]}
+          >
             <Input placeholder="name@fuehrer-nbfc.in" />
           </Form.Item>
-          <Form.Item label="Branch" name="branch" rules={[{ required: true, message: 'Select branch' }]}>
-            <Select placeholder="Select branch" options={branches.map((b) => ({ value: b.name, label: b.name }))} showSearch />
+          <Form.Item
+            label="Branch"
+            name="branch"
+            rules={[{ required: true, message: 'Select branch' }]}
+          >
+            <Select
+              aria-label="Select branch"
+              placeholder="Select branch"
+              options={branches.map((b) => ({ value: b.name, label: b.name }))}
+              showSearch
+            />
           </Form.Item>
           <Form.Item label="Role" name="role" rules={[{ required: true }]}>
             <Select
@@ -304,9 +475,12 @@ const UserManagement: React.FC = () => {
                 value: r,
                 label: (
                   <span>
-                    <Tag style={{ borderRadius: 6, marginRight: 8, color: ROLE_META[r].color, background: `${ROLE_META[r].color}10`, borderColor: `${ROLE_META[r].color}30`, fontWeight: 600, fontSize: 11 }}>
+                    <span
+                      className={`status-tag status-tag--${roleTone(r)} status-tag--sm`}
+                      style={{ marginRight: 8 }}
+                    >
                       {ROLE_META[r].family}
-                    </Tag>
+                    </span>
                     {ROLE_META[r].label}
                   </span>
                 ),
@@ -316,7 +490,16 @@ const UserManagement: React.FC = () => {
           <Form.Item label="Status" name="status" valuePropName="checked">
             <Switch checkedChildren="Active" unCheckedChildren="Inactive" />
           </Form.Item>
-          <div style={{ fontSize: 12, color: '#94a3b8', background: '#f8fafd', border: '1px solid #eef1f7', borderRadius: 10, padding: '10px 14px' }}>
+          <div
+            style={{
+              fontSize: 12,
+              color: 'var(--ink-400)',
+              background: 'var(--ink-50)',
+              border: '1px solid var(--ink-100)',
+              borderRadius: 10,
+              padding: '10px 14px',
+            }}
+          >
             All users sign in with mobile number + OTP. <strong>Credit &amp; Finance</strong> roles
             access this web dashboard; <strong>Sales</strong> roles use the FUEHRER field mobile app
             to source applications. Module access and data visibility follow the assigned role

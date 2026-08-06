@@ -1,0 +1,84 @@
+/* 403. Reads as a record of a permission boundary, not as an error page.
+   No illustration, no oversized status glyph. */
+
+.forbidden {
+  max-width: 56ch;
+  margin: 0 auto;
+  padding: var(--space-8) var(--space-4);
+}
+
+/* A hairline rule carrying the status code — the page's only chromatic gesture. */
+.forbidden__code {
+  display: inline-block;
+  padding-bottom: var(--space-2);
+  border-bottom: 2px solid var(--status-warning-fg);
+  color: var(--status-warning-fg);
+}
+
+.forbidden__title {
+  margin: var(--space-4) 0 0;
+  font-size: var(--text-xl);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-snug);
+  color: var(--ink-900);
+  line-height: var(--leading-tight);
+}
+
+.forbidden__body {
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-md);
+  color: var(--ink-500);
+  line-height: var(--leading-relaxed);
+}
+.forbidden__body strong {
+  font-weight: var(--weight-medium);
+  color: var(--ink-900);
+}
+
+.forbidden__degraded {
+  margin: var(--space-4) 0 0;
+  padding: var(--space-3);
+  border-left: 2px solid var(--status-warning-fg);
+  background: var(--status-warning-tint);
+  color: var(--status-warning-fg);
+  font-size: var(--text-base);
+  line-height: var(--leading-relaxed);
+}
+
+.forbidden__allowed {
+  margin-top: var(--space-6);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--ink-150);
+}
+
+.forbidden__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+/* Not pills — square, hairline-defined, like every other control in the app. */
+.forbidden__chip {
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--ink-200);
+  border-radius: var(--radius-sm);
+  background: var(--ink-0);
+  color: var(--ink-700);
+  font: inherit;
+  font-size: var(--text-base);
+  cursor: pointer;
+  transition:
+    border-color var(--motion-fast) var(--ease),
+    color var(--motion-fast) var(--ease);
+}
+.forbidden__chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.forbidden__actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-6);
+}

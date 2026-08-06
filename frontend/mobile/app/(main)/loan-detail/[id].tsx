@@ -113,6 +113,13 @@ export default function LoanDetailScreen() {
         ? 'Affordable Housing Loan'
         : 'Consumer Durable Loan';
 
+  // The instalment the customer should actually pay next: the earliest overdue
+  // one, else the earliest pending one. Passing this through prevents the
+  // pay screen from defaulting to a hardcoded EMI id.
+  const nextPayableEmi =
+    emiSchedule.find((e) => e.status === 'overdue') ??
+    emiSchedule.find((e) => e.status === 'pending');
+
   return (
     <SafeAreaView style={styles.container}>
       <Header title="Loan Details" showBack />
@@ -199,6 +206,23 @@ export default function LoanDetailScreen() {
           >
             <Ionicons name="list-outline" size={20} color={Colors.primary} />
             <Text style={styles.actionBtnText}>Loan Status</Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.actionRow}>
+          <Pressable
+            style={styles.actionBtn}
+            onPress={() =>
+              router.push({
+                pathname: '/(main)/loan-detail/transaction-history',
+                params: { loanId: loan.id },
+              })
+            }
+            accessibilityRole="button"
+            accessibilityLabel="Transaction History"
+          >
+            <Ionicons name="receipt-outline" size={20} color={Colors.primary} />
+            <Text style={styles.actionBtnText}>Transactions</Text>
           </Pressable>
         </View>
 
@@ -294,8 +318,9 @@ export default function LoanDetailScreen() {
                 pathname: '/(main)/loan-detail/pay-emi',
                 params: {
                   loanId: loan.id,
-                  amount: String(loan.emi),
-                  dueDate: loan.nextDueDate,
+                  emiId: nextPayableEmi?.id,
+                  amount: String(nextPayableEmi?.amount ?? loan.emi),
+                  dueDate: nextPayableEmi?.dueDate ?? loan.nextDueDate,
                 },
               })
             }

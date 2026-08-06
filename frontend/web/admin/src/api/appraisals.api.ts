@@ -8,8 +8,10 @@
 import { apiClient } from './client';
 
 export interface GoldAppraisalPayload {
-  netWeightGrams: number;
+  netWeightGrams: number;            // derived on the frontend, never hand-typed
   grossWeightGrams: number;
+  stoneWeightGrams?: number;
+  impurityPct?: number;
   purityKarat: number;
   ratePerGram: number;               // ₹/gram
   items?: unknown;                   // free-form item breakdown

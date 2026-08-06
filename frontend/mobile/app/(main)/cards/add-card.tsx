@@ -47,6 +47,12 @@ function Field({
   );
 }
 
+// ⚠️ PCI: this screen currently captures the raw PAN + CVV into local state.
+// That is acceptable ONLY while payments are mock and nothing is stored/sent
+// (cardsStore keeps last4 only; the PAN/CVV never leave this component). Before
+// card payments go live, PAN/CVV must be handed straight to the Razorpay
+// tokenization SDK and never touch app-owned JS state.
+// See docs/PCI_CARD_TOKENIZATION.md.
 export default function AddCardScreen() {
   const addCard = useCardsStore((s) => s.addCard);
 

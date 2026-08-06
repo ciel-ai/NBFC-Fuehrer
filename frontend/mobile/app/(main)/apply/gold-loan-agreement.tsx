@@ -9,15 +9,21 @@ import { Spacing, BorderRadius, Shadow } from '@/src/core/theme/spacing';
 import { Header } from '@/src/shared/components/common/Header';
 import { Button } from '@/src/shared/components/common/Button';
 import { OTPInput } from '@/src/shared/components/common/OTPInput';
+import { ErrorView } from '@/src/shared/components/common/ErrorView';
 import { formatCurrency } from '@/src/core/utils/formatters';
 import { useServices } from '@/src/core/services/ServiceProvider';
+import { resolveGoldApplicationId } from '@/src/core/utils/goldApplication';
 import type { GoldLoanAgreementResult } from '@/src/entities/goldLoan';
 
 type Step = 'review' | 'otp' | 'signed';
 
+import { usePersistApplyStep } from '@/src/features/apply/useApplyDraft';
+
 export default function GoldLoanAgreementScreen() {
+  usePersistApplyStep('gold');
   const params = useLocalSearchParams<Record<string, string>>();
   const { goldLoanService } = useServices();
+  const applicationId = resolveGoldApplicationId(params.applicationId);
   const [step, setStep] = useState<Step>('review');
   const [agreement, setAgreement] = useState<GoldLoanAgreementResult | null>(null);
   const [agreed, setAgreed] = useState(false);
@@ -26,10 +32,11 @@ export default function GoldLoanAgreementScreen() {
   const [otpError, setOtpError] = useState('');
 
   useEffect(() => {
+    if (!applicationId) return;
     let mounted = true;
     const load = async () => {
       try {
-        const data = await goldLoanService.generateAgreement(params.applicationId ?? 'gold_mock_application');
+        const data = await goldLoanService.generateAgreement(applicationId);
         if (mounted) setAgreement(data);
       } catch {
         if (mounted) Alert.alert('Agreement unavailable', 'Please try again.');
@@ -39,12 +46,13 @@ export default function GoldLoanAgreementScreen() {
     return () => {
       mounted = false;
     };
-  }, [goldLoanService, params.applicationId]);
+  }, [goldLoanService, applicationId]);
 
   const sign = async () => {
+    if (!applicationId) return;
     setLoading(true);
     try {
-      const data = await goldLoanService.completeESign(params.applicationId ?? 'gold_mock_application', otp);
+      const data = await goldLoanService.completeESign(applicationId, otp);
       setAgreement(data);
       setStep('signed');
     } catch {
@@ -54,6 +62,20 @@ export default function GoldLoanAgreementScreen() {
       setLoading(false);
     }
   };
+
+  if (!applicationId) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Header title="Gold Loan Agreement" showBack />
+        <ErrorView
+          title="Application reference missing"
+          message="We could not find your application reference. Please go back and restart the application."
+          retryLabel="Go Back"
+          onRetry={() => router.back()}
+        />
+      </SafeAreaView>
+    );
+  }
 
   const amount = Number(params.finalLoanAmount ?? params.loanAmount ?? 139500);
 

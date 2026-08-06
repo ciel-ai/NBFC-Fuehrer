@@ -1,15 +1,19 @@
 import api from '../../api/api';
+import { idempotentConfig } from '../../api/idempotency';
+import type { DocumentUploadResult } from '@/src/entities/document';
 import type { IGoldLoanService } from '../interfaces/IGoldLoanService';
 import type {
   GoldEligibility,
   GoldEligibilityRequest,
   GoldLoanAgreementResult,
+  GoldLoanApplicationRef,
   GoldLoanAppraisalResult,
   GoldLoanAppointment,
   GoldLoanAppointmentRequest,
   GoldLoanBranch,
   GoldLoanClosureQuote,
   GoldLoanComplianceResult,
+  GoldLoanCreateApplicationRequest,
   GoldLoanDisbursalStatus,
   GoldLoanMonitoring,
   GoldLoanNachResult,
@@ -24,6 +28,37 @@ export const realGoldLoanService: IGoldLoanService = {
 
   async calculateEligibility(request: GoldEligibilityRequest): Promise<GoldEligibility> {
     const response = await api.post<GoldEligibility>('/gold-loans/eligibility', request);
+    return response.data;
+  },
+
+  async createApplication(
+    request: GoldLoanCreateApplicationRequest,
+  ): Promise<GoldLoanApplicationRef> {
+    // Backend-blocked: endpoint may 501 until the create-application contract
+    // lands. See docs/GOLD_LOAN_S4_API_CONTRACTS.md.
+    const response = await api.post<GoldLoanApplicationRef>('/gold-loans/applications', request);
+    return response.data;
+  },
+
+  async uploadDocument(
+    applicationId: string,
+    uri: string,
+    type: string,
+  ): Promise<DocumentUploadResult> {
+    // Multipart upload of the captured file. Backend-blocked until the
+    // documents endpoint lands (may 501).
+    const form = new FormData();
+    form.append('type', type);
+    form.append('file', {
+      uri,
+      name: `${type}.jpg`,
+      type: 'image/jpeg',
+    } as unknown as Blob);
+    const response = await api.post<DocumentUploadResult>(
+      `/gold-loans/applications/${applicationId}/documents`,
+      form,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
     return response.data;
   },
 
@@ -70,9 +105,11 @@ export const realGoldLoanService: IGoldLoanService = {
     return response.data;
   },
 
-  async initiateNach(applicationId: string): Promise<GoldLoanNachResult> {
+  async initiateNach(applicationId: string, idempotencyKey?: string): Promise<GoldLoanNachResult> {
     const response = await api.post<GoldLoanNachResult>(
       `/gold-loans/applications/${applicationId}/nach`,
+      undefined,
+      idempotentConfig(idempotencyKey),
     );
     return response.data;
   },

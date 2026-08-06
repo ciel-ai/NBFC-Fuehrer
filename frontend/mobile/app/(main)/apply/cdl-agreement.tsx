@@ -21,7 +21,10 @@ import {
 
 type Step = 'review' | 'otp' | 'signed';
 
+import { usePersistApplyStep } from '@/src/features/apply/useApplyDraft';
+
 export default function CdlAgreementScreen() {
+  usePersistApplyStep('cdl');
   const params = useLocalSearchParams<Record<string, string>>();
   const { consumerDurableLoanService } = useServices();
   const [step, setStep] = useState<Step>('review');

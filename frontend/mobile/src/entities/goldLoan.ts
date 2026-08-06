@@ -20,6 +20,25 @@ export interface GoldEligibility {
   source: string;
 }
 
+/**
+ * Payload sent when the customer commits to a gold loan at the estimator
+ * ("Get This Loan"). Creates the application record the rest of the flow —
+ * document upload, compliance, appraisal, agreement — hangs off.
+ */
+export interface GoldLoanCreateApplicationRequest {
+  goldType: string;
+  karat: string;
+  weightGrams: number;
+  estimatedGoldValue: number;
+  requestedAmount: number;
+}
+
+export interface GoldLoanApplicationRef {
+  applicationId: string;
+  status: GoldLoanStepStatus;
+  createdAt: string;
+}
+
 export interface GoldLoanBranch {
   id: string;
   name: string;

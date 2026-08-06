@@ -9,21 +9,28 @@ import { Spacing, BorderRadius, Shadow } from '@/src/core/theme/spacing';
 import { Header } from '@/src/shared/components/common/Header';
 import { Button } from '@/src/shared/components/common/Button';
 import { LoadingSpinner } from '@/src/shared/components/common/LoadingSpinner';
+import { ErrorView } from '@/src/shared/components/common/ErrorView';
 import { formatCurrency } from '@/src/core/utils/formatters';
 import { useServices } from '@/src/core/services/ServiceProvider';
+import { resolveGoldApplicationId } from '@/src/core/utils/goldApplication';
 import type { GoldLoanDisbursalStatus } from '@/src/entities/goldLoan';
 
+import { useClearApplyDraft } from '@/src/features/apply/useApplyDraft';
+
 export default function GoldLoanDisbursalScreen() {
+  useClearApplyDraft('gold');
   const params = useLocalSearchParams<Record<string, string>>();
   const { goldLoanService } = useServices();
+  const applicationId = resolveGoldApplicationId(params.applicationId);
   const [status, setStatus] = useState<GoldLoanDisbursalStatus | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!!applicationId);
 
   useEffect(() => {
+    if (!applicationId) return;
     let mounted = true;
     const load = async () => {
       try {
-        const data = await goldLoanService.getDisbursalStatus(params.applicationId ?? 'gold_mock_application');
+        const data = await goldLoanService.getDisbursalStatus(applicationId);
         if (mounted) setStatus(data);
       } catch {
         if (mounted) Alert.alert('Disbursal status unavailable', 'Please try again.');
@@ -35,7 +42,21 @@ export default function GoldLoanDisbursalScreen() {
     return () => {
       mounted = false;
     };
-  }, [goldLoanService, params.applicationId]);
+  }, [goldLoanService, applicationId]);
+
+  if (!applicationId) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Header title="Disbursal & Vault" showBack />
+        <ErrorView
+          title="Application reference missing"
+          message="We could not find your application reference. Please go back and restart the application."
+          retryLabel="Go Back"
+          onRetry={() => router.back()}
+        />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>

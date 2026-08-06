@@ -6,6 +6,8 @@ import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { QueryClientProvider, focusManager, onlineManager } from '@tanstack/react-query';
 import { ServiceProvider } from '@/src/core/services/ServiceProvider';
+import { realAuthService } from '@/src/core/services/real/realAuthService';
+import { PILOT_REAL_AUTH } from '@/src/core/utils/constants';
 import { queryClient } from '@/src/core/query/queryClient';
 import {
   useFonts,
@@ -22,6 +24,11 @@ import { useSalesStore } from '@/src/store/salesStore';
 import { isSalesRole } from '@/src/entities/auth';
 import { ErrorBoundary } from '@/src/shared/components/common/ErrorBoundary';
 import { AppSplash } from '@/src/shared/components/common/AppSplash';
+import { NetworkStateBanner } from '@/src/shared/components/common/NetworkStateBanner';
+import { initMonitoring, wrapRoot } from '@/src/core/monitoring/sentry';
+
+// Crash reporting starts before first render; silent no-op without a DSN.
+initMonitoring();
 
 SplashScreen.preventAutoHideAsync();
 
@@ -50,7 +57,16 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   const inAuthGroup = firstSegment === '(auth)';
   const inSalesGroup = firstSegment === '(sales)';
   const isRoot = !firstSegment;
+  /* Screens inside (auth) the guard must not bounce.
+     - enter-mpin: it IS the guard's own target, so redirecting would loop.
+     - otp-success: a timed confirmation screen that hands off by itself. A
+       RETURNING customer arrives here with onboardingDone + mpinSet already
+       persisted and mpinVerified reset by the fresh login, which matches the
+       enter-mpin rule below on the screen's very first render — the animation
+       was being cut off before it drew a single frame. */
   const onEnterMpinScreen = inAuthGroup && secondSegment === 'enter-mpin';
+  const onOtpSuccessScreen = inAuthGroup && secondSegment === 'otp-success';
+  const onSelfRoutingAuthScreen = onEnterMpinScreen || onOtpSuccessScreen;
 
   const isSales = isSalesRole(role);
 
@@ -72,13 +88,19 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   } else if (isAuthenticated && !onboardingDone && inAuthGroup) {
     // 4. Customer mid-onboarding → allow the (auth) screens (set-mpin, etc.)
     target = null;
-  } else if (isAuthenticated && onboardingDone && mpinSet && !mpinVerified && !onEnterMpinScreen) {
+  } else if (
+    isAuthenticated &&
+    onboardingDone &&
+    mpinSet &&
+    !mpinVerified &&
+    !onSelfRoutingAuthScreen
+  ) {
     // 5. Returning customer: onboarding done + MPIN set but not yet verified
     target = '/(auth)/enter-mpin';
   } else if (
     isAuthenticated &&
     onboardingDone &&
-    (inPublicGroup || (inAuthGroup && !onEnterMpinScreen) || isRoot)
+    (inPublicGroup || (inAuthGroup && !onSelfRoutingAuthScreen) || isRoot)
   ) {
     // 6. Fully-onboarded customer on public/auth/root → into the app
     target = '/(main)/(tabs)/home';
@@ -101,7 +123,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 // ---------------------------------------------------------------------------
 // RootLayout
 // ---------------------------------------------------------------------------
-export default function RootLayout() {
+function RootLayout() {
   const [fontsLoaded] = useFonts({
     Inter_400Regular,
     Inter_500Medium,
@@ -236,7 +258,9 @@ loadGoldLoanNotifyMe(),
       <StatusBar style="dark" translucent={false} />
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
-          <ServiceProvider>
+          <ServiceProvider
+            services={PILOT_REAL_AUTH ? { authService: realAuthService } : undefined}
+          >
             <GestureHandlerRootView style={styles.root}>
               <AuthGuard>
                 <Stack screenOptions={{ headerShown: false }}>
@@ -246,6 +270,7 @@ loadGoldLoanNotifyMe(),
                   <Stack.Screen name="(sales)" />
                 </Stack>
               </AuthGuard>
+              <NetworkStateBanner />
               {!splashDone && <AppSplash onDone={() => setSplashDone(true)} />}
             </GestureHandlerRootView>
           </ServiceProvider>
@@ -259,3 +284,7 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   splashFill: { flex: 1, backgroundColor: '#156FE8' },
 });
+
+// Sentry touch/navigation instrumentation wraps the tree only when a DSN is
+// configured for the build profile.
+export default wrapRoot(RootLayout);

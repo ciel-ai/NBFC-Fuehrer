@@ -18,7 +18,18 @@
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+    // The repo root hoists @types/react@18, which collides with this app's
+    // @types/react@19 and surfaces as spurious `bigint is not assignable to
+    // ReactNode` errors. Pin resolution to the local copy.
+    "paths": {
+      "react": [
+        "./node_modules/@types/react"
+      ],
+      "react-dom": [
+        "./node_modules/@types/react-dom"
+      ]
+    }
   },
   "include": [
     "src"

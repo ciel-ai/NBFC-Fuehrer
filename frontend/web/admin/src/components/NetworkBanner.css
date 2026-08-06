@@ -1,0 +1,62 @@
+/* Connectivity strip — fixed above all chrome, only present when degraded.
+   Sits below AntD message (z 1010) so toasts still stack over it. */
+.netbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 36px;
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-sm);
+  text-align: center;
+  box-shadow: var(--e2);
+  animation: netbar-in var(--motion-base) var(--ease-out) both;
+}
+
+.netbar__text {
+  min-width: 0;
+}
+
+.netbar__text strong {
+  font-weight: var(--weight-semibold);
+}
+
+.netbar__dot {
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.netbar--offline {
+  background: var(--status-danger-tint);
+  color: var(--status-danger-fg);
+  border-bottom: 1px solid color-mix(in srgb, var(--status-danger-fg) 24%, transparent);
+}
+
+.netbar--slow {
+  background: var(--status-warning-tint);
+  color: var(--status-warning-fg);
+  border-bottom: 1px solid color-mix(in srgb, var(--status-warning-fg) 24%, transparent);
+}
+
+@keyframes netbar-in {
+  from {
+    transform: translateY(-100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .netbar {
+    animation: none;
+  }
+}

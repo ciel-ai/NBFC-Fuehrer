@@ -1,4 +1,6 @@
 import api from '../../api/api';
+import { idempotentConfig } from '../../api/idempotency';
+import type { DocumentUploadResult } from '@/src/entities/document';
 import {
   cdlCalculateFoir,
   CDL_DEFAULT_INTEREST_RATE,
@@ -31,6 +33,22 @@ const base = '/consumer-durable-loans';
 export const realConsumerDurableLoanService: IConsumerDurableLoanService = {
   async submitApplication(input: CdlApplicationInput): Promise<CdlApplicationResult> {
     const res = await api.post<CdlApplicationResult>(`${base}/applications`, input);
+    return res.data;
+  },
+
+  async uploadDocument(
+    applicationId: string,
+    uri: string,
+    type: string,
+  ): Promise<DocumentUploadResult> {
+    const form = new FormData();
+    form.append('type', type);
+    form.append('file', { uri, name: `${type}.jpg`, type: 'image/jpeg' } as unknown as Blob);
+    const res = await api.post<DocumentUploadResult>(
+      `${base}/applications/${applicationId}/documents`,
+      form,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
     return res.data;
   },
 
@@ -76,15 +94,20 @@ export const realConsumerDurableLoanService: IConsumerDurableLoanService = {
     return res.data;
   },
 
-  async registerNachMandate(applicationId, input): Promise<CdlNachResult> {
-    const res = await api.post<CdlNachResult>(`${base}/applications/${applicationId}/nach`, input);
+  async registerNachMandate(applicationId, input, idempotencyKey): Promise<CdlNachResult> {
+    const res = await api.post<CdlNachResult>(
+      `${base}/applications/${applicationId}/nach`,
+      input,
+      idempotentConfig(idempotencyKey),
+    );
     return res.data;
   },
 
-  async disburseToMerchant(applicationId, input): Promise<CdlDisbursalResult> {
+  async disburseToMerchant(applicationId, input, idempotencyKey): Promise<CdlDisbursalResult> {
     const res = await api.post<CdlDisbursalResult>(
       `${base}/applications/${applicationId}/disburse`,
       input,
+      idempotentConfig(idempotencyKey),
     );
     return res.data;
   },
@@ -99,10 +122,15 @@ export const realConsumerDurableLoanService: IConsumerDurableLoanService = {
     return res.data;
   },
 
-  async processManualPayment(loanId: string, emiId: string): Promise<CdlManualPaymentResult> {
+  async processManualPayment(
+    loanId: string,
+    emiId: string,
+    idempotencyKey?: string,
+  ): Promise<CdlManualPaymentResult> {
     const res = await api.post<CdlManualPaymentResult>(
       `${base}/loans/${loanId}/payments`,
       { emiId },
+      idempotentConfig(idempotencyKey),
     );
     return res.data;
   },

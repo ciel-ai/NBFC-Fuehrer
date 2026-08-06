@@ -18,7 +18,10 @@ import {
   type CdlCreditDecision,
 } from '@/src/entities/consumerDurableLoan';
 
+import { usePersistApplyStep } from '@/src/features/apply/useApplyDraft';
+
 export default function CdlCreditDecisionScreen() {
+  usePersistApplyStep('cdl');
   const params = useLocalSearchParams<Record<string, string>>();
   const { consumerDurableLoanService } = useServices();
   const [decision, setDecision] = useState<CdlCreditDecision | null>(null);

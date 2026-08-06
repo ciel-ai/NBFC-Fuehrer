@@ -11,6 +11,8 @@ import { useEffect, useState } from 'react';
 import { USE_MOCK } from '../config';
 import { applicationsApi } from '../api/applications.api';
 import { useAppStore } from '../store/appStore';
+import { describeError, useLiveData } from './useLiveData';
+import type { DataSource } from './useLiveData';
 import type { AppStatus, LoanApplication } from '../types';
 
 // ─── Backend wire shape (web BFF GET /applications) ───────────────────────────
@@ -19,7 +21,7 @@ interface BackendAppRow {
   id: string;
   referenceNumber: string | null;
   status: string;
-  amountRequested: number;   // paise (moneyConverter middleware)
+  amountRequested: number; // paise (moneyConverter middleware)
   approvedAmount: number | null;
   tenureMonths: number;
   interestRate: number | null;
@@ -51,8 +53,8 @@ const rupees = (paise: number | null): number => (paise ? Math.round(paise) / 10
 
 function mapApp(r: BackendAppRow): LoanApplication {
   const year = new Date(r.appliedAt).getFullYear();
-  const appNumber = r.referenceNumber
-    ?? `FHR-${year}-${r.id.replace(/-/g, '').slice(-5).toUpperCase()}`;
+  const appNumber =
+    r.referenceNumber ?? `FHR-${year}-${r.id.replace(/-/g, '').slice(-5).toUpperCase()}`;
 
   return {
     id: r.id,
@@ -91,32 +93,29 @@ function mapApp(r: BackendAppRow): LoanApplication {
 
 export function useApplications(): {
   applications: LoanApplication[];
+  source: DataSource;
   live: boolean;
   loading: boolean;
+  error: string | null;
   reload: () => void;
 } {
   const mockApps = useAppStore((s) => s.applications);
-  const [data, setData] = useState<LoanApplication[] | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [nonce, setNonce] = useState(0);
 
-  useEffect(() => {
-    if (USE_MOCK) { setData(null); setLoading(false); return; }
-    let alive = true;
-    setLoading(true);
-    applicationsApi.list({ limit: 100 })
-      .then((res: { data: BackendAppRow[] }) => {
-        if (alive) { setData(res.data.map(mapApp)); setLoading(false); }
-      })
-      .catch(() => { if (alive) { setData(null); setLoading(false); } });
-    return () => { alive = false; };
-  }, [nonce]);
+  const { data, source, loading, error, reload } = useLiveData<LoanApplication[]>(
+    () =>
+      applicationsApi
+        .list({ limit: 100 })
+        .then((res: { data: BackendAppRow[] }) => res.data.map(mapApp)),
+    mockApps,
+  );
 
   return {
-    applications: data ?? mockApps,
-    live: data !== null,
+    applications: data,
+    source,
+    live: source === 'live',
     loading,
-    reload: () => setNonce((n) => n + 1),
+    error,
+    reload,
   };
 }
 
@@ -134,7 +133,10 @@ interface BackendAppDetail extends BackendAppRow {
   rejectionReason: string | null;
   reviewedAt: string | null;
   customer: {
-    name?: string; fullName?: string; phone?: string; mobile?: string;
+    name?: string;
+    fullName?: string;
+    phone?: string;
+    mobile?: string;
     email?: string;
   } | null;
 }
@@ -145,8 +147,13 @@ function mapAppDetail(r: BackendAppDetail): LoanApplication {
   const custPhone = (r.customer?.phone ?? r.customer?.mobile ?? '').replace(/^\+?91/, '');
 
   const emptyAddress = {
-    line1: '—', line2: '', city: r.storeCity ?? '—', state: '—', pincode: '—',
-    residenceType: '—' as never, yearsAtAddress: 0,
+    line1: '—',
+    line2: '',
+    city: r.storeCity ?? '—',
+    state: '—',
+    pincode: '—',
+    residenceType: '—' as never,
+    yearsAtAddress: 0,
   };
 
   return {
@@ -157,26 +164,46 @@ function mapAppDetail(r: BackendAppDetail): LoanApplication {
     },
     customer: {
       name: custName,
-      dob: '—', age: 0, gender: '—' as never, maritalStatus: '—' as never,
+      dob: '—',
+      age: 0,
+      gender: '—' as never,
+      maritalStatus: '—' as never,
       fatherOrSpouseName: '—',
-      mobile: custPhone, email: r.customer?.email ?? '—', dependents: 0,
-      currentAddress: emptyAddress, permanentAddress: emptyAddress,
+      mobile: custPhone,
+      email: r.customer?.email ?? '—',
+      dependents: 0,
+      currentAddress: emptyAddress,
+      permanentAddress: emptyAddress,
       employment: {
-        type: '—' as never, employer: '—', designation: '—', yearsInJob: 0,
+        type: '—' as never,
+        employer: '—',
+        designation: '—',
+        yearsInJob: 0,
       },
       income: {
-        monthlyIncome: rupees(r.monthlyIncome), otherIncome: 0,
-        existingObligations: 0, foir: 0,
+        monthlyIncome: rupees(r.monthlyIncome),
+        otherIncome: 0,
+        existingObligations: 0,
+        foir: 0,
       },
     },
     kyc: {
-      aadhaarMasked: '— not captured —', aadhaarVerified: false,
-      panNumber: '—', panVerified: false, videoKycStatus: 'PENDING',
+      aadhaarMasked: '— not captured —',
+      aadhaarVerified: false,
+      panNumber: '—',
+      panVerified: false,
+      videoKycStatus: 'PENDING',
     },
     bureau: {
-      score: 0, reportDate: '', enquiries6m: 0, totalAccounts: 0,
-      activeAccounts: 0, overdueAccounts: 0, oldestAccountYears: 0,
-      paymentHistory: [], accounts: [],
+      score: 0,
+      reportDate: '',
+      enquiries6m: 0,
+      totalAccounts: 0,
+      activeAccounts: 0,
+      overdueAccounts: 0,
+      oldestAccountYears: 0,
+      paymentHistory: [],
+      accounts: [],
     },
     documents: [],
     timeline: [],
@@ -187,24 +214,59 @@ export function useApplicationDetail(id: string | undefined): {
   app: LoanApplication | undefined;
   live: boolean;
   loading: boolean;
+  error: string | null;
+  reload: () => void;
 } {
-  const mockApp = useAppStore(
-    (s) => s.applications.find((a) => a.id === id),
-  );
+  const mockApp = useAppStore((s) => s.applications.find((a) => a.id === id));
+
   const [liveApp, setLiveApp] = useState<LoanApplication | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [nonce, setNonce] = useState(0);
 
   useEffect(() => {
-    // Sample rows resolve from the store; only fetch for unknown ids
-    if (USE_MOCK || !id || mockApp) { setLiveApp(null); setLoading(false); return; }
+    // Sample rows resolve from the store; only fetch for unknown ids.
+    if (USE_MOCK || !id || mockApp) {
+      setLiveApp(null);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
     let alive = true;
     setLoading(true);
-    applicationsApi.get(id)
-      .then((r: BackendAppDetail) => { if (alive) { setLiveApp(mapAppDetail(r)); setLoading(false); } })
-      .catch(() => { if (alive) { setLiveApp(null); setLoading(false); } });
-    return () => { alive = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, mockApp === undefined]);
+    setError(null);
 
-  return { app: liveApp ?? mockApp, live: liveApp !== null, loading };
+    applicationsApi
+      .get(id)
+      .then((r: BackendAppDetail) => {
+        if (alive) {
+          setLiveApp(mapAppDetail(r));
+          setLoading(false);
+        }
+      })
+      .catch((err: unknown) => {
+        if (alive) {
+          setLiveApp(null);
+          // This one matters: a detail screen with no record and no sample row is
+          // BLANK. Previously the failure was swallowed and the user just saw an
+          // empty page with no explanation and no way to retry.
+          setError(describeError(err));
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, mockApp === undefined, nonce]);
+
+  return {
+    app: liveApp ?? mockApp,
+    live: liveApp !== null,
+    loading,
+    error,
+    reload: () => setNonce((n) => n + 1),
+  };
 }

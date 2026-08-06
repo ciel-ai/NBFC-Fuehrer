@@ -58,6 +58,49 @@ export interface NACHResponse {
   message: string;
 }
 
+// ---------------------------------------------------------------------------
+// Linked bank accounts & their e-NACH mandates
+// ---------------------------------------------------------------------------
+
+/**
+ * Mandate lifecycle as the customer app needs to see it.
+ *
+ * `paused`, `cancelled` and `expired` are deliberately distinct from `failed`:
+ * a customer whose mandate the BANK cancelled needs to re-register, whereas one
+ * whose debit merely bounced needs to fund the account. Collapsing them into
+ * "inactive" is what made the old hardcoded screen useless.
+ */
+export type MandateState =
+  | 'active'
+  | 'pending'
+  | 'paused'
+  | 'cancelled'
+  | 'failed'
+  | 'expired'
+  | 'none';
+
+export interface AccountMandate {
+  status: MandateState;
+  /** NPCI Unique Mandate Reference Number. Absent until registration completes. */
+  umrn?: string;
+  maxAmount?: number;
+  registeredAt?: string;
+  /** Human-readable reason for the last failure — shown verbatim to the customer. */
+  failureReason?: string;
+}
+
+export interface LinkedBankAccount {
+  id: string;
+  bankName: string;
+  /** Already masked by the server. The app never receives a full account number. */
+  accountMasked: string;
+  accountType: 'Savings' | 'Current';
+  ifsc: string;
+  isPrimary: boolean;
+  /** null = no mandate has ever been registered on this account. */
+  mandate: AccountMandate | null;
+}
+
 export interface PaymentStatusResponse {
   paymentId: string;
   status: PaymentStatus;

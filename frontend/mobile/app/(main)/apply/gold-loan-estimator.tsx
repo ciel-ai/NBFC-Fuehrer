@@ -8,6 +8,7 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -19,6 +20,7 @@ import { Header } from '@/src/shared/components/common/Header';
 import { Button } from '@/src/shared/components/common/Button';
 import { scale } from '@/src/core/utils/responsive';
 import { useServices } from '@/src/core/services/ServiceProvider';
+import { useLoanConsent } from '@/src/features/loans/components/LoanConsentGate';
 
 const FALLBACK_GOLD_RATE_PER_GRAM = 6200;
 const LTV_RATIO = 0.75;
@@ -39,11 +41,13 @@ function formatPrice(n: number) {
 
 export default function GoldLoanEstimatorScreen() {
   const { goldLoanService } = useServices();
+  const { ensureConsent, consentGate } = useLoanConsent();
   const [goldType, setGoldType] = useState<GoldType>('Jewellery');
   const [karat, setKarat] = useState<Karat>('22K');
   const [weight, setWeight] = useState('10');
   const [goldRate, setGoldRate] = useState(FALLBACK_GOLD_RATE_PER_GRAM);
   const [rateSource, setRateSource] = useState('Backend fallback');
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -75,16 +79,41 @@ export default function GoldLoanEstimatorScreen() {
   const maxLoan = useMemo(() => goldValue * LTV_RATIO, [goldValue]);
 
   const handleGetLoan = () => {
-    if (maxLoan <= 0) return;
-    router.push({
-      pathname: '/(main)/apply/gold-loan-amount',
-      params: {
-        maxLoan: Math.round(maxLoan).toString(),
-        goldValue: Math.round(goldValue).toString(),
-        goldType,
-        karat,
-        weight,
-      },
+    if (maxLoan <= 0 || creating) return;
+    // T&C / KYC / bureau consent is collected here — at application start,
+    // not at login. Shows once per install, then goes straight through.
+    ensureConsent(async () => {
+      // Create the application up front so its id threads through the whole
+      // journey (documents, compliance, appraisal, agreement). A failed create
+      // must abort — never navigate into a flow with no application to attach to.
+      setCreating(true);
+      try {
+        const app = await goldLoanService.createApplication({
+          goldType,
+          karat,
+          weightGrams: weightNum,
+          estimatedGoldValue: Math.round(goldValue),
+          requestedAmount: Math.round(maxLoan),
+        });
+        router.push({
+          pathname: '/(main)/apply/gold-loan-amount',
+          params: {
+            applicationId: app.applicationId,
+            maxLoan: Math.round(maxLoan).toString(),
+            goldValue: Math.round(goldValue).toString(),
+            goldType,
+            karat,
+            weight,
+          },
+        });
+      } catch {
+        Alert.alert(
+          'Could not start application',
+          'We could not start your gold loan application. Please check your connection and try again.',
+        );
+      } finally {
+        setCreating(false);
+      }
     });
   };
 
@@ -228,10 +257,12 @@ export default function GoldLoanEstimatorScreen() {
           <Button
             title="Get This Loan"
             onPress={handleGetLoan}
-            disabled={maxLoan <= 0}
+            disabled={maxLoan <= 0 || creating}
+            loading={creating}
           />
         </View>
       </KeyboardAvoidingView>
+      {consentGate}
     </SafeAreaView>
   );
 }

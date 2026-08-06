@@ -5,6 +5,7 @@ import type {
   UpdateProfileRequest,
   PhotoUpdateResponse,
   ChangePhoneResponse,
+  AccountDeletionResult,
 } from '@/src/entities/user';
 
 export const realProfileService: IProfileService = {
@@ -43,6 +44,13 @@ export const realProfileService: IProfileService = {
 
   async changePhone(newPhone: string): Promise<ChangePhoneResponse> {
     const response = await api.post<ChangePhoneResponse>('/user/phone/change', { newPhone });
+    return response.data;
+  },
+
+  async requestAccountDeletion(reason?: string): Promise<AccountDeletionResult> {
+    const response = await api.post<AccountDeletionResult>('/user/profile/delete-request', {
+      reason,
+    });
     return response.data;
   },
 };
