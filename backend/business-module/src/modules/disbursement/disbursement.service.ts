@@ -33,6 +33,7 @@ import {
     NotFoundError,
     PAYMENT_ERRORS,
     ESignNotCompletedError,
+    EStampNotAppliedError,
     DisbursementAlreadyDoneError,
 } from '@/errors';
 import { createModuleLogger } from '@/config/logger';
@@ -92,6 +93,7 @@ export const disbursementService = {
             loanApproved: loan.status === LOAN_STATUS.APPROVED,
             kycComplete: kycDoc?.overallStatus === KYC_STATUS.COMPLETE,
             eSignComplete: kycDoc?.eSignStatus === 'SIGNED',
+            eStampComplete: kycDoc?.eStampStatus === 'APPLIED',
             underwritingPassed: underwritingReport?.decision === 'APPROVED' ||
                 underwritingReport?.decision === 'REFERRED',
             noDuplicatePayout: !existingDisbursement ||
@@ -186,6 +188,14 @@ export const disbursementService = {
         // ── Gate 4: eSign complete ────────────────────────────────────────────
         if (kycDoc.eSignStatus !== 'SIGNED') {
             throw new ESignNotCompletedError(loanId);
+        }
+
+        // ── Gate 4b: eStamp applied ────────────────────────────────────────────
+        // eStamp is legally separate from eSign — RBI requires both before
+        // disbursement (see providers/esign/interface.ts). Previously
+        // unchecked because the eStamp result was never persisted anywhere.
+        if (kycDoc.eStampStatus !== 'APPLIED') {
+            throw new EStampNotAppliedError(loanId);
         }
 
         // ── Gate 5: Underwriting must have cleared ────────────────────────────
@@ -683,6 +693,7 @@ const CHECKLIST_MESSAGES: Record<keyof DisbursementChecklist, string> = {
     loanApproved: 'Loan must be in APPROVED status',
     kycComplete: 'Customer KYC must be fully complete',
     eSignComplete: 'Loan agreement must be eSigned by the customer',
+    eStampComplete: 'Loan agreement must be eStamped',
     underwritingPassed: 'Underwriting assessment must be completed and cleared',
     noDuplicatePayout: 'A disbursement is already in progress or completed for this loan',
     bankAccountVerified: 'Beneficiary bank account could not be verified',

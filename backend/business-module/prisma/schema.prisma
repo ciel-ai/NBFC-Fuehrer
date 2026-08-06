@@ -61,6 +61,12 @@ model kyc_documents {
   credit_score            Int?
   esign_request_id        String?   @db.VarChar(100)
   esign_status            String?   @db.VarChar(30)
+  // eStamp is legally separate from eSign — RBI requires both before
+  // disbursement (see providers/esign/interface.ts). Previously the eStamp
+  // result came back from applyEStamp() and was discarded without being
+  // persisted anywhere, so nothing could actually verify it happened.
+  estamp_id               String?   @db.VarChar(100)
+  estamp_status           String?   @db.VarChar(30)
   signzy_responses        Json?
   overall_status          String    @default("NOT_STARTED") @db.VarChar(30)
   completed_checks        String[]  @default([])

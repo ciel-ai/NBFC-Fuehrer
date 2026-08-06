@@ -50,8 +50,16 @@ export const cdlLoansController = {
     async generateAgreement(req: AuthRequest, res: Response, next: NextFunction) {
         try {
             const id = req.params['id'] as string;
-            const result = cdlLoansService.generateAgreement(id);
+            const result = await cdlLoansService.generateAgreement(id);
             res.status(HTTP.OK).json(successResponse(result, 'Agreement generated'));
+        } catch (err) { next(err); }
+    },
+
+    async completeESign(req: AuthRequest, res: Response, next: NextFunction) {
+        try {
+            const id = req.params['id'] as string;
+            const result = await cdlLoansService.completeESign(id);
+            res.status(HTTP.OK).json(successResponse(result));
         } catch (err) { next(err); }
     },
 

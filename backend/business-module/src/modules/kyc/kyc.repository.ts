@@ -40,6 +40,8 @@ function mapToKycDocument(row: Record<string, unknown>): KycDocument {
         creditScore: row.credit_score as number | null,
         eSignRequestId: row.esign_request_id as string | null,
         eSignStatus: row.esign_status as string | null,
+        eStampId: row.estamp_id as string | null,
+        eStampStatus: row.estamp_status as string | null,
         signzyResponses: row.signzy_responses
             ? (typeof row.signzy_responses === 'string'
                 ? JSON.parse(row.signzy_responses)
