@@ -872,4 +872,86 @@ export const pdfService = {
             doc.end();
         });
     },
+
+    // ── 11. Consumer Durable Loan Agreement ───────────────────────────────────
+    // ⚠️ Content built to a general loan-agreement structure, same caveat as
+    // the Gold/Housing agreements above — legal wording pending client approval.
+
+    async generateCdlLoanAgreement(applicationId: string): Promise<Buffer> {
+        log.info('Generating CDL agreement', { applicationId });
+
+        const application = await prisma.loan_applications.findUnique({
+            where: { id: applicationId },
+            include: { user: { select: { full_name: true, phone: true } } },
+        });
+
+        if (!application) throw new NotFoundError('Loan Application', applicationId);
+
+        const principal = Number(application.approved_amount ?? application.amount_requested);
+        const annualRatePct = Number(application.interest_rate ?? 0);
+        const tenureMonths = application.tenure_months;
+        const monthlyEmi = application.monthly_emi
+            ? Number(application.monthly_emi)
+            : computeMonthlyEmi(principal, annualRatePct, tenureMonths);
+
+        return new Promise((resolve, reject) => {
+            const doc = new PDFDocument({ margin: 50, size: 'A4' });
+            const chunks: Buffer[] = [];
+
+            doc.on('data', (chunk) => chunks.push(chunk));
+            doc.on('end', () => resolve(Buffer.concat(chunks)));
+            doc.on('error', reject);
+
+            addHeader(doc, 'CONSUMER DURABLE LOAN AGREEMENT');
+
+            doc.fontSize(9).fillColor('#94A3B8')
+                .text('This agreement is executed between the Lender and the Borrower named below.', { align: 'center' });
+            doc.moveDown(1);
+
+            doc.fontSize(11).fillColor('#0F2C4F').text('A. Parties');
+            doc.moveDown(0.3);
+            addField(doc, 'Lender:', NBFC_IDENTITY.legalName);
+            addField(doc, 'Borrower Name:', application.user?.full_name ?? 'N/A');
+            addField(doc, 'Borrower Phone:', application.user?.phone ?? 'N/A');
+            addField(doc, 'Application Reference No.:', application.reference_number ?? application.id.slice(0, 8).toUpperCase());
+            addField(doc, 'Date:', formatDate(new Date()));
+            doc.moveDown(0.7);
+
+            doc.fontSize(11).fillColor('#0F2C4F').text('B. Loan Terms');
+            doc.moveDown(0.3);
+            addField(doc, 'Loan Amount:', inr(principal));
+            addField(doc, 'Tenure:', `${tenureMonths} months`);
+            addField(doc, 'Interest Rate:', `${annualRatePct.toFixed(2)}% p.a. (Reducing Balance)`);
+            addField(doc, 'Monthly Instalment (EMI):', inr(monthlyEmi));
+            doc.moveDown(0.7);
+
+            doc.fontSize(11).fillColor('#0F2C4F').text('C. Financed Purchase');
+            doc.moveDown(0.3);
+            addField(doc, 'Item Financed:', application.purpose ?? 'N/A');
+            addField(doc, 'Store Name:', application.store_name ?? 'N/A');
+            addField(doc, 'Store City:', application.store_city ?? 'N/A');
+            doc.moveDown(0.7);
+
+            doc.fontSize(11).fillColor('#0F2C4F').text('D. Terms & Conditions');
+            doc.moveDown(0.3);
+            doc.fontSize(10).fillColor('#1E293B').text(
+                'The loan amount shall be disbursed directly to the store named above, not to the ' +
+                'Borrower, against the purchase described. The Borrower agrees to repay the loan as ' +
+                'per the schedule provided separately, via auto-debit (eNACH). In the event of default, ' +
+                'the Lender reserves the right to recover outstanding dues, foreclosure charges, and ' +
+                'applicable penalties as per RBI guidelines. Full terms are set out in the Key Fact ' +
+                'Statement issued alongside this agreement.',
+                { align: 'justify' },
+            );
+            doc.moveDown(1);
+
+            doc.fontSize(8).fillColor('#94A3B8').text(
+                'This document requires digital signature (eSign) by the Borrower to be legally valid. An unsigned copy has no legal effect.',
+                { align: 'justify' },
+            );
+
+            addFooter(doc);
+            doc.end();
+        });
+    },
 };

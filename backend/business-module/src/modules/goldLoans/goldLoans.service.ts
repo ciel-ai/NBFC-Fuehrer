@@ -559,6 +559,12 @@ const finalLoan  = Math.round(valuation * (maxLtvPercent / 100));
             data: {
                 esign_status: 'SIGNED',
                 signed_agreement_s3_key: signedS3Key,
+                // Previously stampResult was used only for the response's
+                // stampDutyAmount and then discarded — nothing persisted
+                // whether the eStamp actually succeeded, so no disbursement
+                // gate could verify it.
+                estamp_id: stampResult.stampId,
+                estamp_status: stampResult.status,
                 updated_at: new Date(),
             },
         });

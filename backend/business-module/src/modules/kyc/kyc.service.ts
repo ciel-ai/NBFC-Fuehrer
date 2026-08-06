@@ -100,6 +100,7 @@ function toStatusResponse(doc: KycDocument): KycStatusResponse {
         aadhaarLast4: doc.aadhaarLast4,
         panMasked: doc.panMasked,
         eSignStatus: doc.eSignStatus,
+        eStampStatus: doc.eStampStatus,
         rejectionReason: doc.rejectionReason,
         verifiedAt: doc.verifiedAt,
         updatedAt: doc.updatedAt,

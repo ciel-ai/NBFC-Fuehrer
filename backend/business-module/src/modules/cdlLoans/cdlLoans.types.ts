@@ -83,6 +83,7 @@ export interface CdlAgreementResult {
     agreementUrl: string;
     status: 'GENERATED' | 'SIGNED' | 'PENDING';
     eSignRequestId: string | null;
+    stampDutyAmount: number;
     note: string;
 }
 

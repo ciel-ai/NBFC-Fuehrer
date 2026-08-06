@@ -50,6 +50,11 @@ export interface KycDocument {
     eSignRequestId: string | null;
     eSignStatus: string | null;
 
+    // eStamp — legally separate from eSign, RBI requires both before
+    // disbursement (see providers/esign/interface.ts)
+    eStampId: string | null;
+    eStampStatus: string | null;
+
     // Raw vendor responses stored as JSON — for audit and debugging
     // Never log these — they may contain PII
     signzyResponses: KycCheckResponses | null;
@@ -155,6 +160,7 @@ export interface KycStatusResponse {
     aadhaarLast4: string | null;
     panMasked: string | null;
     eSignStatus: string | null;
+    eStampStatus: string | null;
     rejectionReason: string | null;
     verifiedAt: Date | null;
     updatedAt: Date;

@@ -12,17 +12,20 @@ const A = ROLE.SUPER_ADMIN;
 
 // Most of this module is now wired to real persistence (loan_applications,
 // loan_accounts, emi_schedule, disbursements) — same tables/services gold
-// loans use. Two routes remain genuinely stub (agreement generation and
-// NOC generation both need a real document/eSign pipeline, out of tonight's
-// scope) and stay behind stubGuard() so that limitation is explicit rather
-// than silently faked.
+// loans use. Agreement generation (+ eSign) is now real too — see
+// cdlLoansService.generateAgreement / completeESign, same pdfService +
+// docStorage + esign provider pipeline gold loans use. NOC generation is
+// the one route still genuinely stub (needs the same pdfService +
+// docStorage pipeline, no eSign step) and stays behind stubGuard() so that
+// limitation is explicit rather than silently faked.
 router.post('/loans', requireAuth(), allowRoles(C, F), stubGuard(), cdlLoansController.activateLoan);
 router.post('/applications', requireAuth(), allowRoles(C), cdlLoansController.submitApplication);
 router.post('/applications/:id/kyc', requireAuth(), allowRoles(C), cdlLoansController.runKycChecks);
 router.post('/applications/:id/compliance', requireAuth(), allowRoles(C), cdlLoansController.runComplianceChecks);
 router.post('/applications/:id/credit-assessment', requireAuth(), allowRoles(C), cdlLoansController.runCreditAssessment);
 router.post('/applications/:id/credit-decision', requireAuth(), allowRoles(C), cdlLoansController.getCreditDecision);
-router.post('/applications/:id/agreement', requireAuth(), allowRoles(C), stubGuard(), cdlLoansController.generateAgreement);
+router.post('/applications/:id/agreement', requireAuth(), allowRoles(C), cdlLoansController.generateAgreement);
+router.post('/applications/:id/esign', requireAuth(), allowRoles(C), cdlLoansController.completeESign);
 router.post('/applications/:id/nach', requireAuth(), allowRoles(C), cdlLoansController.registerNachMandate);
 // disburseToMerchant is real, wired code (real payment provider call, real
 // disbursements row) — stubGuard() was blocking it unconditionally (see

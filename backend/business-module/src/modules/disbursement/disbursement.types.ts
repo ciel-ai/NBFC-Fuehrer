@@ -79,6 +79,7 @@ export interface DisbursementChecklist {
     loanApproved: boolean;
     kycComplete: boolean;
     eSignComplete: boolean;
+    eStampComplete: boolean;
     underwritingPassed: boolean;
     noDuplicatePayout: boolean;
     bankAccountVerified: boolean;

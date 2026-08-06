@@ -8,6 +8,10 @@ import { emiService } from '@/modules/emi';
 import { loansRepository } from '@/modules/loans/loans.repository';
 import { paymentsService } from '@/modules/payments';
 import { getPaymentProvider } from '@/providers';
+import { pdfService } from '@/modules/documents/pdf.service';
+import { getDocStorageProvider } from '@/providers/docStorage';
+import { getEncryptionProvider } from '@/providers/encryption';
+import { getESignProvider } from '@/providers/esign';
 import { LOAN_STATUS, PRODUCT_TYPE, BUSINESS_RULES } from '@/config/constants';
 import type {
     CdlApplicationInput, CdlApplicationResult,
@@ -280,16 +284,156 @@ export const cdlLoansService = {
         };
     },
 
-    // Still stub — real eSign integration (like gold loan's) is a separate,
-    // larger scope not covered tonight. Route stays behind stubGuard().
-    generateAgreement(applicationId: string): CdlAgreementResult {
+    // ── Real: generates an actual PDF (pdfService), uploads it to real
+    // document storage, and opens a real Signzy eSign request — same
+    // pattern goldLoans.generateAgreement already uses. The eSign
+    // request/status is stored on kyc_documents (not loan_applications),
+    // matching where the existing eSign webhook (POST /webhooks/esign,
+    // /webhooks/signzy → kycService.processESignCallback) already looks it
+    // up — no webhook changes needed to wire this up. ─────────────────────────
+    async generateAgreement(applicationId: string): Promise<CdlAgreementResult> {
+        log.info('Generating CDL agreement', { applicationId });
+
+        const application = await prisma.loan_applications.findUniqueOrThrow({
+            where: { id: applicationId },
+            include: { user: { select: { full_name: true, phone: true } } },
+        });
+
+        const kyc = await prisma.kyc_documents.findUnique({
+            where: { user_id: application.user_id },
+            select: { aadhaar_encrypted: true },
+        });
+
+        if (!kyc?.aadhaar_encrypted) {
+            throw new ValidationError('applicationId', 'Aadhaar verification must be complete before the agreement can be generated');
+        }
+
+        const pdfBuffer = await pdfService.generateCdlLoanAgreement(applicationId);
+
+        const docStorage = getDocStorageProvider();
+        const s3Key = `agreements/cdl/${applicationId}.pdf`;
+        await docStorage.upload({
+            key: s3Key,
+            fileBuffer: pdfBuffer,
+            contentType: 'application/pdf',
+        });
+        const { url: agreementUrl } = await docStorage.getSignedUrl(s3Key);
+
+        const encryption = getEncryptionProvider();
+        const aadhaarPlain = await encryption.decrypt(kyc.aadhaar_encrypted);
+
+        const esign = getESignProvider();
+        const signRequest = await esign.createSignRequest({
+            documentId: `cdl-agreement-${applicationId}`,
+            documentBase64: pdfBuffer.toString('base64'),
+            signerName: application.user?.full_name ?? '',
+            signerPhone: application.user?.phone ?? '',
+            signerAadhaar: aadhaarPlain,
+            purpose: 'Consumer Durable Loan Agreement Signature',
+        });
+
+        await prisma.kyc_documents.update({
+            where: { user_id: application.user_id },
+            data: {
+                esign_request_id: signRequest.requestId,
+                esign_status: signRequest.status,
+                updated_at: new Date(),
+            },
+        });
+
+        log.info('CDL agreement generated, eSign request created', { applicationId, requestId: signRequest.requestId });
+
         return {
             applicationId,
-            agreementId: `agr_cdl_${Date.now()}`,
-            agreementUrl: `https://${env.aws.s3Bucket}.s3.${env.aws.region}.amazonaws.com/agreements/cdl_${applicationId}.pdf`,
+            agreementId: s3Key,
+            agreementUrl: signRequest.signingUrl || agreementUrl,
             status: 'GENERATED',
-            eSignRequestId: null,
-            note: 'Agreement generated. Please sign to proceed.',
+            eSignRequestId: signRequest.requestId,
+            stampDutyAmount: 100, // Placeholder — pending client confirmation of actual stamp duty rate, same as gold/housing loans
+            note: 'Agreement generated. Please review and sign using Aadhaar OTP.',
+        };
+    },
+
+    // ── Real: checks real eSign status, applies a real eStamp once signed,
+    // and stores the signed+stamped PDF — same pattern as
+    // goldLoans.completeESign. Customer polls this after visiting the
+    // signingUrl from generateAgreement (or after the eSign webhook fires). ──
+    async completeESign(applicationId: string): Promise<CdlAgreementResult> {
+        log.info('Checking eSign completion for CDL', { applicationId });
+
+        const application = await prisma.loan_applications.findUniqueOrThrow({
+            where: { id: applicationId },
+        });
+
+        const kyc = await prisma.kyc_documents.findUniqueOrThrow({
+            where: { user_id: application.user_id },
+        });
+
+        if (!kyc.esign_request_id) {
+            throw new ValidationError('applicationId', 'No eSign request found — call the agreement step first');
+        }
+
+        const esign = getESignProvider();
+        const signStatus = await esign.getSignStatus(kyc.esign_request_id);
+
+        if (signStatus.status !== 'SIGNED') {
+            return {
+                applicationId,
+                agreementId: `agreements/cdl/${applicationId}.pdf`,
+                agreementUrl: '',
+                status: 'PENDING',
+                eSignRequestId: kyc.esign_request_id,
+                stampDutyAmount: 100,
+                note: `Signing not yet complete — current status: ${signStatus.status}.`,
+            };
+        }
+
+        const customer = await prisma.customers.findUnique({
+            where: { user_id: application.user_id },
+            select: { state: true },
+        });
+
+        const stampResult = await esign.applyEStamp({
+            requestId: kyc.esign_request_id,
+            loanAmountRupees: Number(application.approved_amount ?? application.amount_requested),
+            stateCode: customer?.state?.slice(0, 2).toUpperCase() ?? 'KA', // Placeholder mapping — pending a real state-name-to-code table, same as gold loan
+        });
+
+        const signedDoc = await esign.getSignedDocument(kyc.esign_request_id);
+        const docStorage = getDocStorageProvider();
+        const signedS3Key = `agreements/cdl/${applicationId}_signed.pdf`;
+        await docStorage.upload({
+            key: signedS3Key,
+            fileBuffer: Buffer.from(signedDoc.documentBase64, 'base64'),
+            contentType: 'application/pdf',
+        });
+        const { url: agreementUrl } = await docStorage.getSignedUrl(signedS3Key);
+
+        await prisma.kyc_documents.update({
+            where: { user_id: application.user_id },
+            data: {
+                esign_status: 'SIGNED',
+                signed_agreement_s3_key: signedS3Key,
+                // Previously stampResult was used only for the response's
+                // stampDutyAmount and then discarded — nothing persisted
+                // whether the eStamp actually succeeded, so disburseToMerchant
+                // below could not verify it before releasing funds.
+                estamp_id: stampResult.stampId,
+                estamp_status: stampResult.status,
+                updated_at: new Date(),
+            },
+        });
+
+        log.info('CDL agreement signed and stamped', { applicationId });
+
+        return {
+            applicationId,
+            agreementId: signedS3Key,
+            agreementUrl,
+            status: 'SIGNED',
+            eSignRequestId: kyc.esign_request_id,
+            stampDutyAmount: stampResult.stampDutyRupees ?? 100,
+            note: 'Agreement signed & stored. Proceeding to NACH setup.',
         };
     },
 
@@ -338,6 +482,21 @@ export const cdlLoansService = {
 
         if (!application.approvedAmount || !application.interestRate) {
             throw new ValidationError('applicationId', 'Application has not been approved yet');
+        }
+
+        // RBI Digital Lending Guidelines 2022: no disbursement without a
+        // signed AND stamped agreement — see providers/esign/interface.ts.
+        // Was not checked at all before, because generateAgreement was a
+        // stub with nothing real to check against.
+        const kyc = await prisma.kyc_documents.findUnique({
+            where: { user_id: application.userId },
+            select: { esign_status: true, estamp_status: true },
+        });
+        if (kyc?.esign_status !== 'SIGNED') {
+            throw new ValidationError('applicationId', 'Loan agreement must be signed (eSign) before disbursement can proceed');
+        }
+        if (kyc?.estamp_status !== 'APPLIED') {
+            throw new ValidationError('applicationId', 'Loan agreement must be eStamped before disbursement can proceed');
         }
 
         const emi = calcEmi(application.approvedAmount, application.interestRate, application.tenureMonths);
@@ -539,11 +698,17 @@ export const cdlLoansService = {
         };
     },
 
-    // Still stub — same as generateAgreement, needs a real document
-    // generation pipeline. Route stays behind stubGuard().
+    // Still stub — disconnected from the rest of the CDL flow (doesn't take
+    // an application ID, invents a random loan). Needs a real spec before
+    // it's touched — see Part 4 Step D of the finish-line guide. Route
+    // stays behind stubGuard().
     activateLoan(userId: string, input: Record<string, unknown>) {
         return { loanId: `cdl_loan_${Date.now()}`, status: 'ACTIVE', activatedAt: new Date().toISOString(), ...input };
     },
+
+    // Still stub — needs the same pdfService + docStorage pipeline
+    // generateAgreement now uses (no eSign step required for a NOC). Route
+    // stays behind stubGuard(). See Part 4 Step C.
     generateNoc(loanId: string): { nocRef: string; nocS3Url: string } {
         return {
             nocRef: `NOC-CDL-${loanId}-${Date.now()}`,

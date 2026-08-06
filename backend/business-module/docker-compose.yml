@@ -11,7 +11,11 @@ services:
       POSTGRES_PASSWORD: localdevpassword
       POSTGRES_DB: fuehrer_mvp
     ports:
-      - "5432:5432"
+      # Mapped to 5434 on the host, not 5432 — this machine already has a
+      # separate, native Postgres install bound to 5432 (see host process
+      # "postgres", unrelated to this project), which would otherwise
+      # silently intercept connections meant for this container.
+      - "5434:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
