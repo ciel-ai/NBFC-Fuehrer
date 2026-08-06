@@ -84,9 +84,10 @@ export const cdlLoansController = {
     async processManualPayment(req: AuthRequest, res: Response, next: NextFunction) {
         try {
             const id = req.params['id'] as string;
-            const { emiId } = req.body as { emiId: string };
-            const result = await cdlLoansService.processManualPayment(id, emiId, req);
-            res.status(HTTP.OK).json(successResponse(result));
+            const collectedBy = req.user!.id;
+            const { emiId, amount, collectionId } = req.body as { emiId: string; amount: number; collectionId?: string };
+            const result = await cdlLoansService.processManualPayment(id, emiId, amount, collectedBy, collectionId, req);
+            res.status(HTTP.OK).json(successResponse(result, 'Payment recorded'));
         } catch (err) { next(err); }
     },
 

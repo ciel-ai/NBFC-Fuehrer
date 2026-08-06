@@ -459,16 +459,41 @@ export const cdlLoansService = {
         }));
     },
 
-    // ── Real: reuses the platform's real EMI payment/bounce handling. ────────
-    async processManualPayment(loanId: string, emiId: string, req: any) {
-        const updated = await emiService.markPaid({
+    // ── Real: reuses the platform's real cash-payment pipeline
+    // (paymentsService.recordCashPayment) instead of calling emiService.markPaid
+    // directly — this is what actually creates the payments row, does
+    // penalty/interest/principal allocation, posts GL entries and fires the
+    // payment.received event. Previously this hardcoded paidAmount: 0 regardless
+    // of what the customer actually paid. ───────────────────────────────────────
+    async processManualPayment(loanId: string, emiId: string, amount: number, collectedBy: string, collectionId: string | undefined, req: any) {
+        if (!amount || amount <= 0) {
+            throw new ValidationError('amount', 'Payment amount must be greater than zero');
+        }
+
+        const account = await loansRepository.findAccountByIdOrThrow(loanId);
+
+        const payment = await paymentsService.recordCashPayment({
+            loanAccountId: loanId,
+            userId: account.userId,
             emiId,
-            paidAt: new Date(),
-            paidAmount: 0, // caller supplies the real amount via the payments module; see route wiring note
-            collectionId: undefined as any,
-            channel: 'CASH' as any,
+            amount,
+            collectedBy,
+            collectionId: collectionId ?? '',
         }, req);
-        return { loanId, emiId, status: updated.status, paidAt: updated.paidAt?.toISOString() ?? new Date().toISOString() };
+
+        log.info('CDL manual EMI payment recorded', { loanId, emiId, amount, paymentId: payment.id });
+
+        return {
+            loanId,
+            emiId,
+            paymentId: payment.id,
+            amountPaid: payment.amount,
+            penaltyPaid: payment.penaltyAmount,
+            totalCollected: payment.totalCollected,
+            status: payment.status,
+            paidAt: (payment.settledAt ?? payment.initiatedAt).toISOString(),
+            note: `₹${amount.toLocaleString('en-IN')} recorded against EMI.`,
+        };
     },
 
     async handlePaymentFailure(loanId: string, emiId: string, req: any) {
