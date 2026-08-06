@@ -488,6 +488,20 @@ export const cdlLoansService = {
         // signed AND stamped agreement — see providers/esign/interface.ts.
         // Was not checked at all before, because generateAgreement was a
         // stub with nothing real to check against.
+        //
+        // ⚠️ KNOWN GAP (proven via live testing, not yet fixed): esign_status
+        // /estamp_status live on kyc_documents, which is ONE ROW PER USER,
+        // not per application. A customer with an already-signed prior loan
+        // (any product — this same pattern exists in goldLoans.service.ts
+        // and the shared disbursement.service.ts) will pass this check for
+        // a BRAND NEW, never-signed application, because it reads the same
+        // shared row. Confirmed live: app #1 signed+disbursed correctly;
+        // app #2 (same customer, agreement never generated) disbursed
+        // anyway. Real fix needs esign/estamp tracked per-application (or
+        // a dedicated agreements table), which also means moving the
+        // POST /webhooks/esign lookup (kycService.processESignCallback,
+        // currently keyed by user via kyc_documents) — do not ship this
+        // check as sufficient for a repeat-customer population.
         const kyc = await prisma.kyc_documents.findUnique({
             where: { user_id: application.userId },
             select: { esign_status: true, estamp_status: true },
