@@ -23,7 +23,10 @@ const FOIR_META = {
   failed: { label: 'Breached — high risk', color: Colors.error, bg: Colors.errorLight },
 };
 
+import { usePersistApplyStep } from '@/src/features/apply/useApplyDraft';
+
 export default function CdlCreditAssessmentScreen() {
+  usePersistApplyStep('cdl');
   const params = useLocalSearchParams<Record<string, string>>();
   const { consumerDurableLoanService } = useServices();
   const [assessment, setAssessment] = useState<CdlCreditAssessment | null>(null);

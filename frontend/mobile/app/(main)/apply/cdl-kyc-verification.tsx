@@ -19,7 +19,10 @@ const STATUS_META: Record<CdlVerificationCheck['status'], { label: string; color
   failed: { label: 'Failed', color: Colors.error, icon: 'close-circle' },
 };
 
+import { usePersistApplyStep } from '@/src/features/apply/useApplyDraft';
+
 export default function CdlKycVerificationScreen() {
+  usePersistApplyStep('cdl');
   const params = useLocalSearchParams<Record<string, string>>();
   const { consumerDurableLoanService } = useServices();
   const [result, setResult] = useState<CdlKycResult | null>(null);

@@ -67,6 +67,10 @@
     " TODO(owner): keep .env.staging / .env.production in sync with the above.",
     " TODO(owner): submit.*.ios.appleId / appleTeamId / ascAppId.",
     " TODO(owner): submit.*.android.serviceAccountKeyPath.",
+    " TODO(owner): EXPO_PUBLIC_SENTRY_DSN in preview/production env — crash",
+    "   reporting stays a silent no-op until the Sentry project DSN is pasted.",
+    " TODO(owner): app.json expo.updates.url — replace TODO_RUN_npx_eas_init",
+    "   with the real EAS projectId (eas init writes extra.eas.projectId).",
     " A build that ships with REPLACE_ME hosts cannot reach the backend and",
     " will be rejected for broken functionality (Apple 2.1 / Play policy)."
   ],
@@ -78,6 +82,7 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
+      "channel": "development",
       "ios": {
         "buildConfiguration": "Debug",
         "simulator": false
@@ -93,6 +98,7 @@
     },
     "preview": {
       "distribution": "store",
+      "channel": "preview",
       "ios": {
         "buildConfiguration": "Release"
       },
@@ -102,11 +108,13 @@
       "envFile": ".env.staging",
       "env": {
         "EXPO_PUBLIC_API_URL": "https://staging-api.REPLACE_ME.in",
-        "EXPO_PUBLIC_USE_MOCK": "false"
+        "EXPO_PUBLIC_USE_MOCK": "false",
+        "EXPO_PUBLIC_SENTRY_DSN": ""
       }
     },
     "production": {
       "distribution": "store",
+      "channel": "production",
       "autoIncrement": true,
       "ios": {
         "buildConfiguration": "Release"
@@ -117,7 +125,8 @@
       "envFile": ".env.production",
       "env": {
         "EXPO_PUBLIC_API_URL": "https://api.REPLACE_ME.in",
-        "EXPO_PUBLIC_USE_MOCK": "false"
+        "EXPO_PUBLIC_USE_MOCK": "false",
+        "EXPO_PUBLIC_SENTRY_DSN": ""
       }
     }
   },

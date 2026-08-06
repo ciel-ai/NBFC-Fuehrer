@@ -1,4 +1,6 @@
 import api from '../../api/api';
+import { idempotentConfig } from '../../api/idempotency';
+import type { DocumentUploadResult } from '@/src/entities/document';
 import { HOUSING_INTEREST_RATE } from '@/src/entities/housingLoan';
 import type { EMISchedule, Loan } from '@/src/entities/loan';
 import type {
@@ -31,6 +33,22 @@ export const realHousingLoanService: IHousingLoanService = {
       ...input,
       interestRate: HOUSING_INTEREST_RATE,
     });
+    return res.data;
+  },
+
+  async uploadDocument(
+    applicationId: string,
+    uri: string,
+    type: string,
+  ): Promise<DocumentUploadResult> {
+    const form = new FormData();
+    form.append('type', type);
+    form.append('file', { uri, name: `${type}.jpg`, type: 'image/jpeg' } as unknown as Blob);
+    const res = await api.post<DocumentUploadResult>(
+      `${base}/applications/${applicationId}/documents`,
+      form,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
     return res.data;
   },
 
@@ -95,23 +113,29 @@ export const realHousingLoanService: IHousingLoanService = {
     return res.data;
   },
 
-  async registerNach(applicationId, input): Promise<HousingNachResult> {
-    const res = await api.post<HousingNachResult>(`${base}/applications/${applicationId}/nach`, input);
-    return res.data;
-  },
-
-  async applyPmaySubsidy(applicationId, input): Promise<HousingPmaySubsidyResult> {
-    const res = await api.post<HousingPmaySubsidyResult>(
-      `${base}/applications/${applicationId}/pmay-subsidy`,
+  async registerNach(applicationId, input, idempotencyKey): Promise<HousingNachResult> {
+    const res = await api.post<HousingNachResult>(
+      `${base}/applications/${applicationId}/nach`,
       input,
+      idempotentConfig(idempotencyKey),
     );
     return res.data;
   },
 
-  async disburseToBuilder(applicationId, input): Promise<HousingDisbursalResult> {
+  async applyPmaySubsidy(applicationId, input, idempotencyKey): Promise<HousingPmaySubsidyResult> {
+    const res = await api.post<HousingPmaySubsidyResult>(
+      `${base}/applications/${applicationId}/pmay-subsidy`,
+      input,
+      idempotentConfig(idempotencyKey),
+    );
+    return res.data;
+  },
+
+  async disburseToBuilder(applicationId, input, idempotencyKey): Promise<HousingDisbursalResult> {
     const res = await api.post<HousingDisbursalResult>(
       `${base}/applications/${applicationId}/disburse`,
       input,
+      idempotentConfig(idempotencyKey),
     );
     return res.data;
   },

@@ -73,14 +73,18 @@ export interface SalesFieldConfig {
   half?: boolean;
 }
 
-export type SalesStepKind = 'form' | 'review' | 'submit';
+export type SalesStepKind = 'form' | 'review' | 'submit' | 'ornaments';
 
 export interface SalesStepConfig {
   id: string;
   title: string;
   subtitle?: string;
   icon: IoniconName;
-  /** Defaults to 'form'. 'review' renders a read-only summary; 'submit' is the final CTA. */
+  /**
+   * Defaults to 'form'. 'review' renders a read-only summary; 'submit' is the
+   * final CTA; 'ornaments' renders the repeating collateral schedule
+   * (rows live in the form store under the `ornaments` key).
+   */
   kind?: SalesStepKind;
   fields?: SalesFieldConfig[];
   /** Per-step validation. Keys are a subset of the step's field names. */

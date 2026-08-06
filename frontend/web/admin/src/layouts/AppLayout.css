@@ -1,0 +1,276 @@
+/* App shell — header, search, notifications, profile.
+   Sider and header base styles live in index.css §3. */
+
+/* ── Header controls ─────────────────────────────────────────────────────── */
+
+.app-header .ant-btn-text {
+  color: var(--ink-500);
+  width: 32px;
+  height: 32px;
+}
+.app-header .ant-btn-text:hover {
+  color: var(--ink-900);
+  background: var(--ink-50);
+}
+
+.hdr-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--ink-150);
+  margin: 0 var(--space-1);
+  flex-shrink: 0;
+}
+
+.global-search {
+  width: 420px;
+  max-width: 40vw;
+}
+
+/* The filled search input reads as a recessed well, not a raised control. */
+.global-search .ant-input-affix-wrapper {
+  background: var(--ink-50);
+  border: 1px solid transparent;
+}
+.global-search .ant-input-affix-wrapper:hover {
+  background: var(--ink-100);
+}
+.global-search .ant-input-affix-wrapper-focused {
+  background: var(--ink-0);
+  border-color: var(--accent);
+}
+.global-search .anticon {
+  color: var(--ink-400);
+}
+
+/* Search results: reference, name, status — a ledger line, not a card. */
+.search-opt {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.search-opt__icon {
+  color: var(--ink-400);
+  flex-shrink: 0;
+}
+.search-opt__ref {
+  font-weight: var(--weight-medium);
+  color: var(--ink-900);
+  flex-shrink: 0;
+}
+.search-opt__name {
+  color: var(--ink-600);
+  flex: 1;
+}
+.search-opt__meta {
+  font-size: var(--text-xs);
+  color: var(--ink-400);
+  text-transform: capitalize;
+  flex-shrink: 0;
+}
+
+/* ── Profile ─────────────────────────────────────────────────────────────── */
+
+.hdr-profile {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  transition: background var(--motion-fast) var(--ease);
+}
+.hdr-profile:hover {
+  background: var(--ink-50);
+}
+
+.hdr-profile__text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.25;
+}
+.hdr-profile__name {
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+  color: var(--ink-900);
+}
+.hdr-profile__role {
+  font-size: var(--text-xs);
+  color: var(--ink-400);
+}
+.hdr-profile__caret {
+  font-size: 9px;
+  color: var(--ink-400);
+}
+
+/* Avatar: a tinted square with initials. No circle, no shadow, no ring. */
+.avatar-tone {
+  border-radius: var(--radius-sm) !important;
+  font-size: var(--text-xs) !important;
+  font-weight: var(--weight-semibold) !important;
+  color: var(--tone-fg) !important;
+  background: var(--tone-tint) !important;
+}
+
+.profile-card {
+  min-width: 200px;
+  padding: var(--space-1) 0;
+}
+.profile-card__name {
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  color: var(--ink-900);
+}
+.profile-card__branch {
+  margin-top: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--ink-400);
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+/* ── Notifications ───────────────────────────────────────────────────────── */
+
+.notif {
+  width: 344px;
+  margin: calc(var(--space-1) * -1) calc(var(--space-2) * -1);
+}
+.notif__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--ink-150);
+}
+.notif__list {
+  max-height: 360px;
+  overflow-y: auto;
+}
+.notif__empty {
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+}
+.notif__item {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--ink-100);
+}
+.notif__item:last-child {
+  border-bottom: none;
+}
+/* Unread is marked by a left rule, not a blue wash across the whole row. */
+.notif__item--unread {
+  box-shadow: inset 2px 0 0 var(--accent);
+  background: var(--accent-wash-soft);
+}
+.notif__time {
+  margin-top: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--ink-400);
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+/* ── Tone helper ─────────────────────────────────────────────────────────────
+   Any element can adopt a semantic tone's fg + tint by adding .tone-<name>.
+   Used by notification slots, avatars, worklist rows. */
+
+.tone-success {
+  --tone-fg: var(--status-success-fg);
+  --tone-tint: var(--status-success-tint);
+}
+.tone-warning {
+  --tone-fg: var(--status-warning-fg);
+  --tone-tint: var(--status-warning-tint);
+}
+.tone-danger {
+  --tone-fg: var(--status-danger-fg);
+  --tone-tint: var(--status-danger-tint);
+}
+.tone-overdue {
+  --tone-fg: var(--status-overdue-fg);
+  --tone-tint: var(--status-overdue-tint);
+}
+.tone-info {
+  --tone-fg: var(--status-info-fg);
+  --tone-tint: var(--status-info-tint);
+}
+.tone-violet {
+  --tone-fg: var(--status-violet-fg);
+  --tone-tint: var(--status-violet-tint);
+}
+.tone-neutral {
+  --tone-fg: var(--status-neutral-fg);
+  --tone-tint: var(--status-neutral-tint);
+}
+
+.work-row__slot.tone-success,
+.work-row__slot.tone-warning,
+.work-row__slot.tone-danger,
+.work-row__slot.tone-overdue,
+.work-row__slot.tone-info,
+.work-row__slot.tone-violet,
+.work-row__slot.tone-neutral {
+  color: var(--tone-fg);
+  background: var(--tone-tint);
+}
+
+/* ── Footer ──────────────────────────────────────────────────────────────── */
+
+.app-foot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-6) 0 var(--space-2);
+  font-size: var(--text-xs);
+  /* ink-300 is a decorative tier and fails AA as text (axe: color-contrast).
+     ink-400 is the lightest ink that still passes 4.5:1 on the canvas. */
+  color: var(--ink-400);
+}
+
+.app-foot__links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-4);
+}
+
+.app-foot__links a {
+  color: var(--ink-400);
+  transition: color var(--motion-fast) var(--ease);
+}
+
+.app-foot__links a:hover {
+  color: var(--accent);
+}
+
+/* ── Mobile drawer sider ─────────────────────────────────────────────────── */
+
+.sider-drawer .ant-drawer-body {
+  background: var(--ink-0);
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+
+@media (max-width: 992px) {
+  .global-search {
+    width: auto;
+    max-width: none;
+    flex: 1;
+  }
+  .app-header {
+    padding: 0 var(--space-3);
+    gap: var(--space-2);
+  }
+  .app-content {
+    padding: var(--space-4) var(--space-3);
+  }
+}

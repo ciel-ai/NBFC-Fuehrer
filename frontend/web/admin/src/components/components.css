@@ -1,0 +1,222 @@
+/* Shared component styles. Tokens only — no literal values. */
+
+/* ── PageHeader ──────────────────────────────────────────────────────────── */
+
+.page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+/* ── InfoGrid ────────────────────────────────────────────────────────────── */
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--space-4) var(--space-5);
+}
+
+.info-item__value {
+  margin-top: var(--space-1);
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  color: var(--ink-900);
+  word-break: break-word;
+  line-height: var(--leading-normal);
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--ink-100);
+}
+
+/* ── Metric delta ────────────────────────────────────────────────────────── */
+
+.metric-cell__delta--success {
+  color: var(--status-success-fg);
+  font-variant-numeric: tabular-nums;
+}
+.metric-cell__delta--danger {
+  color: var(--status-danger-fg);
+  font-variant-numeric: tabular-nums;
+}
+.metric-cell__delta .anticon {
+  font-size: 10px;
+}
+
+/* ── State views ─────────────────────────────────────────────────────────── */
+
+.state-view {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: var(--space-7) var(--space-5);
+}
+
+.state-view__icon {
+  color: var(--ink-300);
+  line-height: 0;
+}
+.state-view__icon--danger {
+  color: var(--status-danger-fg);
+  opacity: 0.6;
+}
+.state-view__icon--success {
+  color: var(--status-success-fg);
+  opacity: 0.75;
+}
+
+.state-view__title {
+  margin: var(--space-4) 0 0;
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  color: var(--ink-800);
+}
+
+.state-view__detail {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-base);
+  color: var(--ink-500);
+  max-width: 40ch;
+  line-height: var(--leading-relaxed);
+}
+
+/* ── Table cell primitives ───────────────────────────────────────────────────
+   The vocabulary every ledger in the app is built from. Three classes replace
+   what used to be a bespoke inline style object in each of ~20 column defs. */
+
+/* The identifier: loan number, application number, PAN. Tabular, dark, medium. */
+.cell-ref {
+  font-weight: var(--weight-medium);
+  color: var(--ink-900);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Supporting line under a ref — the customer name, the timestamp. */
+.cell-sub {
+  font-size: var(--text-sm);
+  color: var(--ink-500);
+}
+
+/* Money. The darkest ink on the row, because the figure is the point. */
+.cell-money {
+  font-weight: var(--weight-medium);
+  color: var(--ink-900);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Money that carries direction. */
+.cell-money--pos {
+  color: var(--status-success-fg);
+}
+.cell-money--neg {
+  color: var(--status-danger-fg);
+}
+
+/* A muted cell — "—", N/A, not-applicable. */
+.cell-nil {
+  color: var(--ink-300);
+}
+
+/* ── Skeletons ───────────────────────────────────────────────────────────── */
+
+/* Skeleton rows match real ledger row height so the page does not reflow when
+   data lands. This is the difference between a skeleton and a placeholder. */
+.skeleton-row {
+  display: flex;
+  align-items: center;
+  height: 44px;
+  padding: 0 var(--space-4);
+  border-bottom: 1px solid var(--ink-100);
+}
+.skeleton-row:last-child {
+  border-bottom: none;
+}
+
+/* AntD's skeleton block is a hard grey; soften it to the hairline tone. */
+.ant-skeleton-input {
+  border-radius: var(--radius-sm) !important;
+  min-width: 0 !important;
+}
+
+/* ── Logo lockup ─────────────────────────────────────────────────────────────
+ * Mark + wordmark, no chrome of its own. The sider's `.brand` header supplies
+ * its own height/border and composes <LogoMark> directly. */
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  white-space: nowrap;
+}
+
+.logo__text {
+  display: block;
+}
+
+/* The mark is a raster with a baked gradient; a touch of saturation keeps it
+ * vivid and legible at small sizes without washing out on white chrome. */
+.logo__img {
+  filter: saturate(1.3);
+}
+
+/* Wrapper around a bare mark that carries a caller's class. */
+.logo__wrap {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+/* The splash treatment: the mark centred on a rounded ground. Radius is set
+ * inline from `size` so it tracks the 30/132 proportion the app splash uses. */
+.logo__tile {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.logo__tile--white {
+  background: var(--ink-0);
+  border: 1px solid var(--ink-150);
+}
+
+.logo__tile--brand {
+  background: var(--brand-mark-blue);
+}
+
+/* The wordmark is the one place the app goes to 700 — the brand should
+ * out-weigh the UI around it. */
+.logo__name {
+  display: block;
+  font-size: var(--text-base);
+  font-weight: var(--weight-bold);
+  color: var(--ink-900);
+  letter-spacing: var(--tracking-snug);
+  line-height: 1.1;
+}
+
+.logo__product {
+  display: block;
+  font-size: var(--text-xs);
+  color: var(--ink-400);
+  line-height: 1.1;
+  margin-top: 2px;
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+
+@media (max-width: 900px) {
+  .info-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: var(--space-3) var(--space-4);
+  }
+  .page-header {
+    gap: var(--space-3);
+  }
+}

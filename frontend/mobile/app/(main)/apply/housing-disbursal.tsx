@@ -12,11 +12,13 @@ import { Button } from '@/src/shared/components/common/Button';
 import { LoadingSpinner } from '@/src/shared/components/common/LoadingSpinner';
 import { formatCurrency } from '@/src/core/utils/formatters';
 import { useServices } from '@/src/core/services/ServiceProvider';
+import { useIdempotencyKey } from '@/src/core/api/idempotency';
 import type { HousingDisbursalResult } from '@/src/entities/housingLoan';
 
 export default function HousingDisbursalScreen() {
   const params = useLocalSearchParams<Record<string, string>>();
   const { housingLoanService } = useServices();
+  const { getKey } = useIdempotencyKey();
   const queryClient = useQueryClient();
   const [status, setStatus] = useState<HousingDisbursalResult | null>(null);
   const [loading, setLoading] = useState(true);
@@ -32,10 +34,11 @@ export default function HousingDisbursalScreen() {
     let mounted = true;
     const run = async () => {
       try {
-        const disbursal = await housingLoanService.disburseToBuilder(params.applicationId ?? 'hl_mock', {
-          amount,
-          builderName,
-        });
+        const disbursal = await housingLoanService.disburseToBuilder(
+          params.applicationId ?? 'hl_mock',
+          { amount, builderName },
+          getKey(),
+        );
         await housingLoanService.activateLoan({
           loanAccountId: disbursal.loanAccountId,
           amount,

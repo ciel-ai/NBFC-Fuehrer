@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -20,6 +20,8 @@ import { Button } from '@/src/shared/components/common/Button';
 import { scale } from '@/src/core/utils/responsive';
 import { formatCurrency, formatDate } from '@/src/core/utils/formatters';
 import { useServices } from '@/src/core/services/ServiceProvider';
+import { useIdempotencyKey } from '@/src/core/api/idempotency';
+import { openRazorpayCheckout, RazorpayError } from '@/src/core/payments/razorpay';
 
 type PaymentMethod = 'upi' | 'netbanking' | 'debit_card';
 
@@ -51,10 +53,18 @@ export default function PayEMIScreen() {
     dueDate?: string;
   }>();
   const { consumerDurableLoanService } = useServices();
+  const { getKey } = useIdempotencyKey();
   const [method, setMethod] = useState<PaymentMethod>('upi');
   const [upiId, setUpiId] = useState('');
   const [selectedUpiApp, setSelectedUpiApp] = useState('gpay');
   const [loading, setLoading] = useState(false);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // Amount/date come from the selected EMI; fall back for legacy seeded loans.
   const EMI_AMOUNT = Number(amount) || 9800;
@@ -65,32 +75,65 @@ export default function PayEMIScreen() {
     method === 'netbanking' ? true :
     true;
 
+  // Human-readable payment mode threaded to the receipt — no longer hardcoded.
+  const methodLabel =
+    method === 'upi'
+      ? selectedUpiApp !== 'other'
+        ? `UPI — ${UPI_APPS.find((a) => a.id === selectedUpiApp)?.label ?? 'UPI'}`
+        : 'UPI'
+      : method === 'netbanking'
+        ? 'Net Banking'
+        : 'Debit Card';
+
   const handlePay = async () => {
     setLoading(true);
-    // Razorpay payment capture (stubbed) — marks the EMI paid and stores a receipt.
-    let receiptId = '';
-    let nextDueDate = '';
     try {
+      // 1) Open the Razorpay checkout sheet. Simulated under USE_MOCK; a real
+      //    gateway capture once the SDK + keys are activated (see razorpay.ts).
+      await openRazorpayCheckout({
+        amount: EMI_AMOUNT,
+        description: `EMI payment · Loan ${loanId ?? 'L1'}`,
+        // orderId: <backend create-order id>  — wire when the endpoint lands
+      });
+
+      // 2) Capture succeeded — mark the EMI paid and fetch the receipt. A thrown
+      //    error here means the capture did NOT settle, so we must surface the
+      //    failure, never a false confirmation.
       const result = await consumerDurableLoanService.processManualPayment(
         loanId ?? 'L1',
         emiId ?? 'e1',
+        getKey(),
       );
-      receiptId = result.receiptId;
-      nextDueDate = result.nextDueDate ?? '';
-    } catch {
-      // fall through — payment-success still shows a confirmation for demo loans
+      if (!isMountedRef.current) return;
+      setLoading(false);
+      router.replace({
+        pathname: '/(main)/loan-detail/payment-success',
+        params: {
+          amount: String(result.amount || EMI_AMOUNT),
+          emiId: result.emiId,
+          loanId: loanId ?? 'L1',
+          receiptId: result.receiptId,
+          receiptUrl: result.receiptS3Url,
+          nextDueDate: result.nextDueDate ?? '',
+          paymentId: result.paymentId,
+          method: methodLabel,
+          paidAt: result.paidAt,
+        },
+      });
+    } catch (err) {
+      if (!isMountedRef.current) return;
+      setLoading(false);
+      // User dismissed the Razorpay sheet — stay put, don't show a failure.
+      if (err instanceof RazorpayError && err.code === 'RAZORPAY_CANCELLED') {
+        return;
+      }
+      // Capture failed — route to the failure screen (retry / penalty details)
+      // rather than showing a success the customer never actually completed.
+      router.replace({
+        pathname: '/(main)/loan-detail/payment-failure',
+        params: { loanId: loanId ?? 'L1', emiId: emiId ?? 'e1' },
+      });
     }
-    setLoading(false);
-    router.replace({
-      pathname: '/(main)/loan-detail/payment-success',
-      params: {
-        amount: String(EMI_AMOUNT),
-        emiId: emiId ?? 'e1',
-        loanId: loanId ?? 'L1',
-        receiptId,
-        nextDueDate,
-      },
-    });
   };
 
   return (

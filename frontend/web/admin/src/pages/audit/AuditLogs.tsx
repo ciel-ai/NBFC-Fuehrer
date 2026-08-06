@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Button, Card, DatePicker, Input, Select, Table, Tag } from 'antd';
+import { Button, Card, DatePicker, Input, Select, Tag } from 'antd';
 import type { TableProps } from 'antd';
 import { DownloadOutlined, SearchOutlined } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
@@ -9,19 +9,28 @@ import { exportCsv } from '../../utils/csv';
 import { fmtDateTime } from '../../utils/format';
 import type { AuditLog } from '../../types';
 import { settingsApi } from '../../api/settings.api';
+import DataTable from '../../components/DataTable';
 
 const { RangePicker } = DatePicker;
 
-const MODULES = ['Applications', 'Credit', 'Finance', 'Collections', 'User Management', 'Settings', 'Auth'];
+const MODULES = [
+  'Applications',
+  'Credit',
+  'Finance',
+  'Collections',
+  'User Management',
+  'Settings',
+  'Auth',
+];
 
 const MODULE_COLOR: Record<string, string> = {
-  Applications: '#0284c7',
-  Credit: '#b45309',
-  Finance: '#047857',
-  Collections: '#ea580c',
-  'User Management': '#7c3aed',
-  Settings: '#475569',
-  Auth: '#0e7490',
+  Applications: 'var(--accent)',
+  Credit: 'var(--status-warning-fg)',
+  Finance: 'var(--status-success-fg)',
+  Collections: 'var(--status-overdue-fg)',
+  'User Management': 'var(--status-violet-fg)',
+  Settings: 'var(--ink-600)',
+  Auth: 'var(--status-info-fg)',
 };
 
 const AuditLogs: React.FC = () => {
@@ -29,8 +38,11 @@ const AuditLogs: React.FC = () => {
   const [realLogs, setRealLogs] = React.useState<any[]>([]);
 
   React.useEffect(() => {
-    settingsApi.getAuditLogs({ limit: 100 })
-      .then((res) => { if (res.data?.length) setRealLogs(res.data); })
+    settingsApi
+      .getAuditLogs({ limit: 100 })
+      .then((res) => {
+        if (res.data?.length) setRealLogs(res.data);
+      })
       .catch(() => {});
   }, []);
 
@@ -59,7 +71,7 @@ const AuditLogs: React.FC = () => {
       title: 'Date & Time',
       dataIndex: 'at',
       width: 185,
-      render: (v: string) => <span className="tnum" style={{ fontSize: 12.5, color: '#475569' }}>{fmtDateTime(v)}</span>,
+      render: (v: string) => <span className="tnum u-sm u-ink-600">{fmtDateTime(v)}</span>,
       sorter: (a, b) => dayjs(a.at).valueOf() - dayjs(b.at).valueOf(),
       defaultSortOrder: 'descend',
     },
@@ -69,8 +81,8 @@ const AuditLogs: React.FC = () => {
       width: 190,
       render: (v: string, r) => (
         <div>
-          <div style={{ fontWeight: 600, fontSize: 12.5, color: '#1e293b' }}>{v}</div>
-          <div style={{ fontSize: 11, color: '#94a3b8' }}>{r.role}</div>
+          <div className="u-semibold u-sm u-ink-900">{v}</div>
+          <div className="u-xs u-ink-400">{r.role}</div>
         </div>
       ),
     },
@@ -79,30 +91,85 @@ const AuditLogs: React.FC = () => {
       dataIndex: 'module',
       width: 145,
       render: (v: string) => (
-        <Tag style={{ borderRadius: 6, fontSize: 11, fontWeight: 600, color: MODULE_COLOR[v] ?? '#475569', background: `${MODULE_COLOR[v] ?? '#475569'}10`, borderColor: `${MODULE_COLOR[v] ?? '#475569'}30` }}>
+        <Tag
+          style={{
+            borderRadius: 6,
+            fontSize: 11,
+            fontWeight: 600,
+            color: MODULE_COLOR[v] ?? 'var(--ink-600)',
+            background: `${MODULE_COLOR[v] ?? 'var(--ink-600)'}10`,
+            borderColor: `${MODULE_COLOR[v] ?? 'var(--ink-600)'}30`,
+          }}
+        >
           {v}
         </Tag>
       ),
     },
-    { title: 'Action', dataIndex: 'action', render: (v: string) => <span style={{ fontWeight: 500, fontSize: 12.5 }}>{v}</span> },
-    { title: 'Entity', dataIndex: 'entity', width: 200, render: (v: string) => <span style={{ fontSize: 12.5, color: '#0284c7', fontWeight: 600 }}>{v}</span> },
+    {
+      title: 'Action',
+      dataIndex: 'action',
+      render: (v: string) => <span className="u-medium u-sm">{v}</span>,
+    },
+    {
+      title: 'Entity',
+      dataIndex: 'entity',
+      width: 200,
+      render: (v: string) => <span className="u-sm u-accent u-semibold">{v}</span>,
+    },
     {
       title: 'Old Value',
       dataIndex: 'oldValue',
       width: 145,
-      render: (v?: string) => v
-        ? <Tag style={{ borderRadius: 6, fontSize: 11, background: '#fef2f2', color: '#b91c1c', borderColor: '#fecaca', maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis' }}>{v}</Tag>
-        : <span style={{ color: '#cbd5e1' }}>—</span>,
+      render: (v?: string) =>
+        v ? (
+          <Tag
+            style={{
+              borderRadius: 6,
+              fontSize: 11,
+              background: 'var(--status-danger-tint)',
+              color: 'var(--status-danger-fg)',
+              borderColor: 'var(--status-danger-tint)',
+              maxWidth: 130,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}
+          >
+            {v}
+          </Tag>
+        ) : (
+          <span style={{ color: 'var(--ink-200)' }}>—</span>
+        ),
     },
     {
       title: 'New Value',
       dataIndex: 'newValue',
       width: 165,
-      render: (v?: string) => v
-        ? <Tag style={{ borderRadius: 6, fontSize: 11, background: '#ecfdf5', color: '#047857', borderColor: '#bbf7d0', maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis' }}>{v}</Tag>
-        : <span style={{ color: '#cbd5e1' }}>—</span>,
+      render: (v?: string) =>
+        v ? (
+          <Tag
+            style={{
+              borderRadius: 6,
+              fontSize: 11,
+              background: 'var(--status-success-tint)',
+              color: 'var(--status-success-fg)',
+              borderColor: 'var(--status-success-tint)',
+              maxWidth: 150,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}
+          >
+            {v}
+          </Tag>
+        ) : (
+          <span style={{ color: 'var(--ink-200)' }}>—</span>
+        ),
     },
-    { title: 'IP Address', dataIndex: 'ip', width: 125, render: (v: string) => <span className="tnum" style={{ fontSize: 12, color: '#64748b' }}>{v}</span> },
+    {
+      title: 'IP Address',
+      dataIndex: 'ip',
+      width: 125,
+      render: (v: string) => <span className="tnum u-sm u-ink-500">{v}</span>,
+    },
   ];
 
   return (
@@ -116,8 +183,28 @@ const AuditLogs: React.FC = () => {
             onClick={() =>
               exportCsv(
                 `audit-logs-${dayjs().format('YYYYMMDD')}`,
-                ['Date & Time', 'User', 'Role', 'Module', 'Action', 'Entity', 'Old Value', 'New Value', 'IP'],
-                rows.map((l) => [fmtDateTime(l.at), l.user, l.role, l.module, l.action, l.entity, l.oldValue ?? '', l.newValue ?? '', l.ip]),
+                [
+                  'Date & Time',
+                  'User',
+                  'Role',
+                  'Module',
+                  'Action',
+                  'Entity',
+                  'Old Value',
+                  'New Value',
+                  'IP',
+                ],
+                rows.map((l) => [
+                  fmtDateTime(l.at),
+                  l.user,
+                  l.role,
+                  l.module,
+                  l.action,
+                  l.entity,
+                  l.oldValue ?? '',
+                  l.newValue ?? '',
+                  l.ip,
+                ]),
               )
             }
           >
@@ -126,27 +213,59 @@ const AuditLogs: React.FC = () => {
         }
       />
 
-      <Card variant="borderless" style={{ boxShadow: 'var(--shadow-card)' }} styles={{ body: { padding: 0 } }}>
-        <div style={{ display: 'flex', gap: 10, padding: '16px 18px', flexWrap: 'wrap', borderBottom: '1px solid #eef1f7' }}>
+      <Card styles={{ body: { padding: 0 } }}>
+        <div
+          style={{
+            display: 'flex',
+            gap: 10,
+            padding: '16px 18px',
+            flexWrap: 'wrap',
+            borderBottom: '1px solid var(--ink-100)',
+          }}
+        >
           <Input
-            prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
+            prefix={<SearchOutlined className="u-ink-400" />}
             placeholder="Search user, action, entity, IP…"
             allowClear
             style={{ width: 290 }}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
-          <Select placeholder="Module" allowClear style={{ width: 175 }} value={moduleFilter} onChange={setModuleFilter} options={MODULES.map((m) => ({ value: m, label: m }))} />
-          <Select placeholder="Role" allowClear style={{ width: 165 }} value={roleFilter} onChange={setRoleFilter} options={roles.map((r) => ({ value: r, label: r }))} />
-          <RangePicker value={range as any} onChange={(v) => setRange(v as any)} style={{ width: 250 }} />
+          <Select
+            aria-label="Module"
+            placeholder="Module"
+            allowClear
+            style={{ width: 175 }}
+            value={moduleFilter}
+            onChange={setModuleFilter}
+            options={MODULES.map((m) => ({ value: m, label: m }))}
+          />
+          <Select
+            aria-label="Role"
+            placeholder="Role"
+            allowClear
+            style={{ width: 165 }}
+            value={roleFilter}
+            onChange={setRoleFilter}
+            options={roles.map((r) => ({ value: r, label: r }))}
+          />
+          <RangePicker
+            value={range as any}
+            onChange={(v) => setRange(v as any)}
+            style={{ width: 250 }}
+          />
         </div>
-        <Table<AuditLog>
+        <DataTable<AuditLog>
           dataSource={rows}
           columns={columns}
           rowKey="id"
           size="middle"
           scroll={{ x: 1280 }}
-          pagination={{ pageSize: 15, showSizeChanger: true, showTotal: (t, r0) => `${r0[0]}–${r0[1]} of ${t} events` }}
+          pagination={{
+            pageSize: 15,
+            showSizeChanger: true,
+            showTotal: (t, r0) => `${r0[0]}–${r0[1]} of ${t} events`,
+          }}
         />
       </Card>
     </div>

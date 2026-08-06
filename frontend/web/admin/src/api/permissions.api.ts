@@ -18,7 +18,27 @@ export interface RoleRow {
   permissions: RolePermission[];
 }
 
+/** The caller's own effective grants: { [module]: ['READ','WRITE'] }. */
+export interface MyPermissions {
+  role: string;
+  permissions: Record<string, string[]>;
+}
+
 export const permissionsApi = {
+  /**
+   * The signed-in user's OWN effective permissions.
+   *
+   * Unlike every other route here this is not admin-gated — it is the endpoint
+   * that lets the portal build navigation and route guards from the real RBAC
+   * model instead of a hardcoded table. Admins are served the full module list
+   * directly (the API bypasses the DB for them), so this can never disagree with
+   * what the server will actually authorise.
+   */
+  me: async (): Promise<MyPermissions> => {
+    const res = await apiClient.get('/permissions/me');
+    return res.data.data;
+  },
+
   /** All roles with their active permission grants. */
   listRoles: async (): Promise<RoleRow[]> => {
     const res = await apiClient.get('/permissions/roles');

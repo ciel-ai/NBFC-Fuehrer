@@ -8,6 +8,20 @@ export const API_RETRY_ATTEMPTS = 3;
 // Mock flag — set EXPO_PUBLIC_USE_MOCK=false in .env.production
 export const USE_MOCK = Config.EXPO_PUBLIC_USE_MOCK;
 
+// ── Pilot: real login against the local user-module backend ──────────────────
+// Temporary switch for the mock→real switch-over pilot (docs/BACKEND_INTEGRATION_NOTES.md).
+// While USE_MOCK stays true (so every other feature keeps using mock data), setting
+// this to `true` makes ONLY the auth service hit the real backend at
+// EXPO_PUBLIC_API_URL, so you can verify a real OTP login end-to-end. Keep it
+// `false` until user-module is running, or dev login will fail. Remove once the
+// full mock→real migration lands.
+export const PILOT_REAL_AUTH = false;
+
+// Razorpay publishable key. Empty until the client provides it — payments run
+// in simulated (mock) mode until both this and the SDK are in place.
+// See src/core/payments/razorpay.ts for the activation steps.
+export const RAZORPAY_KEY_ID = Config.EXPO_PUBLIC_RAZORPAY_KEY_ID ?? '';
+
 // ---------------------------------------------------------------------------
 // SecureStore keys
 // NEVER rename these after the first production release without a migration.
@@ -37,7 +51,12 @@ export const SECURE_STORE_KEYS = {
   // are loan drafts that the agent can resume) → appStorage.
   SALES_DRAFTS: 'nbfc_sales_drafts',
   // Offline mutation queue (applications captured without connectivity) → appStorage.
+  // Reused by BOTH the sales wizard submit and the customer-flow money-movement
+  // ops — one queue, one flush-on-reconnect driver (see offlineQueue.ts).
   SALES_OFFLINE_QUEUE: 'nbfc_sales_offline_queue',
+  // Customer apply-flow resume drafts, keyed by product flow (gold/cdl/housing)
+  // → appStorage. Holds the router param bundle so a killed app can resume.
+  CUSTOMER_APPLY_DRAFTS: 'nbfc_customer_apply_drafts',
 } as const;
 
 export const MPIN_LENGTH = 4;

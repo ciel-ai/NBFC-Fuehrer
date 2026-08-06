@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -14,20 +14,29 @@ import { Colors } from '@/src/core/theme/colors';
 import { FontFamily, FontSize, Typography } from '@/src/core/theme/typography';
 import { Spacing, BorderRadius, Shadow } from '@/src/core/theme/spacing';
 import { Button } from '@/src/shared/components/common/Button';
+import { StatusAnimation } from '@/src/shared/components/common/StatusAnimation';
 import { scale } from '@/src/core/utils/responsive';
 import { formatCurrency, formatDate } from '@/src/core/utils/formatters';
 
-const TXN_ID = `TXN${Date.now().toString().slice(-10)}`;
-
 export default function PaymentSuccessScreen() {
-  const { amount, emiId, loanId, receiptId, nextDueDate } = useLocalSearchParams<{
-    amount?: string;
-    emiId?: string;
-    loanId?: string;
-    receiptId?: string;
-    nextDueDate?: string;
-  }>();
+  const { amount, emiId, loanId, receiptId, receiptUrl, nextDueDate, paymentId, method, paidAt } =
+    useLocalSearchParams<{
+      amount?: string;
+      emiId?: string;
+      loanId?: string;
+      receiptId?: string;
+      receiptUrl?: string;
+      nextDueDate?: string;
+      paymentId?: string;
+      method?: string;
+      paidAt?: string;
+    }>();
   const queryClient = useQueryClient();
+
+  // Prefer the payment reference returned by the gateway. Only fall back to a
+  // locally-generated id (stable for this screen instance) when it is absent.
+  const [fallbackTxnId] = useState(() => `TXN${Date.now().toString().slice(-10)}`);
+  const transactionId = paymentId ?? fallbackTxnId;
 
   // Outstanding balance changed — refresh the dashboard.
   useEffect(() => {
@@ -35,7 +44,7 @@ export default function PaymentSuccessScreen() {
   }, [queryClient]);
 
   const paidAmount = Number(amount ?? 9800);
-  const today = formatDate(new Date().toISOString());
+  const paymentDate = formatDate(paidAt ?? new Date().toISOString());
 
   return (
     <SafeAreaView style={styles.container}>
@@ -43,11 +52,11 @@ export default function PaymentSuccessScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.successCircle}>
-          <View style={styles.successRing}>
-            <Ionicons name="checkmark" size={scale(52)} color={Colors.textWhite} />
-          </View>
-        </View>
+        <StatusAnimation
+          name="paymentSuccess"
+          size={scale(132)}
+          accessibilityLabel="Payment successful"
+        />
 
         <Text style={styles.title}>Payment Successful!</Text>
         <Text style={styles.subtitle}>Your EMI has been received. Thank you for paying on time.</Text>
@@ -59,12 +68,12 @@ export default function PaymentSuccessScreen() {
 
         <View style={styles.detailCard}>
           {[
-            { label: 'Transaction ID', value: TXN_ID },
-            { label: 'Payment Date',   value: today },
+            { label: 'Transaction ID', value: transactionId },
+            { label: 'Payment Date',   value: paymentDate },
             { label: 'Loan ID',        value: loanId ?? 'L1' },
-            { label: 'EMI Reference',  value: emiId ?? 'e4' },
-            { label: 'Payment Mode',   value: 'UPI — GPay' },
-            ...(receiptId ? [{ label: 'Receipt (AWS S3)', value: receiptId }] : []),
+            { label: 'EMI Reference',  value: emiId ?? '—' },
+            { label: 'Payment Mode',   value: method ?? 'UPI' },
+            ...(receiptId ? [{ label: 'Receipt Ref', value: receiptId }] : []),
             { label: 'Status',         value: 'Settled', isStatus: true },
           ].map((item, i, arr) => (
             <View key={item.label}>
@@ -116,11 +125,26 @@ export default function PaymentSuccessScreen() {
 
         <Pressable
           style={styles.downloadBtn}
+          onPress={() =>
+            router.push({
+              pathname: '/(main)/loan-detail/receipt',
+              params: {
+                amount: String(paidAmount),
+                transactionId,
+                paymentDate,
+                loanId: loanId ?? 'L1',
+                emiId: emiId ?? '',
+                method: method ?? 'UPI',
+                receiptId: receiptId ?? '',
+                receiptUrl: receiptUrl ?? '',
+              },
+            })
+          }
           accessibilityRole="button"
-          accessibilityLabel="Download payment receipt"
+          accessibilityLabel="View payment receipt"
         >
-          <Ionicons name="download-outline" size={scale(16)} color={Colors.textSecondary} />
-          <Text style={styles.downloadText}>Download Receipt</Text>
+          <Ionicons name="receipt-outline" size={scale(16)} color={Colors.textSecondary} />
+          <Text style={styles.downloadText}>View Receipt</Text>
         </Pressable>
       </ScrollView>
     </SafeAreaView>

@@ -1,4 +1,5 @@
 import { mockDelay } from '../../api/api';
+import type { DocumentUploadResult } from '@/src/entities/document';
 import { calculateEMI } from '@/src/core/utils/formatters';
 import type { EMISchedule, Loan } from '@/src/entities/loan';
 import {
@@ -64,6 +65,21 @@ export const mockConsumerDurableLoanService: IConsumerDurableLoanService = {
       },
       1200,
     );
+  },
+
+  async uploadDocument(
+    applicationId: string,
+    uri: string,
+    type: string,
+  ): Promise<DocumentUploadResult> {
+    return mockDelay({
+      documentId: ref('CDL-DOC'),
+      applicationId,
+      type,
+      url: 'https://mock.fuehrer.in/docs/' + applicationId + '/' + type + '.jpg',
+      status: 'uploaded',
+      uploadedAt: new Date().toISOString(),
+    }, 900);
   },
 
   async runKycChecks(applicationId: string): Promise<CdlKycResult> {

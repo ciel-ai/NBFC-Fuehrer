@@ -208,7 +208,16 @@ export default function LoanStep2Screen() {
             title="Submit Application"
             onPress={() => router.replace({
               pathname: '/(main)/apply/cdl-kyc-verification',
-              params: { ...params, monthlyIncome: income, employmentType: employment },
+              params: {
+                ...params,
+                addrLine1: `${flatNo.trim()}, ${street.trim()}`,
+                addrCity: city.trim(),
+                addrState: state.trim(),
+                addrPin: pincode,
+                employer: company.trim(),
+                monthlyIncome: income,
+                employmentType: employment,
+              },
             })}
             disabled={!canContinue}
           />

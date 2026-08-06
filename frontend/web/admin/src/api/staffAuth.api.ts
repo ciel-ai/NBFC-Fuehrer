@@ -10,8 +10,8 @@
 
 import axios from 'axios';
 import type { Role } from '../types';
+import { API_URL } from '../config';
 
-const API_URL: string = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api/v1';
 const ROOT_URL = API_URL.replace(/\/api\/v\d+\/?$/, '');
 
 const staffClient = axios.create({

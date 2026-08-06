@@ -31,6 +31,7 @@ export type FrontendAppStatus =
   | 'EMANDATE_PENDING'
   | 'DISBURSED'
   | 'ACTIVE'
+  | 'NPA'
   | 'CLOSED';
 
 // Backend → Frontend display status
@@ -50,7 +51,10 @@ export const toDisplayStatus = (status: BackendLoanStatus): FrontendAppStatus =>
     DISBURSED:           'DISBURSED',
     ACTIVE:              'ACTIVE',
     CLOSED:              'CLOSED',
-    NPA:                 'ACTIVE',
+    // NPA is a non-performing (defaulted) loan — a materially different, serious
+    // state. It must never render as a healthy 'ACTIVE' loan; staff need to see
+    // it apart in the list.
+    NPA:                 'NPA',
     WRITTEN_OFF:         'CLOSED',
   };
   return map[status] ?? 'SUBMITTED';
@@ -67,7 +71,8 @@ export const toBackendStatus = (status: FrontendAppStatus): BackendLoanStatus[] 
     FINANCE_PENDING: ['ESIGN_PENDING'],
     EMANDATE_PENDING: ['ESIGN_PENDING'],
     DISBURSED:       ['DISBURSED'],
-    ACTIVE:          ['ACTIVE', 'NPA'],
+    ACTIVE:          ['ACTIVE'],
+    NPA:             ['NPA'],
     CLOSED:          ['CLOSED', 'WRITTEN_OFF'],
   };
   return map[status] ?? [];

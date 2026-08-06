@@ -52,6 +52,9 @@ interface ServiceContextType {
   salesService: ISalesService;
 }
 
+/** Public alias for the full service bundle (see useServices). */
+export type Services = ServiceContextType;
+
 // Initialized as null to prevent silent bugs when consumed outside the provider.
 const ServiceContext = createContext<ServiceContextType | null>(null);
 

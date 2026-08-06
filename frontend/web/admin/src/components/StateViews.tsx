@@ -1,36 +1,75 @@
-// src/components/StateViews.tsx
-//
-// Shared UI states — the three views every data screen needs:
-//   <PageLoader />  — route-level Suspense fallback / full-page fetch
-//   <ErrorState />  — a failed fetch or action, with retry
-//   <EmptyState />  — a legitimate zero-results state (also wired globally
-//                     as the Table empty view via ConfigProvider renderEmpty)
-
 import React from 'react';
 import { Button, Skeleton } from 'antd';
-import { CloudOffline, InboxIcon } from './stateIcons';
+import { CheckSeal, ConnectionLost, LedgerEmpty, SearchEmpty } from './stateIcons';
 
-// ─── Route / full-page loader ─────────────────────────────────────────────────
-// Skeleton screen shaped like a typical page (header + KPI row + table) so
-// navigation feels instant instead of spinner-then-pop.
+/* ============================================================================
+ * The states every data screen needs.
+ *
+ *   <PageLoader />   — route-level Suspense fallback. A skeleton shaped like the
+ *                      page that is arriving, so navigation resolves in place
+ *                      instead of spinner-then-pop.
+ *   <ErrorState />   — a failed fetch, with a retry that actually retries.
+ *   <EmptyState />   — zero records (wired globally via ConfigProvider renderEmpty).
+ *   <NoResults />    — zero MATCHES: a filter/search returned nothing, but the
+ *                      table has data. Distinct from empty — the fix is "clear",
+ *                      not "add your first record".
+ *   <SuccessState /> — a terminal confirmation (a completed wizard, a submitted
+ *                      queue). For transient feedback use a toast instead.
+ *
+ * There are no spinners in this application.
+ * ==========================================================================*/
+
+/** Skeleton row matching the ledger's real row height, so nothing reflows. */
+const SkeletonRows: React.FC<{ rows?: number }> = ({ rows = 8 }) => (
+  <div>
+    {Array.from({ length: rows }, (_, i) => (
+      <div key={i} className="skeleton-row">
+        <Skeleton.Input
+          active
+          size="small"
+          style={{ width: `${55 + ((i * 13) % 30)}%`, height: 12 }}
+        />
+      </div>
+    ))}
+  </div>
+);
 
 export const PageLoader: React.FC<{ tip?: string }> = () => (
-  <div style={{ padding: '28px 4px' }} aria-busy="true" aria-label="Loading page">
-    <Skeleton.Input active style={{ width: 240, height: 30, borderRadius: 8 }} />
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 16, marginTop: 24 }}>
+  <div className="page" aria-busy="true" aria-label="Loading">
+    <div className="page-header">
+      <Skeleton.Input active style={{ width: 200, height: 24 }} />
+    </div>
+
+    {/* metric band */}
+    <div className="metric-band">
       {[0, 1, 2, 3].map((i) => (
-        <div key={i} style={{ background: '#fff', borderRadius: 16, padding: 20, boxShadow: 'var(--shadow-card, 0 1px 2px rgba(16,24,40,0.05))' }}>
-          <Skeleton active title={{ width: '55%' }} paragraph={{ rows: 1, width: '35%' }} />
+        <div key={i} className="metric-cell">
+          <Skeleton.Input active size="small" style={{ width: 72, height: 10 }} />
+          <div className="mt-2">
+            <Skeleton.Input active style={{ width: 104, height: 24 }} />
+          </div>
         </div>
       ))}
     </div>
-    <div style={{ background: '#fff', borderRadius: 16, padding: 24, marginTop: 16, boxShadow: 'var(--shadow-card, 0 1px 2px rgba(16,24,40,0.05))' }}>
-      <Skeleton active title={false} paragraph={{ rows: 6, width: ['100%', '100%', '92%', '96%', '88%', '60%'] }} />
+
+    {/* ledger */}
+    <div className="panel">
+      <div className="panel__head">
+        <Skeleton.Input active size="small" style={{ width: 130, height: 14 }} />
+      </div>
+      <div className="panel__body panel__body--flush">
+        <SkeletonRows />
+      </div>
     </div>
   </div>
 );
 
-// ─── Error state (fetch/action failure) ───────────────────────────────────────
+/** Inline skeleton for a panel that loads independently of the page. */
+export const PanelLoader: React.FC<{ rows?: number }> = ({ rows }) => (
+  <div aria-busy="true">
+    <SkeletonRows rows={rows} />
+  </div>
+);
 
 export const ErrorState: React.FC<{
   title?: string;
@@ -41,33 +80,66 @@ export const ErrorState: React.FC<{
   detail = 'The server did not respond. Check that the API is reachable, then retry.',
   onRetry,
 }) => (
-  <div role="alert" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', padding: '56px 24px' }}>
-    <CloudOffline />
-    <div style={{ marginTop: 14, fontSize: 15, fontWeight: 700, color: '#1d2733' }}>{title}</div>
-    <div style={{ marginTop: 5, fontSize: 13, color: '#7c8896', maxWidth: 420, lineHeight: 1.55 }}>{detail}</div>
+  <div className="state-view" role="alert">
+    <span className="state-view__icon state-view__icon--danger">
+      <ConnectionLost />
+    </span>
+    <p className="state-view__title">{title}</p>
+    <p className="state-view__detail">{detail}</p>
     {onRetry && (
-      <Button type="primary" style={{ marginTop: 18 }} onClick={onRetry}>
+      <Button className="mt-4" onClick={onRetry}>
         Retry
       </Button>
     )}
   </div>
 );
 
-// ─── Empty state (zero results) ───────────────────────────────────────────────
-
 export const EmptyState: React.FC<{
   title?: string;
   detail?: string;
   action?: React.ReactNode;
-}> = ({
-  title = 'Nothing here yet',
-  detail = 'No records match — try clearing the filters or search.',
-  action,
-}) => (
-  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', padding: '44px 24px' }}>
-    <InboxIcon />
-    <div style={{ marginTop: 12, fontSize: 14, fontWeight: 600, color: '#3d4a59' }}>{title}</div>
-    <div style={{ marginTop: 4, fontSize: 12.5, color: '#94a3b8', maxWidth: 380, lineHeight: 1.5 }}>{detail}</div>
-    {action && <div style={{ marginTop: 16 }}>{action}</div>}
+}> = ({ title = 'No records', detail = 'There is nothing here yet.', action }) => (
+  <div className="state-view">
+    <span className="state-view__icon">
+      <LedgerEmpty />
+    </span>
+    <p className="state-view__title">{title}</p>
+    <p className="state-view__detail">{detail}</p>
+    {action && <div className="mt-4">{action}</div>}
+  </div>
+);
+
+export const NoResults: React.FC<{
+  query?: string;
+  onClear?: () => void;
+}> = ({ query, onClear }) => (
+  <div className="state-view">
+    <span className="state-view__icon">
+      <SearchEmpty />
+    </span>
+    <p className="state-view__title">No matches{query ? ` for “${query}”` : ''}</p>
+    <p className="state-view__detail">
+      No records match your search. Check the spelling, or clear the filters to see everything.
+    </p>
+    {onClear && (
+      <Button className="mt-4" onClick={onClear}>
+        Clear search
+      </Button>
+    )}
+  </div>
+);
+
+export const SuccessState: React.FC<{
+  title?: string;
+  detail?: string;
+  action?: React.ReactNode;
+}> = ({ title = 'Done', detail, action }) => (
+  <div className="state-view" role="status">
+    <span className="state-view__icon state-view__icon--success">
+      <CheckSeal />
+    </span>
+    <p className="state-view__title">{title}</p>
+    {detail && <p className="state-view__detail">{detail}</p>}
+    {action && <div className="mt-4">{action}</div>}
   </div>
 );

@@ -25,7 +25,10 @@ const OVERALL_META = {
   failed: { title: 'Compliance failed', color: Colors.error, bg: Colors.errorLight, icon: 'close-circle' as const },
 };
 
+import { usePersistApplyStep } from '@/src/features/apply/useApplyDraft';
+
 export default function CdlComplianceScreen() {
+  usePersistApplyStep('cdl');
   const params = useLocalSearchParams<Record<string, string>>();
   const { consumerDurableLoanService } = useServices();
   const [result, setResult] = useState<CdlComplianceResult | null>(null);
@@ -118,6 +121,7 @@ export default function CdlComplianceScreen() {
             router.replace({
               pathname: '/(main)/apply/application-submitted',
               params: {
+                ...params,
                 productName: params.productName ?? 'Consumer Durable Loan',
                 loanAmount: params.loanAmount ?? params.amount ?? '',
               },

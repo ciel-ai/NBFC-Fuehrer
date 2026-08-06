@@ -4,17 +4,25 @@ import {
   accountNumberSchema,
   amountSchema,
   consentSchema,
+  dobAdultSchema,
   ifscSchema,
   nameSchema,
   phoneSchema,
-  positiveNumberSchema,
   requiredAsset,
-  requiredDate,
   requiredSelect,
   requiredText,
+  validateIdNumber,
 } from '@/src/features/sales/resolvers/salesSchemas';
 import type { SalesProductConfig } from '@/src/features/sales/config/types';
 import { TILE_PRESETS } from '@/src/features/sales/config/shared';
+import {
+  ornamentTotals,
+  ornamentsStepSchema,
+  type OrnamentEntry,
+} from '@/src/features/sales/config/ornaments';
+
+const rows = (values: Record<string, unknown>): OrnamentEntry[] =>
+  (values.ornaments as OrnamentEntry[]) ?? [];
 
 // Gold Loan — 12-step LOS journey.
 export const goldConfig: SalesProductConfig = {
@@ -52,7 +60,7 @@ export const goldConfig: SalesProductConfig = {
       schema: z.object({
         firstName: nameSchema,
         lastName: nameSchema,
-        dob: requiredDate('date of birth'),
+        dob: dobAdultSchema,
         gender: requiredSelect('gender'),
         mobile: phoneSchema,
       }),
@@ -70,66 +78,56 @@ export const goldConfig: SalesProductConfig = {
         { name: 'idNumber', label: 'ID Number', type: 'text', placeholder: 'Document number', autoCapitalize: 'characters' },
         { name: 'kycDocument', label: 'KYC Document', type: 'document', capture: 'library', placeholder: 'Upload document' },
       ],
-      schema: z.object({
-        idType: requiredSelect('an ID type'),
-        idNumber: requiredText('ID number'),
-        kycDocument: requiredAsset('the KYC document'),
-      }),
+      schema: z
+        .object({
+          idType: requiredSelect('an ID type'),
+          idNumber: requiredText('ID number'),
+          kycDocument: requiredAsset('the KYC document'),
+        })
+        .superRefine((v, ctx) => {
+          const error = validateIdNumber(v.idType, v.idNumber);
+          if (error) {
+            ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['idNumber'], message: error });
+          }
+        }),
     },
     {
       id: 'gold-details',
-      title: 'Gold Details',
-      subtitle: 'Ornament information',
+      title: 'Ornament Schedule',
+      subtitle: 'Each pledged ornament, itemised',
       icon: 'diamond-outline',
-      fields: [
-        { name: 'ornamentType', label: 'Ornament Type', type: 'select', placeholder: 'Select', options: [
-          { label: 'Chain', value: 'chain' }, { label: 'Bangles', value: 'bangles' },
-          { label: 'Ring', value: 'ring' }, { label: 'Coin', value: 'coin' }, { label: 'Mixed', value: 'mixed' },
-        ] },
-        { name: 'itemCount', label: 'Number of Items', type: 'number', placeholder: '3' },
-        { name: 'grossWeight', label: 'Gross Weight (grams)', type: 'number', placeholder: '45' },
-        { name: 'purity', label: 'Purity', type: 'select', placeholder: 'Select karat', options: [
-          { label: '18 Karat', value: '18' }, { label: '20 Karat', value: '20' }, { label: '22 Karat', value: '22' },
-        ] },
-      ],
-      schema: z.object({
-        ornamentType: requiredSelect('an ornament type'),
-        itemCount: positiveNumberSchema('Enter the item count'),
-        grossWeight: positiveNumberSchema('Enter the gross weight'),
-        purity: requiredSelect('purity'),
-      }),
+      kind: 'ornaments',
+      note: 'Add every ornament separately — weight, purity, stone deduction and a photo per item. Net weight is derived automatically.',
+      schema: ornamentsStepSchema,
     },
     {
       id: 'assessment',
       title: 'Gold Assessment',
       subtitle: 'Appraisal & valuation',
       icon: 'scale-outline',
-      note: 'Recorded by the certified branch appraiser after purity and weight testing.',
+      note: 'Weights are totalled from the ornament schedule. The certified branch appraiser records the appraised value after purity testing.',
       fields: [
-        { name: 'netWeight', label: 'Net Weight (grams)', type: 'number', placeholder: '42' },
-        { name: 'stoneDeduction', label: 'Stone Deduction (grams)', type: 'number', placeholder: '3', optional: true },
+        { name: 'totalItems', label: 'Total Items', type: 'derived', compute: (v) => `${ornamentTotals(rows(v)).items} pc` },
+        { name: 'totalGrossWeight', label: 'Total Gross Weight', type: 'derived', compute: (v) => `${ornamentTotals(rows(v)).gross} g` },
+        { name: 'totalNetWeight', label: 'Total Net Weight (derived)', type: 'derived', compute: (v) => `${ornamentTotals(rows(v)).net} g` },
         { name: 'appraisedValue', label: 'Appraised Value', type: 'currency', prefix: '₹', placeholder: '250000' },
         { name: 'appraiserName', label: 'Appraiser Name', type: 'text', placeholder: 'Branch appraiser' },
       ],
       schema: z.object({
-        netWeight: positiveNumberSchema('Enter the net weight'),
-        stoneDeduction: z.union([positiveNumberSchema(), z.literal('')]).optional(),
         appraisedValue: amountSchema(1000, 'Enter the appraised value'),
         appraiserName: requiredText('Appraiser name'),
       }),
     },
     {
       id: 'gold-images',
-      title: 'Gold Images',
+      title: 'Weighing Evidence',
       subtitle: 'Photographic record',
       icon: 'camera-outline',
-      note: 'Capture clear photos of the pledged ornaments and the weighing display.',
+      note: 'Each ornament already has its own photo in the schedule. Capture the weighing-scale display showing the total weight.',
       fields: [
-        { name: 'ornamentPhoto', label: 'Ornament Photo', type: 'photo', capture: 'camera', placeholder: 'Capture ornament' },
         { name: 'weighingPhoto', label: 'Weighing Photo', type: 'photo', capture: 'camera', placeholder: 'Capture weighing' },
       ],
       schema: z.object({
-        ornamentPhoto: requiredAsset('an ornament photo'),
         weighingPhoto: requiredAsset('a weighing photo'),
       }),
     },
@@ -164,11 +162,23 @@ export const goldConfig: SalesProductConfig = {
           { label: 'Monthly interest', value: 'monthly' }, { label: 'Bullet repayment', value: 'bullet' },
         ] },
       ],
-      schema: z.object({
-        loanAmount: amountSchema(5000, 'Enter a valid loan amount'),
-        tenure: requiredSelect('a tenure'),
-        interestScheme: requiredSelect('a scheme'),
-      }),
+      schema: z
+        .object({
+          loanAmount: amountSchema(5000, 'Enter a valid loan amount'),
+          tenure: requiredSelect('a tenure'),
+          interestScheme: requiredSelect('a scheme'),
+          // carried from the eligibility step so the amount can be capped
+          eligibleAmount: z.coerce.number().optional(),
+        })
+        .superRefine((v, ctx) => {
+          if (v.eligibleAmount && v.loanAmount > v.eligibleAmount) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ['loanAmount'],
+              message: 'Loan amount cannot exceed the eligible amount',
+            });
+          }
+        }),
     },
     {
       id: 'bank-details',

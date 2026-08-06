@@ -9,6 +9,7 @@ import { Spacing, BorderRadius, Shadow } from '@/src/core/theme/spacing';
 import { Header } from '@/src/shared/components/common/Header';
 import { Button } from '@/src/shared/components/common/Button';
 import { LoadingSpinner } from '@/src/shared/components/common/LoadingSpinner';
+import { StatusAnimation } from '@/src/shared/components/common/StatusAnimation';
 import { formatCurrency, formatDate } from '@/src/core/utils/formatters';
 import { useServices } from '@/src/core/services/ServiceProvider';
 import type { CdlPaymentFailure } from '@/src/entities/consumerDurableLoan';
@@ -60,9 +61,11 @@ export default function PaymentFailureScreen() {
       <Header title="Payment Failure" showBack />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.heroCard}>
-          <View style={styles.heroCircle}>
-            <Ionicons name="alert" size={42} color={Colors.textWhite} />
-          </View>
+          <StatusAnimation
+            name="paymentFailed"
+            size={110}
+            accessibilityLabel="Payment failed"
+          />
           <Text style={styles.title}>EMI payment failed</Text>
           <Text style={styles.subtitle}>{failure.failureReason} via {failure.provider}.</Text>
         </View>

@@ -7,7 +7,9 @@ import { apiClient } from './client';
 
 export interface ApprovalRequest {
   id: string;
-  action_type: string;      // LOAN_APPROVAL | ...
+  action_type: string;      // LOAN_APPROVAL | LOAN_SANCTION_BM | ...
+  /** Checker role a request is routed to (Sprint-4 §5) — queue tabs filter on it. */
+  required_role: string | null;
   entity_type: string;
   entity_id: string;
   entity_ref: string | null;
@@ -28,6 +30,7 @@ export interface ApprovalRequest {
 const mapRow = (r: ApprovalRequest): ApprovalRequest => ({
   ...r,
   amount: r.amount === null ? null : Math.round(Number(r.amount)) / 100,
+  required_role: r.required_role ?? null,
 });
 
 export const approvalsApi = {

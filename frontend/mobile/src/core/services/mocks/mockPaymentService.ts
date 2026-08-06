@@ -5,6 +5,7 @@ import type {
   PaymentMethod,
   ProcessEMIPaymentResponse,
   BankDetails,
+  LinkedBankAccount,
   NACHResponse,
   PaymentStatusResponse,
 } from '@/src/entities/payment';
@@ -29,6 +30,46 @@ const MOCK_HISTORY: Payment[] = [
     transactionRef: 'TXN20230814002',
     createdAt: '2023-08-14T11:00:00Z',
     updatedAt: '2023-08-14T11:00:08Z',
+  },
+];
+
+/**
+ * Linked accounts as the ENachMandate table would return them.
+ *
+ * Deliberately not all-green: the second account carries a mandate the bank
+ * revoked. The screen has to render that honestly, because a customer who
+ * believes auto-debit is working and is silently accruing DPD is the exact
+ * failure this data shape exists to prevent.
+ */
+const MOCK_ACCOUNTS: LinkedBankAccount[] = [
+  {
+    id: 'acc-hdfc',
+    bankName: 'HDFC Bank',
+    accountMasked: 'XXXX XXXX 4521',
+    accountType: 'Savings',
+    ifsc: 'HDFC0001234',
+    isPrimary: true,
+    mandate: {
+      status: 'active',
+      umrn: 'HDFC6120250417001',
+      maxAmount: 10000,
+      registeredAt: '2025-04-17T09:12:00Z',
+    },
+  },
+  {
+    id: 'acc-icici',
+    bankName: 'ICICI Bank',
+    accountMasked: 'XXXX XXXX 8847',
+    accountType: 'Savings',
+    ifsc: 'ICIC0007722',
+    isPrimary: false,
+    mandate: {
+      status: 'failed',
+      umrn: 'ICIC6120250902014',
+      maxAmount: 10000,
+      registeredAt: '2025-09-02T11:40:00Z',
+      failureReason: 'Last auto-debit was returned — insufficient funds',
+    },
   },
 ];
 
@@ -75,5 +116,9 @@ export const mockPaymentService: IPaymentService = {
       },
       500,
     );
+  },
+
+  async getBankAccounts(): Promise<LinkedBankAccount[]> {
+    return mockDelay(MOCK_ACCOUNTS, 600);
   },
 };

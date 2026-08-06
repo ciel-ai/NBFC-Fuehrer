@@ -3,7 +3,7 @@ import type {
   Address, AppDocument, AppNotification, AppStatus, AuditLog, BureauAccount,
   BureauReport, CustomerProfile, EmiRow, KycInfo, LoanAccount, LoanApplication, LoanType,
   PortalUser, Repayment, LoanCharge, TimelineEvent, RiskGrade, CollectionStatus,
-  Branch, Agent, ProductConfig,
+  Branch, Agent, ProductConfig, LoanMandate, MandateStatus, MigrationOrigin,
 } from '../types';
 import { calcEmi } from '../utils/format';
 
@@ -370,7 +370,24 @@ interface LoanSpec {
   dpd?: number;
   monthsAgo: number; // disbursed N months ago
   paidRatio?: number;
+  /** Brought over from the legacy book by the data migration. */
+  migrated?: boolean;
+  /** Force a mandate state; by default it is derived from the loan's health. */
+  mandate?: MandateStatus | 'NONE';
 }
+
+// Mandate health follows the loan's payment behaviour: a healthy account has a
+// live mandate, a bouncing one has a mandate that is failing, and a closed
+// account's mandate is cancelled at closure. Overridable per spec.
+const derivedMandateStatus = (
+  profile: LoanSpec['profile'],
+  dpd: number,
+): MandateStatus => {
+  if (profile === 'CLOSED') return 'CANCELLED';
+  if (profile === 'NPA') return 'FAILED';
+  if (profile === 'OVERDUE') return dpd > 30 ? 'FAILED' : 'ACTIVE';
+  return 'ACTIVE';
+};
 
 let loanSeq = 850;
 const allRepayments: Repayment[] = [];
@@ -559,6 +576,57 @@ const genLoan = (app: LoanApplication, spec: LoanSpec): LoanAccount => {
 
   const successPayments = repayments.filter((p) => p.status === 'SUCCESS');
   const lastPay = successPayments[successPayments.length - 1];
+
+  // ── e-NACH mandate (survives disbursement — this is what staff need to see on
+  //    a LIVE loan, and what the finance queue only ever showed pre-disbursal) ──
+  const mandateStatus = spec.mandate === 'NONE'
+    ? 'NOT_SETUP'
+    : spec.mandate ?? derivedMandateStatus(spec.profile, dpd);
+
+  const nachPresentations = repayments.filter((p) => p.mode === 'E-MANDATE');
+  const lastPresentation = nachPresentations[nachPresentations.length - 1];
+  // Trailing run of bounces, newest-first — the "this mandate is dying" signal.
+  let consecutiveFailures = 0;
+  for (let i = nachPresentations.length - 1; i >= 0; i--) {
+    if (nachPresentations[i]!.status !== 'BOUNCED') break;
+    consecutiveFailures++;
+  }
+
+  const bank = app.finance?.bank;
+  const acctNo = bank?.accountNumber ?? String(ri(10000000000, 99999999999));
+  const mandate: LoanMandate | undefined = mandateStatus === 'NOT_SETUP'
+    ? { status: 'NOT_SETUP', bankName: bank?.bankName ?? '—', accountMasked: '—', maxAmount: 0, consecutiveFailures: 0 }
+    : {
+        umrn: app.finance?.emandate.umrn ?? `${pick(['HDFC', 'ICIC', 'SBIN', 'UTIB'])}${ri(1000000000000, 9999999999999)}`,
+        status: mandateStatus,
+        bankName: bank?.bankName ?? pick(BANKS),
+        accountMasked: `XXXX${acctNo.slice(-4)}`,
+        ifsc: bank?.ifsc,
+        // NPCI mandates are registered with headroom over the EMI so a
+        // penalty-inclusive presentation is not rejected on the ceiling.
+        maxAmount: round100(emi * 1.5),
+        debitDay: dayjs(schedule[0]!.dueDate).date(),
+        registeredOn: dayjs(disbursedOn).subtract(ri(1, 4), 'day').toISOString(),
+        validTill: dayjs(schedule[tenure - 1]!.dueDate).add(2, 'month').format('YYYY-MM-DD'),
+        lastDebitOn: lastPresentation?.date,
+        lastDebitStatus: lastPresentation
+          ? lastPresentation.status === 'SUCCESS' ? 'SUCCESS' : 'FAILED'
+          : undefined,
+        failureReason: consecutiveFailures > 0
+          ? pick(['Insufficient funds', 'Account frozen', 'Mandate not registered at destination bank'])
+          : undefined,
+        consecutiveFailures,
+      };
+
+  // ── Legacy-book provenance. Only the oldest accounts predate this platform. ──
+  const migratedFrom: MigrationOrigin | undefined = spec.migrated
+    ? {
+        system: 'Finnone (legacy LMS)',
+        legacyLoanNumber: `LGCY/${app.loanType}/${ri(100000, 999999)}`,
+        migratedOn: at(ri(20, 45), 2),
+        batchRef: 'MIG-2026-03',
+      }
+    : undefined;
   const outstandingPrincipal = paidCount >= tenure ? 0 : schedule[Math.max(0, paidCount - 1)]?.balance ?? principal;
 
   if (loanStatus === 'CLOSED') app.status = 'CLOSED';
@@ -594,6 +662,8 @@ const genLoan = (app: LoanApplication, spec: LoanSpec): LoanAccount => {
     lastPaymentAmount: lastPay?.amount,
     branch: app.branch,
     schedule,
+    mandate,
+    migratedFrom,
   };
 };
 
@@ -654,15 +724,18 @@ const LOAN_SPECS: { app: AppSpec; loan: LoanSpec }[] = [
   { app: { loanType: 'CDL', status: 'DISBURSED', ageDays: 4 }, loan: { profile: 'DISBURSED_TODAY', monthsAgo: 0 } },
   { app: { loanType: 'CDL', status: 'DISBURSED', ageDays: 100 }, loan: { profile: 'DUE_TODAY', monthsAgo: 3 } },
   { app: { loanType: 'CDL', status: 'DISBURSED', ageDays: 160 }, loan: { profile: 'OVERDUE', monthsAgo: 5, dpd: 12 } },
-  { app: { loanType: 'CDL', status: 'DISBURSED', ageDays: 400 }, loan: { profile: 'NPA', monthsAgo: 13, dpd: 124 } },
-  { app: { loanType: 'CDL', status: 'DISBURSED', ageDays: 560 }, loan: { profile: 'CLOSED', monthsAgo: 18 } },
+  // Pre-platform accounts carried over by the legacy migration.
+  { app: { loanType: 'CDL', status: 'DISBURSED', ageDays: 400 }, loan: { profile: 'NPA', monthsAgo: 13, dpd: 124, migrated: true } },
+  { app: { loanType: 'CDL', status: 'DISBURSED', ageDays: 560 }, loan: { profile: 'CLOSED', monthsAgo: 18, migrated: true } },
   // GOLD
   { app: { loanType: 'GOLD', status: 'DISBURSED', ageDays: 90 }, loan: { profile: 'ACTIVE', monthsAgo: 3 } },
   { app: { loanType: 'GOLD', status: 'DISBURSED', ageDays: 5 }, loan: { profile: 'DISBURSED_TODAY', monthsAgo: 0 } },
   { app: { loanType: 'GOLD', status: 'DISBURSED', ageDays: 130 }, loan: { profile: 'DUE_TODAY', monthsAgo: 4 } },
   { app: { loanType: 'GOLD', status: 'DISBURSED', ageDays: 200 }, loan: { profile: 'OVERDUE', monthsAgo: 6, dpd: 35 } },
-  { app: { loanType: 'GOLD', status: 'DISBURSED', ageDays: 260 }, loan: { profile: 'ACTIVE', monthsAgo: 8 } },
-  { app: { loanType: 'GOLD', status: 'DISBURSED', ageDays: 540 }, loan: { profile: 'CLOSED', monthsAgo: 17 } },
+  // Migrated with no mandate re-registered yet — the case the recurring-payment
+  // continuity work exists to surface. Staff must be able to see this.
+  { app: { loanType: 'GOLD', status: 'DISBURSED', ageDays: 260 }, loan: { profile: 'ACTIVE', monthsAgo: 8, migrated: true, mandate: 'NONE' } },
+  { app: { loanType: 'GOLD', status: 'DISBURSED', ageDays: 540 }, loan: { profile: 'CLOSED', monthsAgo: 17, migrated: true } },
   // HOUSING
   { app: { loanType: 'HOUSING', status: 'DISBURSED', ageDays: 170 }, loan: { profile: 'ACTIVE', monthsAgo: 5 } },
   { app: { loanType: 'HOUSING', status: 'DISBURSED', ageDays: 80 }, loan: { profile: 'ACTIVE', monthsAgo: 2 } },

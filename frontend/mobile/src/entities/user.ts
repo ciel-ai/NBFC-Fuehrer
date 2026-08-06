@@ -48,3 +48,11 @@ export interface ChangePhoneResponse {
   /** True when the backend requires OTP confirmation to commit the change. */
   otpRequired: boolean;
 }
+
+export interface AccountDeletionResult {
+  requestId: string;
+  status: 'PENDING';
+  /** ISO date by which the deletion will be processed (regulatory retention may apply). */
+  effectiveBy?: string;
+  message: string;
+}

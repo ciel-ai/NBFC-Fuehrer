@@ -8,29 +8,51 @@ import { FontFamily, FontSize, Typography } from '@/src/core/theme/typography';
 import { Spacing, BorderRadius, Shadow } from '@/src/core/theme/spacing';
 import { Header } from '@/src/shared/components/common/Header';
 import { Button } from '@/src/shared/components/common/Button';
+import { ErrorView } from '@/src/shared/components/common/ErrorView';
 import { formatCurrency } from '@/src/core/utils/formatters';
 import { useServices } from '@/src/core/services/ServiceProvider';
+import { useIdempotencyKey } from '@/src/core/api/idempotency';
+import { resolveGoldApplicationId } from '@/src/core/utils/goldApplication';
+import { runOrQueueMoneyOp } from '@/src/features/apply/useMoneyOp';
 import type { GoldLoanNachResult } from '@/src/entities/goldLoan';
 
+import { usePersistApplyStep } from '@/src/features/apply/useApplyDraft';
+
 export default function GoldLoanNachScreen() {
+  usePersistApplyStep('gold');
   const params = useLocalSearchParams<Record<string, string>>();
   const { goldLoanService } = useServices();
+  const { getKey } = useIdempotencyKey();
+  const applicationId = resolveGoldApplicationId(params.applicationId);
   const [accountNumber, setAccountNumber] = useState('');
   const [confirmAccount, setConfirmAccount] = useState('');
   const [ifsc, setIfsc] = useState('');
   const [agreed, setAgreed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<GoldLoanNachResult | null>(null);
+  const [queuedOffline, setQueuedOffline] = useState(false);
 
   const accountsMatch = accountNumber.length >= 9 && accountNumber === confirmAccount;
   const validIfsc = /^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc);
   const canSubmit = accountsMatch && validIfsc && agreed;
 
   const setupNach = async () => {
+    if (!applicationId) return;
     setLoading(true);
     try {
-      const data = await goldLoanService.initiateNach(params.applicationId ?? 'gold_mock_application');
-      setResult(data);
+      // Offline-safe: registers now, or queues under the same Idempotency-Key
+      // and flushes on reconnect (no double mandate).
+      const outcome = await runOrQueueMoneyOp({
+        op: 'gold-nach',
+        applicationId,
+        idempotencyKey: getKey(),
+        run: () => goldLoanService.initiateNach(applicationId, getKey()),
+      });
+      if (outcome.queued) {
+        setQueuedOffline(true);
+      } else {
+        setResult(outcome.result);
+      }
     } catch {
       Alert.alert('NACH setup failed', 'Please try again.');
     } finally {
@@ -38,11 +60,45 @@ export default function GoldLoanNachScreen() {
     }
   };
 
+  if (!applicationId) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Header title="Gold Loan NACH" showBack />
+        <ErrorView
+          title="Application reference missing"
+          message="We could not find your application reference. Please go back and restart the application."
+          retryLabel="Go Back"
+          onRetry={() => router.back()}
+        />
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <Header title="Gold Loan NACH" showBack />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-        {!result ? (
+        {queuedOffline ? (
+          <View style={styles.successSection}>
+            <View style={[styles.successCircle, { backgroundColor: Colors.primary }]}>
+              <Ionicons name="cloud-offline-outline" size={44} color={Colors.textWhite} />
+            </View>
+            <Text style={styles.title}>Saved offline</Text>
+            <Text style={styles.subtitle}>
+              You're offline right now. Your NACH mandate is saved and will be
+              registered automatically once you're back online — no need to re-enter anything.
+            </Text>
+            <Button
+              title="Continue to Disbursal"
+              onPress={() =>
+                router.push({
+                  pathname: '/(main)/apply/gold-loan-disbursal',
+                  params,
+                })
+              }
+            />
+          </View>
+        ) : !result ? (
           <>
             <View style={styles.infoCard}>
               <Ionicons name="repeat-outline" size={24} color={Colors.primary} />

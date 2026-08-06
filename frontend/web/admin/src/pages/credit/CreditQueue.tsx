@@ -1,9 +1,12 @@
 import React, { useMemo, useState } from 'react';
-import { Button, Card, Col, Input, Row, Segmented, Table } from 'antd';
+import { Button, Card, Input, Segmented } from 'antd';
 import type { TableProps } from 'antd';
 import {
-  CheckCircleOutlined, CloseCircleOutlined, DownloadOutlined, EyeOutlined,
-  RollbackOutlined, SafetyCertificateOutlined, SearchOutlined, ThunderboltOutlined,
+  DownloadOutlined,
+  EyeOutlined,
+  SafetyCertificateOutlined,
+  SearchOutlined,
+  ThunderboltOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import dayjs from 'dayjs';
@@ -11,12 +14,14 @@ import { useApplications } from '../../hooks/useApplications';
 import { useAuthStore } from '../../store/authStore';
 import { scopedLoanType } from '../../auth/rbac';
 import PageHeader from '../../components/PageHeader';
-import KpiCard from '../../components/KpiCard';
+import { MetricBand } from '../../components/KpiCard';
 import { LoanTypeTag, RiskGradeTag, StatusTag, scoreColor } from '../../components/StatusTag';
 import CreditDecisionDrawer from '../applications/CreditDecisionDrawer';
 import { exportCsv } from '../../utils/csv';
 import { fmtDate, fmtDateTime, inr } from '../../utils/format';
 import type { LoanApplication } from '../../types';
+import DataTable from '../../components/DataTable';
+import DataSourceNotice from '../../components/DataSourceNotice';
 
 type CreditTab = 'pending' | 'approved' | 'rejected' | 'returned';
 
@@ -30,22 +35,30 @@ const TAB_TITLES: Record<CreditTab, string> = {
 const CreditQueue: React.FC = () => {
   const navigate = useNavigate();
   const { tab = 'pending' } = useParams<{ tab: CreditTab }>();
-  const activeTab = (['pending', 'approved', 'rejected', 'returned'].includes(tab) ? tab : 'pending') as CreditTab;
+  const activeTab = (
+    ['pending', 'approved', 'rejected', 'returned'].includes(tab) ? tab : 'pending'
+  ) as CreditTab;
   const user = useAuthStore((s) => s.user)!;
-  const { applications, live, loading } = useApplications();
+  const { applications, loading, source, error, reload } = useApplications();
   const scope = scopedLoanType(user.role);
 
   const [search, setSearch] = useState('');
   const [decisionApp, setDecisionApp] = useState<LoanApplication | null>(null);
 
-  const scoped = useMemo(() => applications.filter((a) => !scope || a.loanType === scope), [applications, scope]);
+  const scoped = useMemo(
+    () => applications.filter((a) => !scope || a.loanType === scope),
+    [applications, scope],
+  );
 
-  const buckets = useMemo(() => ({
-    pending: scoped.filter((a) => a.status === 'CREDIT_PENDING'),
-    approved: scoped.filter((a) => a.creditDecision?.decision === 'APPROVED'),
-    rejected: scoped.filter((a) => a.status === 'CREDIT_REJECTED'),
-    returned: scoped.filter((a) => a.status === 'CREDIT_RETURNED'),
-  }), [scoped]);
+  const buckets = useMemo(
+    () => ({
+      pending: scoped.filter((a) => a.status === 'CREDIT_PENDING'),
+      approved: scoped.filter((a) => a.creditDecision?.decision === 'APPROVED'),
+      rejected: scoped.filter((a) => a.status === 'CREDIT_REJECTED'),
+      returned: scoped.filter((a) => a.status === 'CREDIT_RETURNED'),
+    }),
+    [scoped],
+  );
 
   const isToday = (iso?: string): boolean => !!iso && dayjs(iso).isSame(dayjs(), 'day');
   const approvedToday = buckets.approved.filter((a) => isToday(a.creditDecision?.decidedAt)).length;
@@ -53,8 +66,9 @@ const CreditQueue: React.FC = () => {
 
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return buckets[activeTab].filter((a) =>
-      !q || `${a.appNumber} ${a.customer.name} ${a.customer.mobile}`.toLowerCase().includes(q),
+    return buckets[activeTab].filter(
+      (a) =>
+        !q || `${a.appNumber} ${a.customer.name} ${a.customer.mobile}`.toLowerCase().includes(q),
     );
   }, [buckets, activeTab, search]);
 
@@ -64,9 +78,11 @@ const CreditQueue: React.FC = () => {
       dataIndex: 'appNumber',
       render: (v: string, r) => (
         <div>
-          <div style={{ fontWeight: 600, color: '#0284c7', fontSize: 12.5 }}>{v}</div>
-          <div style={{ fontWeight: 600, color: '#1e293b', marginTop: 2 }}>{r.customer.name}</div>
-          <div style={{ fontSize: 11.5, color: '#94a3b8' }}>+91 {r.customer.mobile}</div>
+          <div className="u-semibold u-accent u-sm">{v}</div>
+          <div style={{ fontWeight: 600, color: 'var(--ink-900)', marginTop: 2 }}>
+            {r.customer.name}
+          </div>
+          <div className="u-xs u-ink-400">+91 {r.customer.mobile}</div>
         </div>
       ),
     },
@@ -79,8 +95,10 @@ const CreditQueue: React.FC = () => {
       sorter: (a, b) => a.loan.amount - b.loan.amount,
       render: (_, r) => (
         <div>
-          <div className="tnum" style={{ fontWeight: 700 }}>{inr(r.loan.amount)}</div>
-          <div style={{ fontSize: 11.5, color: '#94a3b8' }}>{r.loan.tenureMonths}m @ {r.loan.interestRate}%</div>
+          <div className="tnum u-semibold">{inr(r.loan.amount)}</div>
+          <div className="u-xs u-ink-400">
+            {r.loan.tenureMonths}m @ {r.loan.interestRate}%
+          </div>
         </div>
       ),
     },
@@ -90,14 +108,25 @@ const CreditQueue: React.FC = () => {
       width: 90,
       align: 'center',
       sorter: (a, b) => a.bureau.score - b.bureau.score,
-      render: (v: number) => <span className="tnum" style={{ fontWeight: 700, color: scoreColor(v) }}>{v}</span>,
+      render: (v: number) => (
+        <span className="tnum" style={{ fontWeight: 700, color: scoreColor(v) }}>
+          {v}
+        </span>
+      ),
     },
     {
       title: 'FOIR',
       dataIndex: ['customer', 'income', 'foir'],
       width: 80,
       align: 'center',
-      render: (v: number) => <span className="tnum" style={{ fontWeight: 600, color: v <= 55 ? '#475569' : '#dc2626' }}>{v}%</span>,
+      render: (v: number) => (
+        <span
+          className="tnum"
+          style={{ fontWeight: 600, color: v <= 55 ? 'var(--ink-600)' : 'var(--status-danger-fg)' }}
+        >
+          {v}%
+        </span>
+      ),
     },
   ];
 
@@ -111,7 +140,22 @@ const CreditQueue: React.FC = () => {
       defaultSortOrder: 'ascend',
       render: (v: string) => {
         const days = dayjs().diff(dayjs(v), 'day');
-        return <span style={{ fontWeight: 600, color: days > 4 ? '#dc2626' : days > 2 ? '#d97706' : '#475569', fontSize: 12.5 }}>{days === 0 ? 'Today' : `${days}d`}</span>;
+        return (
+          <span
+            style={{
+              fontWeight: 600,
+              color:
+                days > 4
+                  ? 'var(--status-danger-fg)'
+                  : days > 2
+                    ? 'var(--status-warning-fg)'
+                    : 'var(--ink-600)',
+              fontSize: 12.5,
+            }}
+          >
+            {days === 0 ? 'Today' : `${days}d`}
+          </span>
+        );
       },
     },
     {
@@ -120,10 +164,25 @@ const CreditQueue: React.FC = () => {
       width: 200,
       render: (_, r) => (
         <div style={{ display: 'flex', gap: 8 }}>
-          <Button size="small" icon={<EyeOutlined />} onClick={(e) => { e.stopPropagation(); navigate(`/applications/view/${r.id}`); }}>
+          <Button
+            size="small"
+            icon={<EyeOutlined />}
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/applications/view/${r.id}`);
+            }}
+          >
             Review
           </Button>
-          <Button size="small" type="primary" icon={<SafetyCertificateOutlined />} onClick={(e) => { e.stopPropagation(); setDecisionApp(r); }}>
+          <Button
+            size="small"
+            type="primary"
+            icon={<SafetyCertificateOutlined />}
+            onClick={(e) => {
+              e.stopPropagation();
+              setDecisionApp(r);
+            }}
+          >
             Decide
           </Button>
         </div>
@@ -138,49 +197,87 @@ const CreditQueue: React.FC = () => {
       key: 'grade',
       width: 80,
       align: 'center',
-      render: (_, r) => (r.creditDecision ? <RiskGradeTag grade={r.creditDecision.riskGrade} /> : '—'),
+      render: (_, r) =>
+        r.creditDecision ? <RiskGradeTag grade={r.creditDecision.riskGrade} /> : '—',
     },
     ...(activeTab === 'approved'
-      ? [{
-          title: 'Sanctioned',
-          key: 'sanctioned',
-          align: 'right' as const,
-          width: 130,
-          render: (_: unknown, r: LoanApplication) => <span className="tnum" style={{ fontWeight: 700, color: '#047857' }}>{inr(r.creditDecision?.approvedAmount ?? r.loan.amount)}</span>,
-        }]
-      : [{
-          title: 'Reason',
-          key: 'reason',
-          width: 220,
-          render: (_: unknown, r: LoanApplication) => <span style={{ fontSize: 12.5, color: '#64748b' }}>{r.creditDecision?.reason ?? '—'}</span>,
-        }]),
+      ? [
+          {
+            title: 'Sanctioned',
+            key: 'sanctioned',
+            align: 'right' as const,
+            width: 130,
+            render: (_: unknown, r: LoanApplication) => (
+              <span className="tnum u-semibold u-success">
+                {inr(r.creditDecision?.approvedAmount ?? r.loan.amount)}
+              </span>
+            ),
+          },
+        ]
+      : [
+          {
+            title: 'Reason',
+            key: 'reason',
+            width: 220,
+            render: (_: unknown, r: LoanApplication) => (
+              <span className="u-sm u-ink-500">{r.creditDecision?.reason ?? '—'}</span>
+            ),
+          },
+        ]),
     {
       title: 'Decided',
       key: 'decided',
       width: 170,
       render: (_, r) => (
         <div>
-          <div style={{ fontSize: 12.5, color: '#475569' }}>{fmtDateTime(r.creditDecision?.decidedAt)}</div>
-          <div style={{ fontSize: 11.5, color: '#94a3b8' }}>by {r.creditDecision?.decidedBy}</div>
+          <div className="u-sm u-ink-600">{fmtDateTime(r.creditDecision?.decidedAt)}</div>
+          <div className="u-xs u-ink-400">by {r.creditDecision?.decidedBy}</div>
         </div>
       ),
     },
-    { title: 'Status', dataIndex: 'status', width: 150, render: (s: string) => <StatusTag status={s} /> },
+    {
+      title: 'Status',
+      dataIndex: 'status',
+      width: 150,
+      render: (s: string) => <StatusTag status={s} />,
+    },
   ];
 
   return (
     <div>
       <PageHeader
         title="Credit Workbench"
-        subtitle={scope ? `Underwriting queue — ${scope} portfolio` : 'Underwriting queue across all loan products' + (live ? '' : ' · sample data (live API unreachable)')}
+        subtitle={
+          scope
+            ? `Underwriting queue — ${scope} portfolio`
+            : 'Underwriting queue across all loan products'
+        }
         extra={
           <Button
             icon={<DownloadOutlined />}
             onClick={() =>
               exportCsv(
                 `credit-${activeTab}-${dayjs().format('YYYYMMDD')}`,
-                ['Application', 'Customer', 'Type', 'Amount', 'Bureau', 'FOIR %', 'Status', 'Created'],
-                rows.map((a) => [a.appNumber, a.customer.name, a.loanType, a.loan.amount, a.bureau.score, a.customer.income.foir, a.status, fmtDate(a.createdAt)]),
+                [
+                  'Application',
+                  'Customer',
+                  'Type',
+                  'Amount',
+                  'Bureau',
+                  'FOIR %',
+                  'Status',
+                  'Created',
+                ],
+                rows.map((a) => [
+                  a.appNumber,
+                  a.customer.name,
+                  a.loanType,
+                  a.loan.amount,
+                  a.bureau.score,
+                  a.customer.income.foir,
+                  a.status,
+                  fmtDate(a.createdAt),
+                ]),
               )
             }
           >
@@ -189,15 +286,48 @@ const CreditQueue: React.FC = () => {
         }
       />
 
-      <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-        <Col xs={24} sm={12} xl={6}><KpiCard label="Pending Reviews" value={buckets.pending.length} sub="awaiting decision" icon={<SafetyCertificateOutlined />} tint="#d97706" onClick={() => navigate('/credit/pending')} /></Col>
-        <Col xs={24} sm={12} xl={6}><KpiCard label="Approved Today" value={approvedToday} sub={`${buckets.approved.length} total approved`} icon={<CheckCircleOutlined />} tint="#16a34a" onClick={() => navigate('/credit/approved')} /></Col>
-        <Col xs={24} sm={12} xl={6}><KpiCard label="Rejected Today" value={rejectedToday} sub={`${buckets.rejected.length} total rejected`} icon={<CloseCircleOutlined />} tint="#dc2626" onClick={() => navigate('/credit/rejected')} /></Col>
-        <Col xs={24} sm={12} xl={6}><KpiCard label="Returned Applications" value={buckets.returned.length} sub="with sales for rework" icon={<RollbackOutlined />} tint="#7e22ce" onClick={() => navigate('/credit/returned')} /></Col>
-      </Row>
+      <DataSourceNotice source={source} error={error} onRetry={reload} />
 
-      <Card variant="borderless" style={{ boxShadow: 'var(--shadow-card)' }} styles={{ body: { padding: 0 } }}>
-        <div style={{ display: 'flex', gap: 12, padding: '16px 18px', flexWrap: 'wrap', alignItems: 'center', borderBottom: '1px solid #eef1f7' }}>
+      <MetricBand
+        metrics={[
+          {
+            label: 'Pending Reviews',
+            value: buckets.pending.length,
+            sub: 'awaiting decision',
+            onClick: () => navigate('/credit/pending'),
+          },
+          {
+            label: 'Approved Today',
+            value: approvedToday,
+            sub: `${buckets.approved.length} total approved`,
+            onClick: () => navigate('/credit/approved'),
+          },
+          {
+            label: 'Rejected Today',
+            value: rejectedToday,
+            sub: `${buckets.rejected.length} total rejected`,
+            onClick: () => navigate('/credit/rejected'),
+          },
+          {
+            label: 'Returned Applications',
+            value: buckets.returned.length,
+            sub: 'with sales for rework',
+            onClick: () => navigate('/credit/returned'),
+          },
+        ]}
+      />
+
+      <Card styles={{ body: { padding: 0 } }}>
+        <div
+          style={{
+            display: 'flex',
+            gap: 12,
+            padding: '16px 18px',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            borderBottom: '1px solid var(--ink-100)',
+          }}
+        >
           <Segmented
             value={activeTab}
             onChange={(v) => navigate(`/credit/${v}`)}
@@ -207,7 +337,7 @@ const CreditQueue: React.FC = () => {
             }))}
           />
           <Input
-            prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
+            prefix={<SearchOutlined className="u-ink-400" />}
             placeholder="Search application, customer…"
             allowClear
             style={{ width: 280, marginLeft: 'auto' }}
@@ -215,7 +345,7 @@ const CreditQueue: React.FC = () => {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <Table<LoanApplication>
+        <DataTable<LoanApplication>
           loading={loading}
           dataSource={rows}
           columns={activeTab === 'pending' ? pendingCols : decidedCols}
@@ -229,16 +359,29 @@ const CreditQueue: React.FC = () => {
       </Card>
 
       {activeTab === 'pending' && (
-        <Card variant="borderless" style={{ border: '1px dashed #dbe4f5', marginTop: 16, background: '#fbfcff' }} styles={{ body: { padding: '14px 20px' } }}>
-          <span style={{ fontSize: 12.5, color: '#64748b' }}>
-            <ThunderboltOutlined style={{ color: '#d97706', marginRight: 8 }} />
-            <strong>Credit workflow:</strong> Open application → verify documents → verify KYC → check bureau report → risk assessment → Approve / Reject / Send Back. Decisions are final and logged to the audit trail.
+        <Card
+          style={{
+            border: '1px dashed var(--ink-150)',
+            marginTop: 16,
+            background: 'var(--ink-50)',
+          }}
+          styles={{ body: { padding: '14px 20px' } }}
+        >
+          <span className="u-sm u-ink-500">
+            <ThunderboltOutlined style={{ color: 'var(--status-warning-fg)', marginRight: 8 }} />
+            <strong>Credit workflow:</strong> Open application → verify documents → verify KYC →
+            check bureau report → risk assessment → Approve / Reject / Send Back. Decisions are
+            final and logged to the audit trail.
           </span>
         </Card>
       )}
 
       {decisionApp && (
-        <CreditDecisionDrawer app={decisionApp} open={!!decisionApp} onClose={() => setDecisionApp(null)} />
+        <CreditDecisionDrawer
+          app={decisionApp}
+          open={!!decisionApp}
+          onClose={() => setDecisionApp(null)}
+        />
       )}
     </div>
   );

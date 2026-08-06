@@ -1,0 +1,139 @@
+/* Status / type / grade markers.
+   Tones come from --status-*-fg / --status-*-tint, injected from tokens.ts. */
+
+/* ── Status pill ─────────────────────────────────────────────────────────── */
+
+.status-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  border-radius: var(--radius-sm);
+  font-weight: var(--weight-medium);
+  line-height: 1.6;
+  white-space: nowrap;
+  /* set per-tone below */
+  color: var(--tag-fg);
+  background: var(--tag-tint);
+}
+
+.status-tag--sm {
+  padding: 1px var(--space-2);
+  font-size: var(--text-xs);
+}
+.status-tag--md {
+  padding: 3px var(--space-3);
+  font-size: var(--text-sm);
+}
+
+/* The dot carries the signal redundantly — greyscale and colour-blind safe. */
+.status-tag__dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: currentColor;
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.status-tag--success {
+  --tag-fg: var(--status-success-fg);
+  --tag-tint: var(--status-success-tint);
+}
+.status-tag--warning {
+  --tag-fg: var(--status-warning-fg);
+  --tag-tint: var(--status-warning-tint);
+}
+.status-tag--danger {
+  --tag-fg: var(--status-danger-fg);
+  --tag-tint: var(--status-danger-tint);
+}
+.status-tag--overdue {
+  --tag-fg: var(--status-overdue-fg);
+  --tag-tint: var(--status-overdue-tint);
+}
+.status-tag--info {
+  --tag-fg: var(--status-info-fg);
+  --tag-tint: var(--status-info-tint);
+}
+.status-tag--violet {
+  --tag-fg: var(--status-violet-fg);
+  --tag-tint: var(--status-violet-tint);
+}
+.status-tag--neutral {
+  --tag-fg: var(--status-neutral-fg);
+  --tag-tint: var(--status-neutral-tint);
+}
+
+/* ── Loan type marker ────────────────────────────────────────────────────────
+   Outlined, not filled: the product type is context, not a status. Keeping it
+   visually subordinate is what stops a dense table turning into confetti. */
+
+.type-tag {
+  display: inline-block;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--ink-200);
+  background: transparent;
+  color: var(--ink-600);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  line-height: 1.7;
+  white-space: nowrap;
+}
+
+.type-tag--cdl {
+  border-color: var(--status-info-fg);
+  color: var(--status-info-fg);
+}
+.type-tag--gold {
+  border-color: var(--status-warning-fg);
+  color: var(--status-warning-fg);
+}
+.type-tag--housing {
+  border-color: var(--status-violet-fg);
+  color: var(--status-violet-fg);
+}
+
+/* ── Risk grade ──────────────────────────────────────────────────────────────
+   A square, not a circle. Monospaced-feeling, sits in a table column cleanly. */
+
+.grade-tag {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 3px;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--tag-fg);
+  background: var(--tag-tint);
+}
+
+.grade-tag--success {
+  --tag-fg: var(--status-success-fg);
+  --tag-tint: var(--status-success-tint);
+}
+.grade-tag--warning {
+  --tag-fg: var(--status-warning-fg);
+  --tag-tint: var(--status-warning-tint);
+}
+.grade-tag--danger {
+  --tag-fg: var(--status-danger-fg);
+  --tag-tint: var(--status-danger-tint);
+}
+.grade-tag--info {
+  --tag-fg: var(--status-info-fg);
+  --tag-tint: var(--status-info-tint);
+}
+.grade-tag--overdue {
+  --tag-fg: var(--status-overdue-fg);
+  --tag-tint: var(--status-overdue-tint);
+}
+.grade-tag--violet {
+  --tag-fg: var(--status-violet-fg);
+  --tag-tint: var(--status-violet-tint);
+}
+.grade-tag--neutral {
+  --tag-fg: var(--status-neutral-fg);
+  --tag-tint: var(--status-neutral-tint);
+}

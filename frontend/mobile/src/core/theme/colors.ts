@@ -12,6 +12,9 @@ export const Colors = {
   error: '#EF4444',
   errorLight: '#FEE2E2',
   warning: '#F59E0B',
+  // Every other semantic colour ships a tint for badge/icon backgrounds;
+  // `warning` did not, so callers reached for a raw hex instead.
+  warningLight: '#FEF3C7',
 
   background: '#FFFFFF',
   backgroundLight: '#F9FAFB',

@@ -2,10 +2,16 @@ import { create } from 'zustand';
 import dayjs from 'dayjs';
 import { MOCK } from '../data/mock';
 import { calcEmi } from '../utils/format';
+import { calcFees, buildAmortization } from '../utils/finance';
+import { applyPayment } from '../utils/payments';
+import { buildWaiverDeviation, deriveDeviations } from '../utils/deviations';
 import type {
   AppNotification, AuditLog, EmiRow, LoanAccount, LoanApplication, PortalUser,
   Repayment, LoanCharge, RiskGrade, Role,
   Branch, Agent, ProductConfig, GoldCollateral, PropertyDetails,
+  Deviation, DeviationCategory, DeviationSeverity,
+  TvrRecord, TvrChecklistItem, TvrOutcome, TvrCallStatus,
+  CpvRecord, CpvType, CpvRelation, CpvOutcome, VerificationWaiver,
 } from '../types';
 
 export type GoldAppraisalInput = Omit<GoldCollateral, 'valuedBy' | 'appraisedAt'>;
@@ -44,6 +50,37 @@ interface AppState {
   // application workflow
   pickForReview: (appId: string, actor: Actor) => void;
   creditDecision: (appId: string, input: CreditDecisionInput, actor: Actor) => void;
+
+  // deviations (Sprint-4)
+  ensureDeviations: (appId: string) => void;
+  raiseDeviation: (
+    appId: string,
+    input: { code?: string; category: DeviationCategory; severity: DeviationSeverity; description: string },
+    actor: Actor,
+  ) => void;
+  decideDeviation: (
+    appId: string,
+    devId: string,
+    decision: 'APPROVED' | 'REJECTED',
+    remarks: string,
+    actor: Actor,
+    mitigant?: string,
+  ) => void;
+  withdrawDeviation: (appId: string, devId: string, remarks: string, actor: Actor) => void;
+
+  // TVR / CPV (Sprint-4)
+  saveTvr: (
+    appId: string,
+    input: { phoneCalled: string; checklist: TvrChecklistItem[]; outcome: TvrOutcome; remarks: string; status: TvrCallStatus },
+    actor: Actor,
+  ) => void;
+  waiveTvr: (appId: string, remarks: string, actor: Actor) => void;
+  saveCpv: (
+    appId: string,
+    input: { type: CpvType; assignedTo: string; visitDate: string; addressVerified: boolean; personMet: string; relation: CpvRelation; outcome: CpvOutcome; remarks: string },
+    actor: Actor,
+  ) => void;
+  waiveCpv: (appId: string, remarks: string, actor: Actor) => void;
   financeVerify: (appId: string, actor: Actor) => void;
   setupEmandate: (appId: string, mode: 'Net Banking' | 'Debit Card' | 'Aadhaar', actor: Actor) => void;
   refreshEmandate: (appId: string, actor: Actor) => void;
@@ -145,6 +182,12 @@ export const useAppStore = create<AppState>((set, get) => {
           approvedRate: input.approvedRate,
           reason: input.reason,
           remarks: input.remarks,
+          // Record the deviations that were APPROVED so the CAM shows what the
+          // sanction was granted despite (the gate guarantees none are OPEN).
+          approvedDeviationIds:
+            decision === 'APPROVED'
+              ? (app.deviations ?? []).filter((d) => d.status === 'APPROVED').map((d) => d.id)
+              : undefined,
         };
         next = pushTimeline(
           next, 'CREDIT_DECISION',
@@ -160,21 +203,171 @@ export const useAppStore = create<AppState>((set, get) => {
       audit({ user: actor.name, role: String(actor.role), module: 'Credit', action: `Credit ${input.decision}`, entity: app?.appNumber ?? appId, oldValue: 'CREDIT_PENDING', newValue: input.decision });
     },
 
+    // ─── Deviations (Sprint-4) ────────────────────────────────────────────────
+    ensureDeviations: (appId) => {
+      patchApp(appId, (app) =>
+        app.deviations ? app : { ...app, deviations: deriveDeviations(app) },
+      );
+    },
+
+    raiseDeviation: (appId, input, actor) => {
+      patchApp(appId, (app) => {
+        const base = app.deviations ?? deriveDeviations(app);
+        const dev: Deviation = {
+          id: uid('DEV'),
+          code: input.code || 'MANUAL',
+          category: input.category,
+          severity: input.severity,
+          description: input.description,
+          raisedBy: actor.name,
+          status: 'OPEN',
+          createdAt: nowIso(),
+        };
+        return pushTimeline(
+          { ...app, deviations: [...base, dev] },
+          'DEVIATION_RAISED', 'Deviation raised', actor, input.description,
+          `${input.severity} · ${input.category}`,
+        );
+      });
+      const app = get().applications.find((a) => a.id === appId);
+      audit({ user: actor.name, role: String(actor.role), module: 'Credit', action: 'Deviation Raised', entity: app?.appNumber ?? appId, oldValue: '—', newValue: input.severity });
+    },
+
+    decideDeviation: (appId, devId, decision, remarks, actor, mitigant) => {
+      patchApp(appId, (app) => {
+        const base = app.deviations ?? deriveDeviations(app);
+        const deviations = base.map((d) =>
+          d.id === devId
+            ? {
+                ...d,
+                status: decision,
+                mitigant: mitigant ?? d.mitigant,
+                decidedBy: actor.name,
+                decidedRole: String(actor.role),
+                decidedRemarks: remarks,
+                decidedAt: nowIso(),
+              }
+            : d,
+        );
+        const decided = deviations.find((d) => d.id === devId);
+        return pushTimeline(
+          { ...app, deviations },
+          'DEVIATION_DECIDED', `Deviation ${decision.toLowerCase()}`, actor, remarks, decided?.code,
+        );
+      });
+      const app = get().applications.find((a) => a.id === appId);
+      audit({ user: actor.name, role: String(actor.role), module: 'Credit', action: `Deviation ${decision}`, entity: app?.appNumber ?? appId, oldValue: 'OPEN', newValue: decision });
+    },
+
+    withdrawDeviation: (appId, devId, remarks, actor) => {
+      patchApp(appId, (app) => {
+        const base = app.deviations ?? deriveDeviations(app);
+        const deviations = base.map((d) =>
+          d.id === devId
+            ? { ...d, status: 'WITHDRAWN' as const, decidedBy: actor.name, decidedRole: String(actor.role), decidedRemarks: remarks, decidedAt: nowIso() }
+            : d,
+        );
+        return pushTimeline({ ...app, deviations }, 'DEVIATION_WITHDRAWN', 'Deviation withdrawn', actor, remarks);
+      });
+      const app = get().applications.find((a) => a.id === appId);
+      audit({ user: actor.name, role: String(actor.role), module: 'Credit', action: 'Deviation Withdrawn', entity: app?.appNumber ?? appId, oldValue: 'OPEN', newValue: 'WITHDRAWN' });
+    },
+
+    // ─── TVR / CPV (Sprint-4 §3/§4) ───────────────────────────────────────────
+    // A waiver auto-raises an L1 deviation so the gate still forces an explicit
+    // credit decision on the skipped verification.
+    saveTvr: (appId, input, actor) => {
+      patchApp(appId, (app) => {
+        const existing = app.tvr ?? [];
+        const rec: TvrRecord = {
+          id: uid('TVR'),
+          applicationId: appId,
+          attemptNo: existing.length + 1,
+          phoneCalled: input.phoneCalled,
+          calledBy: actor.name,
+          checklist: input.checklist,
+          outcome: input.outcome,
+          remarks: input.remarks,
+          status: input.status,
+          createdAt: nowIso(),
+        };
+        return pushTimeline(
+          { ...app, tvr: [rec, ...existing] },
+          'TVR', `TVR ${input.outcome}`, actor, input.remarks,
+          `Attempt ${rec.attemptNo} · ${input.status}`,
+        );
+      });
+      const app = get().applications.find((a) => a.id === appId);
+      audit({ user: actor.name, role: String(actor.role), module: 'Credit', action: 'TVR Recorded', entity: app?.appNumber ?? appId, oldValue: '—', newValue: input.outcome });
+    },
+
+    waiveTvr: (appId, remarks, actor) => {
+      patchApp(appId, (app) => {
+        const waiver: VerificationWaiver = { remarks, by: actor.name, role: String(actor.role), at: nowIso() };
+        const base = app.deviations ?? deriveDeviations(app);
+        const dev: Deviation = buildWaiverDeviation('TVR', remarks, actor.name, uid('DEV'), nowIso());
+        return pushTimeline(
+          { ...app, tvrWaiver: waiver, deviations: [...base, dev] },
+          'TVR_WAIVED', 'TVR waived', actor, remarks,
+        );
+      });
+      const app = get().applications.find((a) => a.id === appId);
+      audit({ user: actor.name, role: String(actor.role), module: 'Credit', action: 'TVR Waived', entity: app?.appNumber ?? appId, oldValue: 'PENDING', newValue: 'WAIVED' });
+    },
+
+    saveCpv: (appId, input, actor) => {
+      patchApp(appId, (app) => {
+        const existing = app.cpv ?? [];
+        const rec: CpvRecord = {
+          id: uid('CPV'),
+          applicationId: appId,
+          type: input.type,
+          assignedTo: input.assignedTo,
+          visitDate: input.visitDate,
+          addressVerified: input.addressVerified,
+          personMet: input.personMet,
+          relation: input.relation,
+          outcome: input.outcome,
+          remarks: input.remarks,
+          createdAt: nowIso(),
+        };
+        return pushTimeline(
+          { ...app, cpv: [rec, ...existing] },
+          'CPV', `CPV ${input.type} ${input.outcome}`, actor, input.remarks,
+          `${input.type} visit · address ${input.addressVerified ? 'verified' : 'not verified'}`,
+        );
+      });
+      const app = get().applications.find((a) => a.id === appId);
+      audit({ user: actor.name, role: String(actor.role), module: 'Credit', action: 'CPV Recorded', entity: app?.appNumber ?? appId, oldValue: input.type, newValue: input.outcome });
+    },
+
+    waiveCpv: (appId, remarks, actor) => {
+      patchApp(appId, (app) => {
+        const waiver: VerificationWaiver = { remarks, by: actor.name, role: String(actor.role), at: nowIso() };
+        const base = app.deviations ?? deriveDeviations(app);
+        const dev: Deviation = buildWaiverDeviation('CPV', remarks, actor.name, uid('DEV'), nowIso());
+        return pushTimeline(
+          { ...app, cpvWaiver: waiver, deviations: [...base, dev] },
+          'CPV_WAIVED', 'CPV waived', actor, remarks,
+        );
+      });
+      const app = get().applications.find((a) => a.id === appId);
+      audit({ user: actor.name, role: String(actor.role), module: 'Credit', action: 'CPV Waived', entity: app?.appNumber ?? appId, oldValue: 'PENDING', newValue: 'WAIVED' });
+    },
+
     financeVerify: (appId, actor) => {
       patchApp(appId, (app) => {
         const approved = app.creditDecision?.approvedAmount ?? app.loan.amount;
-        const lt = app.loanType;
-        const processingFee = Math.round((approved * (lt === 'HOUSING' ? 0.01 : lt === 'GOLD' ? 0.005 : 0.025)) / 100) * 100;
-        const gst = Math.round(processingFee * 0.18);
-        const insurance = lt === 'CDL' ? Math.round(approved * 0.012) : lt === 'HOUSING' ? Math.round(approved * 0.004) : 0;
-        const stampDuty = lt === 'HOUSING' ? 600 : 100;
-        const documentation = lt === 'HOUSING' ? 1500 : 250;
+        const { processingFee, gst, insurance, stampDuty, documentation, netDisbursement } = calcFees(
+          app.loanType,
+          approved,
+        );
         let next: LoanApplication = {
           ...app,
           status: 'FINANCE_PENDING',
           finance: app.finance ?? {
             fees: { processingFee, gst, insurance, stampDuty, documentation },
-            netDisbursement: approved - processingFee - gst - insurance - stampDuty - documentation,
+            netDisbursement,
             bank: {
               accountName: app.customer.name,
               accountNumber: String(Math.floor(10000000000 + Math.random() * 89999999999)),
@@ -248,26 +441,18 @@ export const useAppStore = create<AppState>((set, get) => {
       const loanNumber = `FNLN-${app.loanType}-${String(86000 + state.loans.length).padStart(5, '0')}`;
       const utr = `${mode}R5${Math.floor(2026000000 + Math.random() * 999999)}`;
 
-      // amortization
+      // amortization — numeric schedule from the pure builder, dates layered on top
       let due = dayjs().add(1, 'month').date(5);
       if (due.diff(dayjs(), 'day') < 18) due = due.add(1, 'month');
-      const r = rate / 12 / 100;
-      let balance = principal;
-      const schedule: EmiRow[] = [];
-      for (let s = 1; s <= tenure; s++) {
-        const interest = Math.round(balance * r);
-        const prin = s === tenure ? balance : Math.min(balance, emi - interest);
-        balance = Math.max(0, balance - prin);
-        schedule.push({
-          seq: s,
-          dueDate: due.add(s - 1, 'month').format('YYYY-MM-DD'),
-          principal: prin,
-          interest,
-          emi: s === tenure ? prin + interest : emi,
-          balance,
-          status: 'UPCOMING',
-        });
-      }
+      const schedule: EmiRow[] = buildAmortization(principal, rate, tenure).map((row) => ({
+        seq: row.seq,
+        dueDate: due.add(row.seq - 1, 'month').format('YYYY-MM-DD'),
+        principal: row.principal,
+        interest: row.interest,
+        emi: row.emi,
+        balance: row.balance,
+        status: 'UPCOMING',
+      }));
 
       const newLoan: LoanAccount = {
         loanNumber,
@@ -349,40 +534,7 @@ export const useAppStore = create<AppState>((set, get) => {
         }));
       }
       set((s) => ({
-        loans: s.loans.map((l) => {
-          if (l.loanNumber !== loanNumber) return l;
-          const schedule = l.schedule.map((row) => ({ ...row }));
-          let remaining = amount;
-          let paidCount = l.paidCount;
-          for (const row of schedule) {
-            if (row.status === 'OVERDUE' || row.status === 'DUE') {
-              if (remaining >= row.emi) {
-                remaining -= row.emi;
-                row.status = 'PAID';
-                row.paidOn = dayjs().format('YYYY-MM-DD');
-                row.paidAmount = row.emi;
-                paidCount += 1;
-              } else break;
-            }
-          }
-          const firstUnpaid = schedule.find((row) => row.status !== 'PAID');
-          const overdueAmount = schedule.filter((row) => row.status === 'OVERDUE').reduce((sum, row) => sum + row.emi, 0);
-          const dpd = firstUnpaid && firstUnpaid.status === 'OVERDUE' ? dayjs().diff(dayjs(firstUnpaid.dueDate), 'day') : 0;
-          const closed = schedule.every((row) => row.status === 'PAID');
-          return {
-            ...l,
-            schedule,
-            paidCount,
-            overdueAmount,
-            dpd,
-            status: closed ? 'CLOSED' : dpd > 90 ? 'NPA' : dpd > 0 ? 'OVERDUE' : 'ACTIVE',
-            collectionStatus: dpd > 0 ? l.collectionStatus : 'NORMAL',
-            outstandingPrincipal: paidCount === 0 ? l.principal : schedule[Math.max(0, paidCount - 1)]?.balance ?? l.outstandingPrincipal,
-            nextDueDate: firstUnpaid?.dueDate,
-            lastPaymentDate: nowIso(),
-            lastPaymentAmount: amount,
-          };
-        }),
+        loans: s.loans.map((l) => (l.loanNumber === loanNumber ? applyPayment(l, amount).loan : l)),
       }));
       const isNpa = get().loans.find((l) => l.loanNumber === loanNumber)?.status === 'NPA';
       audit({ user: actor.name, role: String(actor.role), module: 'Collections', action: isNpa ? 'Recovery Payment' : 'Payment Recorded', entity: loanNumber, newValue: `₹${amount.toLocaleString('en-IN')} via ${mode}` });

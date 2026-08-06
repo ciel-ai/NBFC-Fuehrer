@@ -1,30 +1,34 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
+/* Inter is self-hosted — imported once from main.tsx via @fontsource-variable/inter
+   so Vite bundles it same-origin. It must NOT come back as a Google Fonts @import:
+   the production CSP (nginx.conf) allows style-src/font-src 'self' only, so a
+   remote @import is blocked and the typeface silently disappears. The variable
+   axis covers 100-900, including the 700 the wordmark needs — without a real 700
+   the browser synthesises a faux-bold, which smears on tracked uppercase. */
+@import './components/components.css';
 
 /* ============================================================================
-   FUEHRER NBFC — global stylesheet
-   Calm, institutional, hairline-defined. Motion is functional, never showy.
+   GLOBAL STYLESHEET
+
+   Every value below resolves to a custom property injected from theme/tokens.ts
+   (see theme/cssVars.ts). There are no literal colours, sizes, or radii in this
+   file — if you need one, add it to the tokens, not here.
+
+   Structure:
+     1. Reset & base
+     2. Typography primitives
+     3. App shell (sider, header, content)
+     4. Panels & surfaces
+     5. Data density (tables)
+     6. Utilities
+     7. Motion & reduced-motion
+     8. Print
    ==========================================================================*/
 
-:root {
-  /* Indigo minimal theme — modern fintech */
-  --brand: #0284c7;
-  --brand-dark: #0369a1;
-  --brand-deep: #075985;
-  --brand-soft: #e0f2fe;
-  --accent: #38bdf8;
-  --page-bg: #f8f9fb;
-  --ink: #111827;
-  --body: #4b5563;
-  --muted: #6b7280;
-  --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.04), 0 4px 12px rgba(16, 24, 40, 0.05);
-  --line: #e4e8ee;
-  --line-soft: #eef1f5;
-  --sider-w: 248px;
-  --nbfc-page: #f8f9fb;
-}
+/* ─────────────────────────── 1. reset & base ─────────────────────────── */
 
-* {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
@@ -37,25 +41,76 @@ body,
 }
 
 body {
-  font-family: 'Inter', 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
-    'Helvetica Neue', Arial, sans-serif;
-  background: var(--page-bg);
-  color: var(--ink);
+  font-family: var(--font-family);
+  font-size: var(--text-base);
+  font-weight: var(--weight-regular);
+  line-height: var(--leading-normal);
+  background: var(--ink-50);
+  color: var(--ink-700);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
-  font-feature-settings: 'cv02', 'cv03', 'cv04';
+  /* Inter's disambiguated glyphs — a lending back-office reads a lot of 1/l/0/O */
+  font-feature-settings: 'cv01', 'cv03', 'cv04', 'ss03';
 }
 
-/* tabular numerals in tables / KPI values / financial figures */
+/* Financial figures are always tabular. Non-negotiable in a ledger. */
 .tnum,
 .ant-table,
-.ant-statistic-content {
+.ant-statistic-content,
+.ant-descriptions-item-content,
+.ant-input-number-input {
   font-variant-numeric: tabular-nums;
-  font-feature-settings: 'tnum';
+  font-feature-settings: 'tnum', 'cv01', 'cv03';
 }
 
-/* ─────────────────────────── scrollbars ─────────────────────────── */
+/* Focus: one visible, consistent ring everywhere. Never removed. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* Skip-to-content (WCAG 2.4.1). Off-screen until focused rather than
+   display:none — a hidden element cannot receive focus, so it would never
+   appear. First Tab on any route reveals it over the header. */
+.skip-link {
+  position: fixed;
+  top: var(--space-2);
+  left: var(--space-2);
+  z-index: 2000;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-sm);
+  background: var(--ink-0);
+  color: var(--ink-900);
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+  text-decoration: none;
+  box-shadow: var(--e2);
+  /* Visually hidden, still focusable and still in the a11y tree. */
+  transform: translateY(calc(-100% - var(--space-4)));
+  opacity: 0;
+  transition: transform var(--motion-fast) var(--ease-out);
+}
+
+.skip-link:focus,
+.skip-link:focus-visible {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+/* The skip target itself must not draw a ring when focused programmatically —
+   it is a landmark, not a control. Focus is still moved there. */
+#main:focus {
+  outline: none;
+}
+
+::selection {
+  background: var(--accent-wash);
+  color: var(--accent-press);
+}
+
+/* Scrollbars — present but quiet; they must not read as chrome. */
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
@@ -64,985 +119,722 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #cdd5e0;
-  border-radius: 8px;
+  background: var(--ink-200);
+  border-radius: 999px;
   border: 3px solid transparent;
   background-clip: padding-box;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #b3bdcc;
+  background: var(--ink-300);
   background-clip: padding-box;
-  border: 3px solid transparent;
 }
 
-/* ─────────────────────────── page transitions ─────────────────────────── */
-.page-fade {
-  animation: pageFade 0.26s cubic-bezier(0.22, 1, 0.36, 1);
-}
-@keyframes pageFade {
-  from {
-    opacity: 0;
-    transform: translateY(5px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+/* ─────────────────────────── 2. typography ─────────────────────────── */
+
+/* The micro-label: uppercase, tracked, tertiary. Used for column heads,
+   KPI labels, section eyebrows. This is the app's most repeated text style. */
+.t-label {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--ink-400);
+  line-height: var(--leading-tight);
 }
 
-/* ─────────────────────────── app shell ─────────────────────────── */
+.t-page-title {
+  font-size: var(--text-xl);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-snug);
+  color: var(--ink-900);
+  line-height: var(--leading-tight);
+  margin: 0;
+}
+
+.t-section {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-snug);
+  color: var(--ink-900);
+  line-height: var(--leading-tight);
+  margin: 0;
+}
+
+.t-body {
+  font-size: var(--text-md);
+  font-weight: var(--weight-regular);
+  color: var(--ink-600);
+}
+
+.t-meta {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-regular);
+  color: var(--ink-500);
+}
+
+/* The money figure. Tight, tabular, dark — the thing the eye lands on. */
+.t-figure {
+  font-size: var(--text-xxl);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-tight);
+  color: var(--ink-900);
+  line-height: var(--leading-tight);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Directional money. Colour here is meaning, not decoration. */
+.t-pos {
+  color: var(--status-success-fg);
+  font-variant-numeric: tabular-nums;
+}
+.t-neg {
+  color: var(--status-danger-fg);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Monospaced identifiers — loan numbers, PANs, txn refs. */
+.t-ref {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+  letter-spacing: 0.01em;
+  color: var(--ink-700);
+}
+
+/* ── Text utilities ───────────────────────────────────────────────────────────
+   These exist so a component never has to write `style={{ fontSize: 12.5 }}`.
+   Sizes snap to the scale — there is no 11.5 or 12.5 any more, which is what
+   removes the old system's 22-distinct-font-size drift. */
+
+.u-xs {
+  font-size: var(--text-xs);
+}
+.u-sm {
+  font-size: var(--text-sm);
+}
+.u-base {
+  font-size: var(--text-base);
+}
+.u-md {
+  font-size: var(--text-md);
+}
+.u-lg {
+  font-size: var(--text-lg);
+}
+
+.u-regular {
+  font-weight: var(--weight-regular);
+}
+.u-medium {
+  font-weight: var(--weight-medium);
+}
+.u-semibold {
+  font-weight: var(--weight-semibold);
+}
+
+.u-ink-300 {
+  color: var(--ink-300);
+}
+.u-ink-400 {
+  color: var(--ink-400);
+}
+.u-ink-500 {
+  color: var(--ink-500);
+}
+.u-ink-600 {
+  color: var(--ink-600);
+}
+.u-ink-700 {
+  color: var(--ink-700);
+}
+.u-ink-900 {
+  color: var(--ink-900);
+}
+.u-accent {
+  color: var(--accent);
+}
+.u-success {
+  color: var(--status-success-fg);
+}
+.u-warning {
+  color: var(--status-warning-fg);
+}
+.u-danger {
+  color: var(--status-danger-fg);
+}
+.u-overdue {
+  color: var(--status-overdue-fg);
+}
+.u-violet {
+  color: var(--status-violet-fg);
+}
+.u-info {
+  color: var(--status-info-fg);
+}
+
+/* ─────────────────────────── 3. app shell ─────────────────────────── */
+
 .app-shell {
   min-height: 100vh;
-  background: var(--page-bg);
+  background: var(--ink-50);
 }
 
-/* full-height deep-navy sidebar (Ice Blue) */
 .app-sider {
-  background: #ffffff !important;
-  border-right: 1px solid var(--line);
-  position: relative;
-}
-.app-sider::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 240px;
-  background: none;
-  pointer-events: none;
+  background: var(--ink-0);
+  border-right: 1px solid var(--ink-150);
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
-.sider-brand {
+.app-sider__scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-bottom: var(--space-4);
+}
+
+/* Wordmark. The sider header supplies the height and the hairline; the mark
+ * itself is <LogoMark> (components/Logo.tsx) and brings its own shrink guard. */
+.brand {
   display: flex;
   align-items: center;
-  gap: 11px;
-  height: 64px;
-  padding: 0 18px;
+  gap: var(--space-3);
+  height: var(--header-h);
+  padding: 0 var(--space-4);
+  border-bottom: 1px solid var(--ink-150);
+  flex-shrink: 0;
   white-space: nowrap;
   overflow: hidden;
-  position: relative;
-  z-index: 1;
 }
 
-.brand-mark {
-  width: 38px;
-  height: 38px;
-  min-width: 38px;
-  border-radius: 11px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 800;
-  font-size: 18px;
-  color: #ffffff;
-  background: var(--brand);
-  box-shadow: 0 4px 10px rgba(2, 132, 199, 0.28);
-  letter-spacing: 0.5px;
+.brand__name {
+  font-size: var(--text-base);
+  font-weight: var(--weight-bold);
+  color: var(--ink-900);
+  letter-spacing: var(--tracking-snug);
+  line-height: 1.1;
 }
 
-/* New Application CTA */
-.sider-cta {
-  padding: 8px 16px 12px;
-  position: relative;
-  z-index: 1;
-}
-.new-app-btn {
-  width: 100%;
-  height: 46px !important;
-  border: none !important;
-  border-radius: 12px !important;
-  background: var(--brand) !important;
-  color: #ffffff !important;
-  font-weight: 700 !important;
-  font-size: 14px !important;
-  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.25) !important;
-  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease !important;
-}
-.new-app-btn:hover {
-  background: var(--brand-dark) !important;
-  color: #ffffff !important;
-  transform: translateY(-1px);
-  box-shadow: 0 8px 18px rgba(2, 132, 199, 0.3) !important;
+.brand__product {
+  font-size: var(--text-xs);
+  color: var(--ink-400);
+  line-height: 1.1;
+  margin-top: 2px;
 }
 
-/* white-on-blue menu — colours come from a scoped ConfigProvider; tweaks here */
+/* Nav section heading */
+.nav-section {
+  padding: var(--space-4) var(--space-4) var(--space-1);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--ink-400);
+}
+
 .app-sider .ant-menu {
-  position: relative;
-  z-index: 1;
+  background: transparent;
+  border-inline-end: none;
 }
-.app-sider .ant-menu-item-selected::before {
+
+/* AntD paints a 3px active bar on the selected item; we use a wash instead. */
+.app-sider .ant-menu-item::after,
+.app-sider .ant-menu-item-selected::after {
   display: none;
 }
-.app-sider .ant-menu-submenu-arrow {
-  color: var(--muted);
-}
-.app-sider .ant-menu-item,
-.app-sider .ant-menu-submenu-title {
-  transition: background 0.15s ease, color 0.15s ease;
+
+.app-sider .ant-menu-item-selected {
+  font-weight: var(--weight-medium);
 }
 
-.sider-section {
-  position: relative;
-  z-index: 1;
-  padding: 16px 22px 6px;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 1.1px;
-  text-transform: uppercase;
-  color: var(--muted);
-}
+/* Sider footer — build/version. Infrastructural, quiet. */
 .sider-foot {
-  position: relative;
-  z-index: 1;
-  margin-top: auto;
-  padding: 14px 20px 18px;
-  border-top: 1px solid var(--line-soft);
-  color: var(--body);
-}
-.sider-link {
-  color: var(--brand);
-  font-weight: 600;
-  font-size: 12.5px;
-  cursor: pointer;
-}
-.sider-link:hover {
-  opacity: 0.85;
+  flex-shrink: 0;
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--ink-150);
+  font-size: var(--text-xs);
+  color: var(--ink-400);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 
-/* ─────────────────────────── app header ─────────────────────────── */
-.app-header {
-  background: #ffffff !important;
+.live-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--status-success-fg);
+  flex-shrink: 0;
 }
+
+/* Header — a hairline rule, not a floating bar. */
+.app-header {
+  background: var(--ink-0);
+  border-bottom: 1px solid var(--ink-150);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0 var(--space-5);
+}
+
+.app-content {
+  padding: var(--space-5);
+  max-width: var(--content-max);
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* Keyboard hint in the search field */
 .kbd {
   display: inline-flex;
   align-items: center;
-  padding: 1px 7px;
-  border-radius: 6px;
-  border: 1px solid #e2e8f0;
-  background: #f8fafc;
-  color: #94a3b8;
-  font-size: 11px;
-  font-weight: 600;
-}
-.hdr-icon {
-  color: #5a6675 !important;
-  width: 40px;
-  height: 40px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  border: 1px solid var(--ink-150);
+  background: var(--ink-50);
+  color: var(--ink-400);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  line-height: 1.5;
 }
 
-/* quick-access cards */
-.qa-card {
-  border-radius: 16px;
-  padding: 18px;
-  cursor: pointer;
-  box-shadow: var(--shadow-card);
-  background: #fff;
-  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
-  height: 100%;
-}
-.qa-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 26px rgba(16, 32, 47, 0.1);
-  border-color: #d7deea;
-}
-.qa-card--primary {
-  border: none;
-  background: linear-gradient(140deg, #2f6df0, #0284c7);
-  color: #fff;
-  box-shadow: 0 12px 26px rgba(2, 132, 199, 0.32);
-}
-.qa-card--primary:hover {
-  box-shadow: 0 16px 32px rgba(2, 132, 199, 0.4);
-}
+/* ─────────────────────────── 4. panels & surfaces ─────────────────────────── */
 
-/* ─────────────────────────── cards & hover ─────────────────────────── */
-.kpi-card {
-  transition: box-shadow 0.16s ease, border-color 0.16s ease;
-  position: relative;
-}
-.kpi-card:hover {
-  box-shadow: 0 2px 4px rgba(16, 32, 47, 0.06), 0 8px 20px rgba(16, 32, 47, 0.07);
-  border-color: #d3dae6 !important;
-}
-
-.lift {
-  transition: box-shadow 0.16s ease, border-color 0.16s ease;
-}
-.lift:hover {
-  border-color: #d3dae6 !important;
-}
-
-/* clickable table rows */
-.row-link .ant-table-tbody > tr {
-  cursor: pointer;
-}
-
-/* default card: defined edge + real (subtle) elevation — no more ghost float */
-.ant-card {
-  box-shadow: 0 1px 2px rgba(16, 32, 47, 0.05), 0 4px 12px rgba(16, 32, 47, 0.05);
-}
-
-/* ─────────────────────────── work-first console ─────────────────────────── */
+/* The core surface primitive. A hairline, a radius, no shadow. */
 .panel {
-  background: #fff;
-  border-radius: 16px;
-  box-shadow: 0 1px 2px rgba(16, 32, 47, 0.05), 0 6px 16px rgba(16, 32, 47, 0.05);
+  background: var(--ink-0);
+  border: 1px solid var(--ink-150);
+  border-radius: var(--radius-md);
+  overflow: hidden;
 }
-.panel-head {
+
+.panel__head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 14px 18px;
-  border-bottom: 1px solid #eef1f6;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--ink-150);
+  min-height: 44px;
 }
-.panel-title {
+
+.panel__title {
   display: flex;
   align-items: center;
-  gap: 9px;
-  font-size: 14.5px;
-  font-weight: 700;
-  color: #10202f;
+  gap: var(--space-2);
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  color: var(--ink-900);
+  letter-spacing: var(--tracking-snug);
 }
+
+.panel__body {
+  padding: var(--space-4);
+}
+
+.panel__body--flush {
+  padding: 0;
+}
+
+/* Count chip beside a panel title — neutral by default; it is not a badge. */
 .count-chip {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 22px;
-  height: 20px;
-  padding: 0 7px;
-  border-radius: 6px;
-  background: #38bdf8;
-  color: #fff;
-  font-size: 12px;
-  font-weight: 700;
-}
-.count-chip--muted {
-  background: #eef1f6;
-  color: #5a6675;
-}
-
-/* dense metric band — 1px grid gaps render as clean dividers */
-.metric-band {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 1px;
-  background: #eef1f5;
-  border-radius: 16px;
-  box-shadow: 0 1px 2px rgba(16, 32, 47, 0.05), 0 6px 16px rgba(16, 32, 47, 0.05);
-  overflow: hidden;
-}
-.metric-cell {
-  padding: 15px 18px;
-  background: #fff;
-  cursor: pointer;
-  transition: background 0.14s ease;
-}
-.metric-cell:hover {
-  background: #f6f9fe;
-}
-.metric-label {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.4px;
-  text-transform: uppercase;
-  color: #6b7785;
-}
-.metric-value {
-  font-size: 23px;
-  font-weight: 800;
-  color: #0b1b2b;
-  letter-spacing: -0.6px;
-  margin-top: 6px;
-  line-height: 1.05;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 var(--space-1);
+  border-radius: 3px;
+  background: var(--ink-100);
+  color: var(--ink-600);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
   font-variant-numeric: tabular-nums;
 }
-.metric-sub {
-  font-size: 11.5px;
-  color: #7c8896;
-  margin-top: 5px;
+
+.count-chip--attention {
+  background: var(--status-warning-tint);
+  color: var(--status-warning-fg);
 }
 
-/* action rows (needs-action worklist) */
-.action-row {
+/* Metric band — the dense KPI strip. 1px grid gaps ARE the dividers, so the
+   whole band reads as one ledger object rather than N floating cards. */
+.metric-band {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1px;
+  background: var(--ink-150);
+  border: 1px solid var(--ink-150);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.metric-cell {
+  padding: var(--space-4);
+  background: var(--ink-0);
+  transition: background var(--motion-fast) var(--ease);
+  min-width: 0;
+}
+
+.metric-cell--clickable {
+  cursor: pointer;
+}
+.metric-cell--clickable:hover {
+  background: var(--ink-50);
+}
+
+.metric-cell__value {
+  font-size: var(--text-xxl);
+  font-weight: var(--weight-semibold);
+  color: var(--ink-900);
+  letter-spacing: var(--tracking-tight);
+  line-height: var(--leading-tight);
+  margin-top: var(--space-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.metric-cell__delta {
+  font-size: var(--text-sm);
+  margin-top: var(--space-1);
+  color: var(--ink-400);
   display: flex;
   align-items: center;
-  gap: 13px;
-  padding: 13px 18px;
-  border-bottom: 1px solid #f1f4f8;
-  cursor: pointer;
-  transition: background 0.14s ease;
+  gap: var(--space-1);
 }
-.action-row:last-child {
+
+/* Worklist row — "needs action" items. Hover shifts background, never lifts. */
+.work-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--ink-100);
+  cursor: pointer;
+  transition: background var(--motion-fast) var(--ease);
+  text-align: left;
+  width: 100%;
+  background: none;
+  border-left: 0;
+  border-right: 0;
+  border-top: 0;
+  font: inherit;
+}
+.work-row:last-child {
   border-bottom: none;
 }
-.action-row:hover {
-  background: #f6f9fe;
-}
-.action-ico {
-  width: 38px;
-  height: 38px;
-  min-width: 38px;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 17px;
-}
-.action-title {
-  font-size: 13.5px;
-  font-weight: 600;
-  color: #1d2733;
-  line-height: 1.35;
-}
-.action-sub {
-  font-size: 12px;
-  color: #7c8896;
-  margin-top: 2px;
+.work-row:hover {
+  background: var(--ink-50);
 }
 
-/* dense stat rows */
+/* The icon slot. A tinted square, not a circle-with-shadow. */
+.work-row__slot {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  border-radius: var(--radius-sm);
+  display: grid;
+  place-items: center;
+  font-size: var(--text-md);
+}
+
+/* display:block — these are rendered as <span> inside a <button>, and inline
+   spans would run the title and its subtitle together on one line. */
+.work-row__title {
+  display: block;
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+  color: var(--ink-800);
+  line-height: 1.4;
+}
+
+.work-row__sub {
+  display: block;
+  font-size: var(--text-sm);
+  color: var(--ink-500);
+  margin-top: 1px;
+}
+
+/* Key/value rows */
 .stat-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 11px 18px;
-  border-bottom: 1px solid #f1f4f8;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--ink-100);
 }
 .stat-row:last-child {
   border-bottom: none;
 }
-.stat-label {
-  font-size: 12.5px;
-  color: #5a6675;
+.stat-row__label {
+  font-size: var(--text-base);
+  color: var(--ink-500);
 }
-.stat-val {
-  font-size: 14px;
-  font-weight: 700;
-  color: #10202f;
+.stat-row__value {
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+  color: var(--ink-900);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* ─────────────────────────── 5. data density ─────────────────────────── */
+
+/* Tables live inside .panel, so they must not double up on borders. */
+.panel .ant-table-wrapper .ant-table {
+  background: transparent;
+}
+
+/* Column heads adopt the micro-label style — this is what makes a dense table
+   scan as a ledger rather than a spreadsheet. */
+.ant-table-thead > tr > th.ant-table-cell {
+  font-size: var(--text-xs) !important;
+  font-weight: var(--weight-medium) !important;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--ink-400) !important;
+  background: transparent !important;
+  border-bottom: 1px solid var(--ink-150) !important;
+  white-space: nowrap;
+}
+
+/* Kill AntD's vertical header split bars */
+.ant-table-thead > tr > th::before {
+  display: none !important;
+}
+
+.ant-table-tbody > tr > td {
+  border-bottom: 1px solid var(--ink-100);
+}
+
+/* Numeric columns right-align and go tabular — money never ragged. */
+.col-num {
+  text-align: right !important;
   font-variant-numeric: tabular-nums;
 }
-
-/* ═══════════════════════════ LOGIN ═══════════════════════════ */
-
-/* premium light field with soft sky-tinted geometric decoration */
-.login-bg {
-  position: relative;
-  min-height: 100vh;
-  background: linear-gradient(160deg, #fafbfd 0%, #f2f8fd 55%, #e0f2fe 100%);
+.col-num.ant-table-cell {
+  text-align: right;
 }
 
-/* fixed, clipped decoration layer — sits behind content, lets the page scroll */
-.lb-field {
-  position: fixed;
-  inset: 0;
-  overflow: hidden;
-  z-index: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(58% 52% at 100% 0%, rgba(56, 189, 248, 0.14), transparent 60%),
-    radial-gradient(60% 58% at 0% 100%, rgba(2, 132, 199, 0.10), transparent 62%);
+/* Row density — driven by the Segmented control, applied on the wrapper. */
+.density-compact .ant-table-tbody > tr > td {
+  padding-block: var(--space-1) !important;
+}
+.density-compact .ant-table-thead > tr > th {
+  padding-block: var(--space-1) !important;
+}
+.density-default .ant-table-tbody > tr > td {
+  padding-block: var(--space-2) !important;
+}
+.density-comfortable .ant-table-tbody > tr > td {
+  padding-block: var(--space-4) !important;
 }
 
-.login-stage {
-  position: relative;
-  z-index: 3;
-  min-height: 100vh;
+/* Clickable rows */
+.row-link .ant-table-tbody > tr {
+  cursor: pointer;
+}
+
+/* A row that demands attention (overdue, NPA) — a 2px left rule, not a red fill.
+   Filling the row red makes a table unreadable; a marginal rule does not. */
+.row-flag td:first-child {
+  box-shadow: inset 2px 0 0 var(--status-danger-fg);
+}
+.row-flag-warn td:first-child {
+  box-shadow: inset 2px 0 0 var(--status-warning-fg);
+}
+
+/* Sticky header for long ledgers */
+.ant-table-sticky-holder {
+  background: var(--ink-0);
+}
+
+/* Horizontal containment. A wide ledger scrolls INSIDE its panel rather than
+   pushing the page sideways — which is what the old layout did below ~1200px.
+   Done in CSS (not via AntD's scroll.x) so the table keeps `table-layout: auto`
+   and columns without an explicit width still size to their content. */
+.ant-table-content,
+.ant-table-body {
+  overflow-x: auto;
+}
+
+/* Give the ledger a sensible floor so columns stop compressing into each other
+   before the scrollbar takes over. */
+.panel .ant-table-content > table,
+.panel .ant-table-body > table {
+  min-width: 100%;
+}
+
+/* ─────────────────────────── 6. utilities ─────────────────────────── */
+
+.stack {
   display: flex;
   flex-direction: column;
+}
+.row {
+  display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 18px;
-  padding: 32px 20px;
+}
+.row-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.grow {
+  flex: 1;
+  min-width: 0;
+}
+.wrap {
+  flex-wrap: wrap;
+}
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.lb-deco {
-  position: absolute;
-  pointer-events: none;
+.gap-1 {
+  gap: var(--space-1);
+}
+.gap-2 {
+  gap: var(--space-2);
+}
+.gap-3 {
+  gap: var(--space-3);
+}
+.gap-4 {
+  gap: var(--space-4);
+}
+.gap-5 {
+  gap: var(--space-5);
 }
 
-/* bottom-left concentric ripples */
-.lb-circles {
-  left: -170px;
-  bottom: -170px;
-  width: 540px;
-  height: 540px;
-  border-radius: 50%;
-  background: repeating-radial-gradient(
-    circle at center,
-    rgba(2, 132, 199, 0) 0 47px,
-    rgba(2, 132, 199, 0.10) 47px 49px
-  );
-  -webkit-mask-image: radial-gradient(circle at center, #000 58%, transparent 72%);
-  mask-image: radial-gradient(circle at center, #000 58%, transparent 72%);
+.mt-1 {
+  margin-top: var(--space-1);
+}
+.mt-2 {
+  margin-top: var(--space-2);
+}
+.mt-3 {
+  margin-top: var(--space-3);
+}
+.mt-4 {
+  margin-top: var(--space-4);
+}
+.mt-5 {
+  margin-top: var(--space-5);
+}
+.mb-4 {
+  margin-bottom: var(--space-4);
+}
+.mb-5 {
+  margin-bottom: var(--space-5);
 }
 
-/* top-right angular panel */
-.lb-shape-tr {
-  right: -90px;
-  top: -130px;
-  width: 360px;
-  height: 440px;
-  border-radius: 84px;
-  transform: rotate(26deg);
-  background: linear-gradient(180deg, rgba(56, 189, 248, 0.22), rgba(56, 189, 248, 0.05));
-  opacity: 0.8;
-  filter: blur(1px);
+/* Page grid — the standard content rhythm */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
 }
 
-/* bottom-right soft blob */
-.lb-shape-br {
-  right: -130px;
-  bottom: -150px;
-  width: 400px;
-  height: 400px;
-  border-radius: 46% 54% 52% 48%;
-  background: radial-gradient(circle at 32% 30%, rgba(56, 189, 248, 0.2), rgba(56, 189, 248, 0.03) 70%);
+/* ─────────────────────────── 7. motion ─────────────────────────── */
+
+/* Entrances are opacity + a few pixels. Nothing bounces, nothing scales. */
+.enter {
+  animation: enter var(--motion-slow) var(--ease-out) both;
 }
 
-/* dotted grids */
-.lb-dots {
-  background-image: radial-gradient(circle, rgba(2, 132, 199, 0.22) 1.6px, transparent 1.8px);
-  background-size: 24px 24px;
-}
-.lb-dots-tl {
-  left: 44px;
-  top: 72px;
-  width: 150px;
-  height: 150px;
-  opacity: 0.55;
-}
-.lb-dots-br {
-  right: 64px;
-  bottom: 84px;
-  width: 170px;
-  height: 210px;
-  opacity: 0.55;
-}
-
-/* diagonal hairlines on the right */
-.lb-lines {
-  right: 0;
-  top: 0;
-  width: 340px;
-  height: 100%;
-  background: repeating-linear-gradient(118deg, transparent 0 46px, rgba(2, 132, 199, 0.07) 46px 47px);
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000);
-  mask-image: linear-gradient(90deg, transparent, #000);
-  opacity: 0.7;
-}
-
-/* floating accents */
-.lb-dot {
-  border-radius: 50%;
-  background: #38bdf8;
-}
-.lb-dot-1 {
-  width: 12px;
-  height: 12px;
-  left: 120px;
-  top: 56%;
-  box-shadow: 0 0 0 6px rgba(56, 189, 248, 0.16);
-}
-.lb-ring {
-  border-radius: 50%;
-  border: 2px solid rgba(2, 132, 199, 0.3);
-}
-.lb-ring-1 {
-  width: 34px;
-  height: 34px;
-  right: 190px;
-  top: 132px;
-}
-
-/* the card */
-.login-card {
-  position: relative;
-  z-index: 3;
-  width: 350px;
-  max-width: 100%;
-  background: #fff;
-  border-radius: 16px;
-  padding: 26px 30px 22px;
-  box-shadow: 0 12px 34px rgba(16, 24, 40, 0.08), 0 2px 8px rgba(16, 24, 40, 0.05);
-  border: 1px solid rgba(16, 24, 40, 0.05);
-}
-
-.auth-rise {
-  animation: rise 0.5s cubic-bezier(0.22, 1, 0.36, 1);
-}
-@keyframes rise {
+@keyframes enter {
   from {
     opacity: 0;
-    transform: translateY(12px);
+    transform: translateY(4px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: none;
   }
 }
 
-.login-logo {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto;
-  background: linear-gradient(160deg, #38bdf8 0%, #0284c7 100%);
-  color: #fff;
-  font-weight: 800;
-  font-size: 20px;
-  box-shadow: 0 6px 16px rgba(60, 134, 196, 0.34);
+/* Staggered entrance for the login form fields */
+.enter-stagger > * {
+  animation: enter var(--motion-slow) var(--ease-out) both;
+}
+.enter-stagger > *:nth-child(1) {
+  animation-delay: 40ms;
+}
+.enter-stagger > *:nth-child(2) {
+  animation-delay: 80ms;
+}
+.enter-stagger > *:nth-child(3) {
+  animation-delay: 120ms;
+}
+.enter-stagger > *:nth-child(4) {
+  animation-delay: 160ms;
+}
+.enter-stagger > *:nth-child(5) {
+  animation-delay: 200ms;
+}
+.enter-stagger > *:nth-child(6) {
+  animation-delay: 240ms;
 }
 
-/* portal tab switcher */
-.seg {
-  display: flex;
-  border-radius: 12px;
-  padding: 4px;
-  background: #f1f5f9;
-}
-.seg-item {
-  flex: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  height: 36px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: #64748b;
-  border-radius: 8px;
-  transition: background 0.15s ease, color 0.15s ease;
-}
-.seg-item:hover {
-  color: #0284c7;
-}
-.seg-item.active {
-  background: #ffffff;
-  color: #0284c7;
-  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.1);
-}
-
-/* footer trust */
-.login-foot {
-  position: relative;
-  z-index: 3;
-  text-align: center;
-  color: #4b5563;
-}
-
-/* demo helper */
-.login-demo {
-  position: relative;
-  z-index: 3;
-  width: 350px;
-  max-width: 100%;
-  text-align: center;
-  border-top: 1px solid rgba(255, 255, 255, 0.18);
-  padding-top: 16px;
-}
-.login-demo-title {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.7px;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.8);
-  margin-bottom: 10px;
-}
-.login-demo-chips {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 7px;
-}
-.demo-chip {
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: 500;
-  color: #fff;
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  border-radius: 8px;
-  padding: 5px 11px;
-  cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
-}
-.demo-chip:hover {
-  background: rgba(255, 255, 255, 0.22);
-  border-color: rgba(255, 255, 255, 0.5);
-}
-
-/* ─────────────────────────── misc shared ─────────────────────────── */
-.app-timeline .ant-timeline-item-content {
-  margin-inline-start: 30px;
-}
-.ph-cell {
-  width: 16px;
-  height: 16px;
-  border-radius: 4px;
-  display: inline-block;
-}
-
-/* reduced motion */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
-    animation-duration: 0.001ms !important;
+    animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
-    transition-duration: 0.001ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 
-/* responsive: tighten the login card on small screens */
-@media (max-width: 600px) {
-  .login-stage {
-    padding: 24px 14px;
-  }
-  .login-card {
-    padding: 30px 22px 26px;
-    border-radius: 18px;
-  }
-  .login-demo {
-    width: 100%;
-  }
-}
+/* ─────────────────────────── 8. print ─────────────────────────── */
 
-/* print */
 @media print {
   .no-print {
     display: none !important;
   }
-  .print-area {
-    margin: 0 !important;
-  }
   body {
-    background: #fff;
+    background: var(--ink-0);
   }
-}
+  .panel {
+    border: 1px solid var(--ink-200);
+    break-inside: avoid;
+  }
 
-/* ═══════════════════ LOGIN v2 — split-card (reference layout) ═══════════════ */
-
-.wl-page {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px 16px;
-  background: #e8eaee;
-}
-
-.wl-card {
-  display: flex;
-  width: 960px;
-  height: 560px;
-  max-width: 100%;
-  background: #ffffff;
-  border-radius: 22px;
-  box-shadow: 0 18px 44px rgba(16, 24, 40, 0.10), 0 4px 12px rgba(16, 24, 40, 0.05);
-  overflow: hidden;
-}
-
-/* — left brand panel — */
-.wl-left {
-  position: relative;
-  flex: 0 0 340px;
-  margin: 12px;
-  border-radius: 16px;
-  background: linear-gradient(170deg, #8ec9f2 0%, #6cb6ec 100%);
-  padding: 30px 28px;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-.wl-brand {
-  font-size: 24px;
-  font-weight: 800;
-  color: #ffffff;
-  letter-spacing: -0.4px;
-}
-.wl-tag {
-  margin-top: 12px;
-  font-size: 12.5px;
-  line-height: 1.6;
-  color: rgba(255, 255, 255, 0.92);
-  max-width: 240px;
-}
-.wl-illus {
-  position: absolute;
-  bottom: -6px;
-  left: 50%;
-  transform: translateX(-52%);
-  width: 118%;
-  max-width: none;
-  pointer-events: none;
-}
-
-/* — right form panel — */
-.wl-right {
-  flex: 1;
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 56px 48px 40px;
-}
-.wl-lang {
-  position: absolute;
-  top: 22px;
-  right: 26px;
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.6px;
-  color: #9ca3af;
-  cursor: default;
-  user-select: none;
-}
-.wl-body {
-  width: 348px;
-  max-width: 100%;
-}
-.wl-title {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 700;
-  color: #111827;
-  letter-spacing: -0.3px;
-}
-.wl-sub {
-  margin-top: 4px;
-  font-size: 12px;
-  color: #9ca3af;
-}
-
-/* portal chips — the three roles, styled like the reference's outline buttons */
-.wl-portals {
-  display: flex;
-  gap: 8px;
-  margin: 22px 0 8px;
-}
-.wl-portal {
-  flex: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  height: 34px;
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  color: #4b5563;
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
-}
-.wl-portal:hover { border-color: #93c5fd; color: #0284c7; }
-.wl-portal.active {
-  border-color: #0284c7;
-  color: #0284c7;
-  background: #f0f9ff;
-}
-
-/* underline inputs */
-.wl-item { margin-bottom: 8px; }
-.u-input {
-  border: none !important;
-  border-bottom: 1px solid #e5e7eb !important;
-  border-radius: 0 !important;
-  padding: 10px 0 8px !important;
-  font-size: 13.5px;
-  box-shadow: none !important;
-  background: transparent !important;
-}
-.u-input:hover { border-bottom-color: #cbd5e1 !important; }
-.u-input:focus,
-.u-input:focus-within {
-  border-bottom-color: #0284c7 !important;
-}
-.u-input input::placeholder,
-.u-input::placeholder { color: #9ca3af; }
-.wl-prefix {
-  color: #6b7280;
-  font-weight: 600;
-  font-size: 13px;
-  margin-right: 6px;
-}
-
-.wl-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin: 14px 0 22px;
-}
-.wl-muted { font-size: 12.5px; color: #6b7280; }
-
-/* flat primary button (reference style — modest width feel, flat, 6px radius) */
-.wl-btn {
-  height: 40px !important;
-  border-radius: 6px !important;
-  font-weight: 600 !important;
-  box-shadow: none !important;
-}
-
-.wl-foot {
-  margin-top: 26px;
-  font-size: 12.5px;
-  color: #6b7280;
-  text-align: center;
-}
-.wl-foot a { font-weight: 600; }
-
-/* responsive — drop the brand panel on small screens */
-@media (max-width: 860px) {
-  .wl-left { display: none; }
-  .wl-right { padding: 44px 26px 32px; }
-  .wl-card { min-height: 0; }
-}
-
-/* — login brand-panel hero: floating dashboard cards — */
-.wl-hero {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 14px;
-  height: 350px;
-  pointer-events: none;
-}
-.wl-ring {
-  position: absolute;
-  right: -60px;
-  top: 8px;
-  width: 190px;
-  height: 190px;
-  border: 2px solid rgba(255, 255, 255, 0.25);
-  border-radius: 50%;
-}
-.wl-ring--sm {
-  right: auto;
-  left: -46px;
-  top: auto;
-  bottom: -52px;
-  width: 150px;
-  height: 150px;
-  border-color: rgba(255, 255, 255, 0.18);
-}
-.wl-mock {
-  position: absolute;
-  background: #ffffff;
-  border-radius: 12px;
-  box-shadow: 0 12px 28px rgba(7, 55, 92, 0.22);
-}
-.wl-mock--main {
-  left: 50%;
-  margin-left: -130px;
-  top: 20px;
-  width: 224px;
-  padding: 16px 18px;
-  transform: rotate(-2deg);
-}
-.wl-mock-label {
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.4px;
-  text-transform: uppercase;
-  color: #9ca3af;
-}
-.wl-mock-value {
-  margin-top: 3px;
-  font-size: 22px;
-  font-weight: 800;
-  color: #111827;
-  letter-spacing: -0.5px;
-  font-variant-numeric: tabular-nums;
-}
-.wl-mock-bars {
-  display: flex;
-  align-items: flex-end;
-  gap: 7px;
-  margin-top: 12px;
-  height: 44px;
-}
-.wl-mock-bars span {
-  flex: 1;
-  border-radius: 3px 3px 0 0;
-  background: #bae6fd;
-}
-.wl-mock-bars span:nth-child(4),
-.wl-mock-bars span:last-child { background: #0284c7; }
-.wl-mock--row {
-  left: 50%;
-  margin-left: -78px;
-  top: 188px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 14px;
-  width: 216px;
-  transform: rotate(1.5deg);
-}
-.wl-mock-dot {
-  width: 30px;
-  height: 30px;
-  min-width: 30px;
-  border-radius: 9px;
-  background: #e0f2fe;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-.wl-mock-dot::after {
-  content: '₹';
-  color: #0284c7;
-  font-weight: 800;
-  font-size: 14px;
-}
-.wl-mock-strong {
-  font-size: 14px;
-  font-weight: 700;
-  color: #111827;
-  font-variant-numeric: tabular-nums;
-}
-.wl-mock-pill {
-  margin-left: auto;
-  font-size: 10.5px;
-  font-weight: 700;
-  color: #047857;
-  background: #ecfdf5;
-  border-radius: 999px;
-  padding: 3px 8px;
-}
-.wl-mock--chip {
-  left: 50%;
-  margin-left: -20px;
-  top: 274px;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 9px 13px;
-  font-size: 11.5px;
-  font-weight: 600;
-  color: #111827;
-  transform: rotate(-1deg);
-}
-.wl-mock-check {
-  width: 17px;
-  height: 17px;
-  border-radius: 50%;
-  background: #10b981;
-  color: #fff;
-  font-size: 10px;
-  font-weight: 800;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  /* ── CAM print (F2) ──────────────────────────────────────────────────────
+     When printing the CAM, hide the whole app, then re-show only the CAM
+     document subtree and lift it to the page origin. This prints the memo
+     cleanly regardless of the surrounding layout. The backend
+     POST /applications/:id/cam/generate (S4 Appendix A) replaces this with an
+     audit-versioned PDF later. */
+  body.cam-print {
+    visibility: hidden;
+  }
+  body.cam-print .cam-document,
+  body.cam-print .cam-document * {
+    visibility: visible;
+  }
+  body.cam-print .cam-document {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    max-width: none;
+    padding: 0 8mm;
+    /* keep accent badges / status tags coloured in the printout */
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  body.cam-print .cam-toolbar {
+    display: none !important;
+  }
 }

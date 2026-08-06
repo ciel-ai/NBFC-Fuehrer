@@ -5,6 +5,7 @@ import type {
   UpdateProfileRequest,
   PhotoUpdateResponse,
   ChangePhoneResponse,
+  AccountDeletionResult,
 } from '@/src/entities/user';
 
 let MOCK_PROFILE: UserProfile = {
@@ -65,6 +66,17 @@ export const mockProfileService: IProfileService = {
       success: true,
       message: `OTP sent to ${newPhone}. Please verify to confirm the change.`,
       otpRequired: true,
+    };
+  },
+
+  async requestAccountDeletion(): Promise<AccountDeletionResult> {
+    await mockDelay(null, 900);
+    const effectiveBy = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    return {
+      requestId: `del_${Date.now()}`,
+      status: 'PENDING',
+      effectiveBy,
+      message: 'Your account deletion request has been recorded.',
     };
   },
 };

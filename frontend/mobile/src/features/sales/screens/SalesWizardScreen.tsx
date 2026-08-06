@@ -24,6 +24,8 @@ import { getProductConfig } from '@/src/features/sales/config';
 import { SalesField } from '@/src/features/sales/components/SalesField';
 import { StepProgress } from '@/src/features/sales/components/StepProgress';
 import { ReviewSummary } from '@/src/features/sales/components/ReviewSummary';
+import { OrnamentList } from '@/src/features/sales/components/OrnamentList';
+import type { OrnamentEntry } from '@/src/features/sales/config/ornaments';
 import { useSalesDraft } from '@/src/features/sales/hooks/useSalesDraft';
 import { useSubmitApplication } from '@/src/features/sales/queries/useSubmitApplication';
 import { useSalesStore } from '@/src/store/salesStore';
@@ -63,6 +65,7 @@ export function SalesWizardScreen({ product }: { product: SalesProduct }) {
   const defaultValues = useMemo<FormValues>(() => {
     const dv: FormValues = {};
     for (const step of steps) {
+      if ((step.kind ?? 'form') === 'ornaments') dv.ornaments = [];
       for (const field of step.fields ?? []) {
         if (field.type === 'derived') continue;
         dv[field.name] = field.type === 'checkbox' ? false : '';
@@ -82,7 +85,7 @@ export function SalesWizardScreen({ product }: { product: SalesProduct }) {
     return zodResolver(schema)(values, context, options);
   }, []);
 
-  const { control, watch, getValues } = useForm<FormValues>({
+  const { control, watch, getValues, setValue } = useForm<FormValues>({
     resolver,
     mode: 'onTouched',
     defaultValues,
@@ -101,7 +104,10 @@ export function SalesWizardScreen({ product }: { product: SalesProduct }) {
 
   const step = steps[currentStep];
   const kind = step.kind ?? 'form';
-  const formSteps = useMemo(() => steps.filter((s) => (s.kind ?? 'form') === 'form'), [steps]);
+  const formSteps = useMemo(
+    () => steps.filter((s) => ['form', 'ornaments'].includes(s.kind ?? 'form')),
+    [steps],
+  );
 
   const stepValid = useMemo(() => {
     const schema = step.schema as z.ZodTypeAny | undefined;
@@ -197,6 +203,14 @@ export function SalesWizardScreen({ product }: { product: SalesProduct }) {
 
           {kind === 'review' ? (
             <ReviewSummary steps={formSteps} values={values} />
+          ) : kind === 'ornaments' ? (
+            <OrnamentList
+              rows={(values.ornaments as OrnamentEntry[]) ?? []}
+              onChange={(rows) =>
+                setValue('ornaments', rows, { shouldValidate: true, shouldTouch: true })
+              }
+              accent={config.accent}
+            />
           ) : (
             (step.fields ?? []).map((field) => (
               <SalesField key={field.name} field={field} control={control} values={values} />

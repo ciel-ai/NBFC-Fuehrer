@@ -13,6 +13,7 @@ import { Colors } from '@/src/core/theme/colors';
 import { FontFamily, FontSize, Typography } from '@/src/core/theme/typography';
 import { Spacing, BorderRadius, Shadow } from '@/src/core/theme/spacing';
 import { Button } from '@/src/shared/components/common/Button';
+import { StatusAnimation } from '@/src/shared/components/common/StatusAnimation';
 import { scale } from '@/src/core/utils/responsive';
 
 interface RejectionReason {
@@ -54,9 +55,11 @@ export default function LoanRejectedScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.heroSection}>
-          <View style={styles.heroCircle}>
-            <Ionicons name="close" size={scale(52)} color={Colors.error} />
-          </View>
+          <StatusAnimation
+            name="failure"
+            size={scale(132)}
+            accessibilityLabel="Application declined"
+          />
           <Text style={styles.heroTitle}>Application Declined</Text>
           <Text style={styles.heroSubtitle}>
             We are unable to process your loan application at this time. Here's why, and what you can do next.

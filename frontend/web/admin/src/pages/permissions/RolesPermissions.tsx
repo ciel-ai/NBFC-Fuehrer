@@ -6,13 +6,14 @@
 // IS the audit surface, so an unreachable API shows an explicit error.
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { App, Card, Input, Table, Tag, Tooltip } from 'antd';
+import { App, Card, Input, Tag, Tooltip } from 'antd';
 import type { TableProps } from 'antd';
 import { SearchOutlined } from '@ant-design/icons';
 import PageHeader from '../../components/PageHeader';
 import { ErrorState, PageLoader } from '../../components/StateViews';
 import { permissionsApi } from '../../api/permissions.api';
 import type { RoleRow } from '../../api/permissions.api';
+import DataTable from '../../components/DataTable';
 
 const ACTIONS = ['READ', 'WRITE'] as const;
 
@@ -36,7 +37,9 @@ const RolesPermissions: React.FC = () => {
     }
   };
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => {
+    void load();
+  }, []);
 
   const modules = useMemo(() => {
     const set = new Set<string>();
@@ -77,11 +80,13 @@ const RolesPermissions: React.FC = () => {
     return (
       <div>
         <PageHeader title="Roles & Permissions" subtitle="Access-control rulebook" />
-        <Card variant="borderless" style={{ boxShadow: 'var(--shadow-card)' }}>
+        <Card>
           <ErrorState
             title="Could not load the permission model"
             detail="The permissions API did not respond. This screen has no sample fallback by design — it is the audit surface for access control."
-            onRetry={() => { void load(); }}
+            onRetry={() => {
+              void load();
+            }}
           />
         </Card>
       </div>
@@ -93,16 +98,22 @@ const RolesPermissions: React.FC = () => {
       title: 'Role',
       dataIndex: 'label',
       width: 230,
-      fixed: 'left',
       render: (v: string, r) => (
         <div>
-          <div style={{ fontWeight: 600, color: '#111827' }}>{v}</div>
-          <div style={{ fontSize: 11, color: '#9ca3af' }}>{r.name}{r.is_active ? '' : ' · INACTIVE'}</div>
+          <div className="u-semibold u-ink-900">{v}</div>
+          <div className="u-xs u-ink-400">
+            {r.name}
+            {r.is_active ? '' : ' · INACTIVE'}
+          </div>
         </div>
       ),
     },
     ...modules.map((m) => ({
-      title: <span style={{ fontSize: 11, textTransform: 'uppercase' as const, letterSpacing: 0.4 }}>{m}</span>,
+      title: (
+        <span style={{ fontSize: 11, textTransform: 'uppercase' as const, letterSpacing: 0.4 }}>
+          {m}
+        </span>
+      ),
       key: m,
       width: 110,
       align: 'center' as const,
@@ -114,7 +125,9 @@ const RolesPermissions: React.FC = () => {
             return (
               <Tooltip key={a} title={`${granted ? 'Revoke' : 'Grant'} ${m}:${a}`}>
                 <Tag
-                  onClick={() => { if (!busy) void toggle(r, m, a); }}
+                  onClick={() => {
+                    if (!busy) void toggle(r, m, a);
+                  }}
                   style={{
                     cursor: 'pointer',
                     userSelect: 'none',
@@ -123,9 +136,21 @@ const RolesPermissions: React.FC = () => {
                     fontSize: 10.5,
                     fontWeight: 700,
                     opacity: busy ? 0.4 : 1,
-                    color: granted ? (a === 'WRITE' ? '#9a3412' : '#075985') : '#c2c9d4',
-                    background: granted ? (a === 'WRITE' ? '#fff7ed' : '#f0f9ff') : '#f8fafc',
-                    borderColor: granted ? (a === 'WRITE' ? '#fed7aa' : '#bae6fd') : '#eef1f5',
+                    color: granted
+                      ? a === 'WRITE'
+                        ? 'var(--status-overdue-fg)'
+                        : 'var(--accent-press)'
+                      : 'var(--ink-200)',
+                    background: granted
+                      ? a === 'WRITE'
+                        ? 'var(--ink-0)7ed'
+                        : 'var(--accent-wash)'
+                      : 'var(--ink-50)',
+                    borderColor: granted
+                      ? a === 'WRITE'
+                        ? 'var(--status-warning-tint)'
+                        : 'var(--accent-wash)'
+                      : 'var(--ink-100)',
                   }}
                 >
                   {a === 'READ' ? 'R' : 'W'}
@@ -144,26 +169,25 @@ const RolesPermissions: React.FC = () => {
         title="Roles & Permissions"
         subtitle={`Access-control rulebook · ${roles?.length ?? 0} roles · ${modules.length} modules · live`}
       />
-      <Card variant="borderless" style={{ boxShadow: 'var(--shadow-card)' }} styles={{ body: { padding: 0 } }}>
-        <div style={{ padding: '16px 18px', borderBottom: '1px solid #eef1f5' }}>
+      <Card styles={{ body: { padding: 0 } }}>
+        <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--ink-100)' }}>
           <Input
-            prefix={<SearchOutlined style={{ color: '#9ca3af' }} />}
+            prefix={<SearchOutlined className="u-ink-400" />}
             placeholder="Search roles…"
             allowClear
             style={{ width: 260 }}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
-          <span style={{ marginLeft: 14, fontSize: 12, color: '#9ca3af' }}>
+          <span style={{ marginLeft: 14, fontSize: 12, color: 'var(--ink-400)' }}>
             Click R / W chips to grant or revoke. Changes apply immediately and are audited.
           </span>
         </div>
-        <Table<RoleRow>
+        <DataTable<RoleRow>
           dataSource={rows}
           columns={columns}
           rowKey="name"
           loading={loading}
-          size="middle"
           scroll={{ x: 230 + modules.length * 110 }}
           pagination={false}
         />

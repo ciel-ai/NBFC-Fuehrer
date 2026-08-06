@@ -15,8 +15,10 @@ import { Colors } from '@/src/core/theme/colors';
 import { Spacing, BorderRadius, Shadow } from '@/src/core/theme/spacing';
 import { Header } from '@/src/shared/components/common/Header';
 import { Button } from '@/src/shared/components/common/Button';
+import { useLoanConsent } from '@/src/features/loans/components/LoanConsentGate';
 
 export default function AffordableHousingScreen() {
+  const { ensureConsent, consentGate } = useLoanConsent();
   const details = [
     { label: 'Loan Amount', value: 'Up to ₹50 Lakhs' },
     { label: 'Tenure', value: 'Up to 30 Years' },
@@ -100,9 +102,10 @@ export default function AffordableHousingScreen() {
       <View style={styles.footer}>
         <Button
           title="Check Eligibility"
-          onPress={() => router.push('/(main)/apply/housing-apply')}
+          onPress={() => ensureConsent(() => router.push('/(main)/apply/housing-apply'))}
         />
       </View>
+      {consentGate}
     </SafeAreaView>
   );
 }

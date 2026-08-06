@@ -9,22 +9,29 @@ import { Spacing, BorderRadius, Shadow } from '@/src/core/theme/spacing';
 import { Header } from '@/src/shared/components/common/Header';
 import { Button } from '@/src/shared/components/common/Button';
 import { LoadingSpinner } from '@/src/shared/components/common/LoadingSpinner';
+import { ErrorView } from '@/src/shared/components/common/ErrorView';
 import { formatCurrency, formatDate } from '@/src/core/utils/formatters';
 import { useServices } from '@/src/core/services/ServiceProvider';
+import { resolveGoldApplicationId } from '@/src/core/utils/goldApplication';
 import type { GoldLoanAppraisalResult } from '@/src/entities/goldLoan';
 
+import { usePersistApplyStep } from '@/src/features/apply/useApplyDraft';
+
 export default function GoldLoanAppraisalResultScreen() {
+  usePersistApplyStep('gold');
   const params = useLocalSearchParams<Record<string, string>>();
   const { goldLoanService } = useServices();
+  const applicationId = resolveGoldApplicationId(params.applicationId);
   const [result, setResult] = useState<GoldLoanAppraisalResult | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(!!applicationId);
   const [isAccepting, setIsAccepting] = useState(false);
 
   useEffect(() => {
+    if (!applicationId) return;
     let mounted = true;
     const load = async () => {
       try {
-        const data = await goldLoanService.getAppraisalResult(params.applicationId ?? 'gold_mock_application');
+        const data = await goldLoanService.getAppraisalResult(applicationId);
         if (mounted) setResult(data);
       } catch {
         if (mounted) Alert.alert('Appraisal unavailable', 'Please try again later.');
@@ -36,7 +43,7 @@ export default function GoldLoanAppraisalResultScreen() {
     return () => {
       mounted = false;
     };
-  }, [goldLoanService, params.applicationId]);
+  }, [goldLoanService, applicationId]);
 
   const accept = async () => {
     if (!result) return;
@@ -57,6 +64,20 @@ export default function GoldLoanAppraisalResultScreen() {
       setIsAccepting(false);
     }
   };
+
+  if (!applicationId) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Header title="Appraisal Result" showBack />
+        <ErrorView
+          title="Application reference missing"
+          message="We could not find your application reference. Please go back and restart the application."
+          retryLabel="Go Back"
+          onRetry={() => router.back()}
+        />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>

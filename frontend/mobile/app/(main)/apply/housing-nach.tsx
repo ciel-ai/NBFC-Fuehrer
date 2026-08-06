@@ -10,11 +10,13 @@ import { Header } from '@/src/shared/components/common/Header';
 import { Button } from '@/src/shared/components/common/Button';
 import { formatCurrency } from '@/src/core/utils/formatters';
 import { useServices } from '@/src/core/services/ServiceProvider';
+import { useIdempotencyKey } from '@/src/core/api/idempotency';
 import type { HousingNachResult } from '@/src/entities/housingLoan';
 
 export default function HousingNachScreen() {
   const params = useLocalSearchParams<Record<string, string>>();
   const { housingLoanService } = useServices();
+  const { getKey } = useIdempotencyKey();
   const [accountNumber, setAccountNumber] = useState('');
   const [confirmAccount, setConfirmAccount] = useState('');
   const [ifsc, setIfsc] = useState('');
@@ -30,10 +32,11 @@ export default function HousingNachScreen() {
   const setupNach = async () => {
     setLoading(true);
     try {
-      const data = await housingLoanService.registerNach(params.applicationId ?? 'hl_mock', {
-        emi,
-        bankAccount: `****${accountNumber.slice(-4)}`,
-      });
+      const data = await housingLoanService.registerNach(
+        params.applicationId ?? 'hl_mock',
+        { emi, bankAccount: `****${accountNumber.slice(-4)}` },
+        getKey(),
+      );
       setResult(data);
     } catch {
       Alert.alert('NACH setup failed', 'Please try again.');

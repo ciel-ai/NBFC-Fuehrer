@@ -1,3 +1,4 @@
+import type { DocumentUploadResult } from '@/src/entities/document';
 import type { EMISchedule, Loan } from '@/src/entities/loan';
 import type {
   CdlAgentReviewDecision,
@@ -20,6 +21,8 @@ import type {
 export interface IConsumerDurableLoanService {
   // LOS
   submitApplication(input: CdlApplicationInput): Promise<CdlApplicationResult>;
+  /** Uploads a captured KYC/collateral document against the application. */
+  uploadDocument(applicationId: string, uri: string, type: string): Promise<DocumentUploadResult>;
   runKycChecks(applicationId: string): Promise<CdlKycResult>;
   runComplianceChecks(applicationId: string): Promise<CdlComplianceResult>;
   runCreditAssessment(
@@ -52,16 +55,22 @@ export interface IConsumerDurableLoanService {
   registerNachMandate(
     applicationId: string,
     input: { emi: number; bankAccount: string; autoDebitDate?: number },
+    idempotencyKey?: string,
   ): Promise<CdlNachResult>;
   disburseToMerchant(
     applicationId: string,
     input: { amount: number; merchantName: string },
+    idempotencyKey?: string,
   ): Promise<CdlDisbursalResult>;
 
   // LMS
   activateLoan(input: CdlApplicationInput & { loanAccountId: string }): Promise<Loan>;
   getEmiSchedule(loanId: string): Promise<EMISchedule[]>;
-  processManualPayment(loanId: string, emiId: string): Promise<CdlManualPaymentResult>;
+  processManualPayment(
+    loanId: string,
+    emiId: string,
+    idempotencyKey?: string,
+  ): Promise<CdlManualPaymentResult>;
   handlePaymentFailure(loanId: string, emiId: string): Promise<CdlPaymentFailure>;
   getOverdueStatus(loanId: string): Promise<CdlOverdueStatus>;
   closeLoan(loanId: string): Promise<CdlClosureResult>;

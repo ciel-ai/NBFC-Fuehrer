@@ -1,31 +1,26 @@
 // src/hooks/useDashboard.ts
 //
-// Live dashboard summary — same live-first / labelled-fallback convention
-// as useLms: fetch the real /dashboard/summary once; if the API is
-// unreachable the screen keeps its store-derived sample data and the
-// `live` flag lets it say so honestly.
+// Live dashboard summary. Fetches /dashboard/summary and keeps the screen's
+// store-derived sample data if the API cannot be reached — but reports WHY,
+// so the page can say so and offer a retry. See hooks/useLiveData.ts.
 
-import { useEffect, useState } from 'react';
-import { USE_MOCK } from '../config';
+import { useLiveData } from './useLiveData';
+import type { DataSource } from './useLiveData';
 import { dashboardApi } from '../api/dashboard.api';
 import type { DashboardSummary } from '../api/dashboard.api';
 
 export function useDashboardSummary(): {
   summary: DashboardSummary | null;
+  source: DataSource;
   live: boolean;
   loading: boolean;
+  error: string | null;
+  reload: () => void;
 } {
-  const [summary, setSummary] = useState<DashboardSummary | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data, source, loading, error, reload } = useLiveData<DashboardSummary | null>(
+    () => dashboardApi.getSummary(),
+    null,
+  );
 
-  useEffect(() => {
-    if (USE_MOCK) { setLoading(false); return; }
-    let alive = true;
-    dashboardApi.getSummary()
-      .then((s) => { if (alive) { setSummary(s); setLoading(false); } })
-      .catch(() => { if (alive) { setSummary(null); setLoading(false); } });
-    return () => { alive = false; };
-  }, []);
-
-  return { summary, live: summary !== null, loading };
+  return { summary: data, source, live: source === 'live', loading, error, reload };
 }

@@ -39,14 +39,15 @@ const STEPS = [
 ];
 
 export default function GoldLoanConfirmedScreen() {
-  const { branchName, branchAddress, date, slot, referenceId, applicationId } = useLocalSearchParams<{
+  const params = useLocalSearchParams<Record<string, string>>();
+  const { branchName, branchAddress, date, slot, referenceId, applicationId } = params as {
     branchName: string;
     branchAddress: string;
     date: string;
     slot: string;
     referenceId?: string;
     applicationId?: string;
-  }>();
+  };
 
   const circleScale = useSharedValue(0);
   const circleOpacity = useSharedValue(0);
@@ -191,6 +192,16 @@ export default function GoldLoanConfirmedScreen() {
       </ScrollView>
 
       <View style={styles.footer}>
+        <Button
+          title="View CAM Summary"
+          variant="outline"
+          onPress={() =>
+            router.push({
+              pathname: '/(main)/apply/application-summary',
+              params: { ...params, flow: 'gold' },
+            })
+          }
+        />
         <Button
           title="Track from My Loans"
           onPress={() => router.replace('/(main)/(tabs)/loans')}
@@ -364,6 +375,7 @@ const styles = StyleSheet.create({
 
   footer: {
     padding: Spacing.md,
+    gap: Spacing.sm,
     borderTopWidth: 1,
     borderTopColor: Colors.border,
     backgroundColor: Colors.background,
