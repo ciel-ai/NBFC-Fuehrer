@@ -142,16 +142,10 @@ export const cdlLoansController = {
         } catch (err) { next(err); }
     },
 
-    // Not touched — activateLoan still needs a real spec before it's worth
-    // validating input for (see Part 4 Step D of the finish-line guide;
-    // stays behind stubGuard()). No validation added here on purpose.
-    activateLoan: async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
-    try {
-        const userId = req.user!.id;
-        const result = cdlLoansService.activateLoan(userId, req.body);
-        res.status(200).json({ success: true, data: result });
-    } catch (err) {
-        next(err);
-    }
-},
+    // activateLoan (POST /loans) removed — loan activation is now automatic:
+    // disburseToMerchant transitions DISBURSED -> ACTIVE on synchronous
+    // payout confirmation, and disbursement.service.ts's
+    // _completeDisbursement does the same for the async (webhook-confirmed)
+    // case. Nothing else referenced this endpoint (checked src/, tests/,
+    // and the frontend before removing).
 };

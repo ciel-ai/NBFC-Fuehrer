@@ -18,11 +18,13 @@
 
 const mockFindApplicationByIdOrThrow = jest.fn();
 const mockCreateAccount = jest.fn();
+const mockUpdateAccountStatus = jest.fn();
 
 jest.mock('@/modules/loans/loans.repository', () => ({
     loansRepository: {
         findApplicationByIdOrThrow: (...args: unknown[]) => mockFindApplicationByIdOrThrow(...args),
         createAccount: (...args: unknown[]) => mockCreateAccount(...args),
+        updateAccountStatus: (...args: unknown[]) => mockUpdateAccountStatus(...args),
         findCustomerByUserId: jest.fn(),
         updateApplicationStatus: jest.fn(),
     },
@@ -99,7 +101,7 @@ jest.mock('@/providers/esign', () => ({
 }));
 
 import { cdlLoansService } from '@/modules/cdlLoans/cdlLoans.service';
-import { ValidationError } from '@/errors';
+import { ValidationError, LoanStateError } from '@/errors';
 
 // Same customer, two different loan applications — this is the crux of
 // the bug: both share userId 'user-1', but must be gated independently.
@@ -122,7 +124,11 @@ function approvedApplication(overrides: Partial<Record<string, unknown>> = {}) {
 describe('CDL disburseToMerchant — eSign/eStamp gate is per-application', () => {
     beforeEach(() => {
         jest.clearAllMocks();
-        mockCreateAccount.mockResolvedValue({ id: 'account-1' });
+        // status: 'DISBURSED' matches what loansRepository.createAccount
+        // actually sets at creation time in production — disburseToMerchant
+        // now reads account.status to activate the loan on sync-complete
+        // payouts (assertTransition needs a real, valid current status).
+        mockCreateAccount.mockResolvedValue({ id: 'account-1', status: 'DISBURSED' });
         mockCreateSchedule.mockResolvedValue(undefined);
         mockDisbursementsCreate.mockResolvedValue({ id: 'disb-1', utr_number: null, completed_at: null });
         mockCreatePayout.mockResolvedValue({ status: 'DONE', utrNumber: 'UTR123', payoutId: 'payout-1' });
@@ -141,6 +147,28 @@ describe('CDL disburseToMerchant — eSign/eStamp gate is per-application', () =
             expect.objectContaining({ where: { id: APP_1 } }),
         );
         expect(result.status).toBe('COMPLETED');
+    });
+
+    test('activation guard: assertTransition genuinely rejects activating an account that is not DISBURSED (not just decorative)', async () => {
+        // A malformed state that should never happen in practice (the
+        // account would normally be DISBURSED at this point) — exercises
+        // that assertTransition actually enforces LOAN_TRANSITIONS rather
+        // than unconditionally forcing ACTIVE.
+        mockFindApplicationByIdOrThrow.mockResolvedValue(approvedApplication({ id: APP_1 }));
+        mockLoanApplicationsFindUnique.mockResolvedValue({ esign_status: 'SIGNED', estamp_status: 'APPLIED' });
+        mockCreateAccount.mockResolvedValue({ id: 'account-1', status: 'CLOSED' });
+
+        await expect(
+            cdlLoansService.disburseToMerchant(APP_1, {
+                merchantName: 'Mobile World', amount: 24500, initiatedBy: 'finance-1',
+            }),
+        ).rejects.toThrow(LoanStateError);
+
+        // The disbursement-COMPLETED write and the activation attempt are
+        // sequential, not transactional, so the disbursement update does
+        // still happen (real money moved) — the account is what must NOT
+        // be force-activated when the transition is invalid.
+        expect(mockUpdateAccountStatus).not.toHaveBeenCalled();
     });
 
     test('(b) app #2: same customer as app #1, but its OWN agreement was never generated — disbursement is REJECTED, not silently allowed by app #1\'s signed status', async () => {

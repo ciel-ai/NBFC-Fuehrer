@@ -2,7 +2,6 @@
 import { Router } from 'express';
 import { cdlLoansController } from './cdlLoans.controller';
 import { requireAuth, allowRoles, validateBody, validateParams, validateAll } from '@/middlewares';
-import { stubGuard } from '@/middlewares/stubGuard.middleware';
 import { ROLE } from '@/config/constants';
 import {
     cdlSubmitApplicationSchema,
@@ -26,10 +25,13 @@ const A = ROLE.SUPER_ADMIN;
 // cdlLoansService.generateAgreement / completeESign, same pdfService +
 // docStorage + esign provider pipeline gold loans use. NOC generation is
 // real too now — same pdfService + docStorage pipeline, no eSign step —
-// see cdlLoansService.generateNoc. Every route below (except
-// activateLoan — see its own comment) now validates its :id param and
-// body via cdlLoans.dto.ts, same pattern loans.routes.ts already uses.
-router.post('/loans', requireAuth(), allowRoles(C, F), stubGuard(), cdlLoansController.activateLoan);
+// see cdlLoansService.generateNoc. Every route below now validates its
+// :id param and body via cdlLoans.dto.ts, same pattern loans.routes.ts
+// already uses.
+//
+// POST /loans (activateLoan) removed — activation is automatic now, see
+// disburseToMerchant (sync) and disbursement.service.ts's
+// _completeDisbursement (async webhook confirmation).
 router.post(
     '/applications',
     requireAuth(), allowRoles(C),
