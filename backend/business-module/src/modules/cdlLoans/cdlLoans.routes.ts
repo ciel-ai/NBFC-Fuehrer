@@ -1,9 +1,19 @@
-﻿// src/modules/cdlLoans/cdlLoans.routes.ts
+// src/modules/cdlLoans/cdlLoans.routes.ts
 import { Router } from 'express';
 import { cdlLoansController } from './cdlLoans.controller';
-import { requireAuth, allowRoles } from '@/middlewares';
+import { requireAuth, allowRoles, validateBody, validateParams, validateAll } from '@/middlewares';
 import { stubGuard } from '@/middlewares/stubGuard.middleware';
 import { ROLE } from '@/config/constants';
+import {
+    cdlSubmitApplicationSchema,
+    cdlCreditAssessmentSchema,
+    cdlCreditDecisionSchema,
+    cdlNachSchema,
+    cdlDisburseSchema,
+    cdlManualPaymentSchema,
+    cdlPaymentFailureSchema,
+    cdlIdParamSchema,
+} from './cdlLoans.dto';
 
 const router = Router();
 const C = ROLE.CUSTOMER;
@@ -16,29 +26,106 @@ const A = ROLE.SUPER_ADMIN;
 // cdlLoansService.generateAgreement / completeESign, same pdfService +
 // docStorage + esign provider pipeline gold loans use. NOC generation is
 // real too now — same pdfService + docStorage pipeline, no eSign step —
-// see cdlLoansService.generateNoc.
+// see cdlLoansService.generateNoc. Every route below (except
+// activateLoan — see its own comment) now validates its :id param and
+// body via cdlLoans.dto.ts, same pattern loans.routes.ts already uses.
 router.post('/loans', requireAuth(), allowRoles(C, F), stubGuard(), cdlLoansController.activateLoan);
-router.post('/applications', requireAuth(), allowRoles(C), cdlLoansController.submitApplication);
-router.post('/applications/:id/kyc', requireAuth(), allowRoles(C), cdlLoansController.runKycChecks);
-router.post('/applications/:id/compliance', requireAuth(), allowRoles(C), cdlLoansController.runComplianceChecks);
-router.post('/applications/:id/credit-assessment', requireAuth(), allowRoles(C), cdlLoansController.runCreditAssessment);
-router.post('/applications/:id/credit-decision', requireAuth(), allowRoles(C), cdlLoansController.getCreditDecision);
-router.post('/applications/:id/agreement', requireAuth(), allowRoles(C), cdlLoansController.generateAgreement);
-router.post('/applications/:id/esign', requireAuth(), allowRoles(C), cdlLoansController.completeESign);
-router.post('/applications/:id/nach', requireAuth(), allowRoles(C), cdlLoansController.registerNachMandate);
+router.post(
+    '/applications',
+    requireAuth(), allowRoles(C),
+    validateBody(cdlSubmitApplicationSchema),
+    cdlLoansController.submitApplication,
+);
+router.post(
+    '/applications/:id/kyc',
+    requireAuth(), allowRoles(C),
+    validateParams(cdlIdParamSchema),
+    cdlLoansController.runKycChecks,
+);
+router.post(
+    '/applications/:id/compliance',
+    requireAuth(), allowRoles(C),
+    validateParams(cdlIdParamSchema),
+    cdlLoansController.runComplianceChecks,
+);
+router.post(
+    '/applications/:id/credit-assessment',
+    requireAuth(), allowRoles(C),
+    ...validateAll({ params: cdlIdParamSchema, body: cdlCreditAssessmentSchema }),
+    cdlLoansController.runCreditAssessment,
+);
+router.post(
+    '/applications/:id/credit-decision',
+    requireAuth(), allowRoles(C),
+    ...validateAll({ params: cdlIdParamSchema, body: cdlCreditDecisionSchema }),
+    cdlLoansController.getCreditDecision,
+);
+router.post(
+    '/applications/:id/agreement',
+    requireAuth(), allowRoles(C),
+    validateParams(cdlIdParamSchema),
+    cdlLoansController.generateAgreement,
+);
+router.post(
+    '/applications/:id/esign',
+    requireAuth(), allowRoles(C),
+    validateParams(cdlIdParamSchema),
+    cdlLoansController.completeESign,
+);
+router.post(
+    '/applications/:id/nach',
+    requireAuth(), allowRoles(C),
+    ...validateAll({ params: cdlIdParamSchema, body: cdlNachSchema }),
+    cdlLoansController.registerNachMandate,
+);
 // disburseToMerchant is real, wired code (real payment provider call, real
 // disbursements row) — stubGuard() was blocking it unconditionally (see
 // env.ts ENABLE_UNWIRED_LOAN_STUBS fix), which made this endpoint
 // unreachable in every environment, not just production.
-router.post('/applications/:id/disburse', requireAuth(), allowRoles(F, A), cdlLoansController.disburseToMerchant);
-router.get('/loans/:id/emi-schedule', requireAuth(), allowRoles(C), cdlLoansController.getEmiSchedule);
-router.post('/loans/:id/payments', requireAuth(), allowRoles(C), cdlLoansController.processManualPayment);
-router.post('/loans/:id/payment-failure', requireAuth(), allowRoles(C), cdlLoansController.handlePaymentFailure);
-router.get('/loans/:id/overdue', requireAuth(), allowRoles(C, F), cdlLoansController.getOverdueStatus);
-router.post('/loans/:id/close', requireAuth(), allowRoles(C, F), cdlLoansController.closeLoan);
+router.post(
+    '/applications/:id/disburse',
+    requireAuth(), allowRoles(F, A),
+    ...validateAll({ params: cdlIdParamSchema, body: cdlDisburseSchema }),
+    cdlLoansController.disburseToMerchant,
+);
+router.get(
+    '/loans/:id/emi-schedule',
+    requireAuth(), allowRoles(C),
+    validateParams(cdlIdParamSchema),
+    cdlLoansController.getEmiSchedule,
+);
+router.post(
+    '/loans/:id/payments',
+    requireAuth(), allowRoles(C),
+    ...validateAll({ params: cdlIdParamSchema, body: cdlManualPaymentSchema }),
+    cdlLoansController.processManualPayment,
+);
+router.post(
+    '/loans/:id/payment-failure',
+    requireAuth(), allowRoles(C),
+    ...validateAll({ params: cdlIdParamSchema, body: cdlPaymentFailureSchema }),
+    cdlLoansController.handlePaymentFailure,
+);
+router.get(
+    '/loans/:id/overdue',
+    requireAuth(), allowRoles(C, F),
+    validateParams(cdlIdParamSchema),
+    cdlLoansController.getOverdueStatus,
+);
+router.post(
+    '/loans/:id/close',
+    requireAuth(), allowRoles(C, F),
+    validateParams(cdlIdParamSchema),
+    cdlLoansController.closeLoan,
+);
 // generateNoc is real now (pdfService + docStorage, gated on the loan
 // actually being CLOSED) — stubGuard() removed, same as disburseToMerchant
 // above.
-router.post('/loans/:id/noc', requireAuth(), allowRoles(C), cdlLoansController.generateNoc);
+router.post(
+    '/loans/:id/noc',
+    requireAuth(), allowRoles(C),
+    validateParams(cdlIdParamSchema),
+    cdlLoansController.generateNoc,
+);
 
 export { router as cdlLoansRouter };

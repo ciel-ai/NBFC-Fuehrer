@@ -25,8 +25,12 @@ const log = createModuleLogger('cdlLoans.service');
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
+// Exported (not just for this file's own use) so cdlLoans.dto.ts's Joi
+// schemas can validate against the exact same bounds instead of
+// duplicating literal numbers that could drift out of sync.
+
 // Discrete allowed rates per employment type — per client spec, not a range.
-const CDL_INTEREST_RATES: Record<'SALARIED' | 'SELF_EMPLOYED' | 'STUDENT', number[]> = {
+export const CDL_INTEREST_RATES: Record<'SALARIED' | 'SELF_EMPLOYED' | 'STUDENT', number[]> = {
     SALARIED: [0, 13, 14],
     SELF_EMPLOYED: [0, 14, 15],
     // Client's rate table only covers Salaried/Self-Employed — STUDENT has
@@ -42,11 +46,11 @@ const CDL_PROCESSING_FEE_TIERS: { max: number; fee: number }[] = [
     { max: 100000, fee: 2466 },
 ];
 
-const CDL_MIN_LOAN_AMOUNT = 7000;
-const CDL_MAX_LOAN_AMOUNT = 100000;
-const CDL_MIN_TENURE_MONTHS = 6;
-const CDL_MAX_TENURE_MONTHS = 12;
-const CDL_AUTO_DEBIT_DATES = [4, 7, 12];
+export const CDL_MIN_LOAN_AMOUNT = 7000;
+export const CDL_MAX_LOAN_AMOUNT = 100000;
+export const CDL_MIN_TENURE_MONTHS = 6;
+export const CDL_MAX_TENURE_MONTHS = 12;
+export const CDL_AUTO_DEBIT_DATES = [4, 7, 12];
 const CDL_FOIR_LIMIT = 60; // per this CDL-specific spec (platform default elsewhere is 55%)
 
 function getCdlInterestRate(employmentType: keyof typeof CDL_INTEREST_RATES, requested?: number): number {
