@@ -127,7 +127,11 @@ export const cdlLoansController = {
     async generateNoc(req: AuthRequest, res: Response, next: NextFunction) {
         try {
             const id = req.params['id'] as string;
-            const result = cdlLoansService.generateNoc(id);
+            // generateNoc is real/async now — was previously called without
+            // await (harmless while it was a synchronous fake; would have
+            // serialized an empty object once it became async, same bug
+            // found live in housingLoans.controller.ts's generateNoc).
+            const result = await cdlLoansService.generateNoc(id);
             res.status(HTTP.OK).json(successResponse(result));
         } catch (err) { next(err); }
     },

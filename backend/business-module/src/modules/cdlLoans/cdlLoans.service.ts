@@ -1,8 +1,7 @@
 ﻿// src/modules/cdlLoans/cdlLoans.service.ts
 import { createModuleLogger } from '@/config/logger';
-import { env } from '@/config/env';
 import { prisma } from '@/config/database';
-import { ValidationError, NotFoundError } from '@/errors';
+import { ValidationError, NotFoundError, LoanStateError } from '@/errors';
 import { computeMonthlyEmi } from '@/modules/emi/emi.calculator';
 import { emiService } from '@/modules/emi';
 import { loansRepository } from '@/modules/loans/loans.repository';
@@ -688,6 +687,15 @@ export const cdlLoansService = {
     // correct and tested for gold/CDL via the shared calculator. ────────────
     async closeLoan(loanId: string): Promise<CdlClosureResult> {
         const account = await loansRepository.findAccountByIdOrThrow(loanId);
+
+        // Same check housingLoans.service.ts's closeLoan already has —
+        // this one had no equivalent, so it closed unconditionally
+        // regardless of remaining balance.
+        const summary = await emiService.getSummary(loanId);
+        if (summary.totalOutstanding > 0) {
+            throw new LoanStateError(loanId, account.status, LOAN_STATUS.CLOSED);
+        }
+
         const quote = await emiService.getForeclosureQuote(loanId, account.interestRate);
 
         await loansRepository.updateAccountStatus(loanId, LOAN_STATUS.CLOSED, { closed_at: new Date() });
@@ -709,13 +717,31 @@ export const cdlLoansService = {
         return { loanId: `cdl_loan_${Date.now()}`, status: 'ACTIVE', activatedAt: new Date().toISOString(), ...input };
     },
 
-    // Still stub — needs the same pdfService + docStorage pipeline
-    // generateAgreement now uses (no eSign step required for a NOC). Route
-    // stays behind stubGuard(). See Part 4 Step C.
-    generateNoc(loanId: string): { nocRef: string; nocS3Url: string } {
+    // ── Real: pdfService.generateNoc already exists (housing loans already
+    // use it) — this was just never actually calling it. Same pattern as
+    // housingLoans.service.ts's generateNoc. ─────────────────────────────────
+    async generateNoc(loanId: string): Promise<{ nocRef: string; nocS3Url: string }> {
+        const account = await loansRepository.findAccountByIdOrThrow(loanId);
+        if (account.status !== LOAN_STATUS.CLOSED) {
+            throw new LoanStateError(loanId, account.status, LOAN_STATUS.CLOSED);
+        }
+
+        const pdfBuffer = await pdfService.generateNoc(loanId);
+
+        const docStorage = getDocStorageProvider();
+        const s3Key = `noc/cdl_${loanId}.pdf`;
+        await docStorage.upload({
+            key: s3Key,
+            fileBuffer: pdfBuffer,
+            contentType: 'application/pdf',
+        });
+        const { url } = await docStorage.getSignedUrl(s3Key);
+
+        log.info('CDL NOC generated', { loanId });
+
         return {
             nocRef: `NOC-CDL-${loanId}-${Date.now()}`,
-            nocS3Url: `https://${env.aws.s3Bucket}.s3.${env.aws.region}.amazonaws.com/noc/cdl_${loanId}.pdf`,
+            nocS3Url: url,
         };
     },
 };

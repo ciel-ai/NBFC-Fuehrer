@@ -254,7 +254,14 @@ export const housingLoansController = {
             const account = await loansRepository.findAccountByIdOrThrow(id);
             assertAccountOwnership(user.id, account, user.role, 'housing loan account');
 
-            const result = housingLoansService.generateNoc(id);
+            // Found while building CDL's generateNoc off this function as a
+            // template: generateNoc is async and was being called without
+            // await here, so successResponse() wrapped an unresolved
+            // Promise — res.json() would have serialized it as `{}`, and
+            // the PDF/upload work ran fire-and-forget, detached from the
+            // request (an error inside it would have been an unhandled
+            // rejection, which crashes the process — see server.ts).
+            const result = await housingLoansService.generateNoc(id);
             res.status(HTTP.OK).json(successResponse(result));
         } catch (err) { next(err); }
     },
