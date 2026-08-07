@@ -11,6 +11,7 @@ import { emiService } from '@/modules/emi';
 import { accountingService } from '@/modules/accounting/accounting.service';
 import { getPaymentProvider } from '@/providers';
 import { generateLoanAccountNumber } from '@/utils/referenceNumber.util';
+import { assertTransition } from '@/utils/loanStateMachine.util';
 import {
     getRedisClient,
     RedisKeys,
@@ -23,6 +24,7 @@ import {
     DISBURSEMENT_MODE,
     AUDIT_ACTION,
     KYC_STATUS,
+    PRODUCT_TYPE,
 } from '@/config/constants';
 import { roundRupees, toNumber } from '@/types/common.types';
 import { env } from '@/config/env';
@@ -463,10 +465,28 @@ export const disbursementService = {
         }
     },
 
-    // ── 4. Core completion — atomically creates account + EMI schedule ────────
+    // ── 4. Core completion ──────────────────────────────────────────────────
     // This is the most critical path in the entire platform.
-    // Uses withTransaction so loan account + EMI schedule are created together.
-    // If either fails, both roll back — no orphaned records.
+    //
+    // Two paths, branched on whether a loan_accounts row already exists for
+    // this application:
+    //
+    //   PATH A — account already exists (CDL only, today). CDL's
+    //   disburseToMerchant creates the account + EMI schedule synchronously,
+    //   inline, before the payment provider is even called — this function
+    //   is only reached for CDL because that payout wasn't confirmed
+    //   synchronously (status was left INITIATED). The original version of
+    //   this function unconditionally created a NEW account here regardless
+    //   — for CDL that collided with loan_accounts.application_id's unique
+    //   constraint, which rolled back the disbursement-COMPLETED update and
+    //   the GL posting along with it (that GL posting was the ONLY place
+    //   any CDL disbursement ever posted one — cdlLoans.service.ts doesn't).
+    //   Razorpay would then retry the identical failure for ~24h before the
+    //   dead-letter job merely flagged it, never fixed it. Found via a live
+    //   trace of findByPayoutId → processPayoutWebhook → here.
+    //
+    //   PATH B — no account yet (gold/housing, unchanged from the original
+    //   behavior other than the productType branch added below).
 
     async _completeDisbursement(
         record: DisbursementRecord,
@@ -476,12 +496,146 @@ export const disbursementService = {
     ): Promise<DisbursementResponse> {
         const disbursedAt = new Date();
 
+        const existingAccount = await loansRepository.findAccountByApplicationId(loan.id);
+
+        if (existingAccount) {
+            await this._completeDisbursementForExistingAccount(
+                record, loan, existingAccount, utrNumber, disbursedAt, req,
+            );
+        } else {
+            await this._completeDisbursementByCreatingAccount(
+                record, loan, utrNumber, disbursedAt, req,
+            );
+        }
+
+        const finalRecord = await disbursementRepository.findByIdOrThrow(record.id);
+        return toResponse(finalRecord);
+    },
+
+    // ── 4a. PATH A — account already exists (CDL's synchronous-create case) ──
+    // No new account, no new EMI schedule — both already exist, created by
+    // CDL's own disburseToMerchant. Only: mark the disbursement COMPLETED,
+    // post the GL entry (the fix for the gap described above), and activate
+    // the loan (guarded by assertTransition, same as the synchronous path
+    // in cdlLoans.service.ts uses — this function can be reached more than
+    // once in theory, e.g. a duplicate webhook delivery arriving after the
+    // lock window, so the guard is real, not decorative).
+
+    async _completeDisbursementForExistingAccount(
+        record: DisbursementRecord,
+        loan: Awaited<ReturnType<typeof loansRepository.findApplicationByIdOrThrow>>,
+        existingAccount: NonNullable<Awaited<ReturnType<typeof loansRepository.findAccountByApplicationId>>>,
+        utrNumber: string,
+        disbursedAt: Date,
+        req: Request,
+    ): Promise<void> {
+        await prisma.$transaction(async (tx) => {
+            await tx.disbursements.update({
+                where: { id: record.id },
+                data: {
+                    status: 'COMPLETED',
+                    utr_number: utrNumber,
+                    loan_account_id: existingAccount.id,
+                    completed_at: disbursedAt,
+                    updated_at: new Date(),
+                },
+            });
+
+            await accountingService.postDisbursement({
+                disbursementId: record.id,
+                loanAccountId:  existingAccount.id,
+                productType:    loan.productType,
+                amount:         record.principalAmount,
+                postedBy:       record.initiatedBy,
+            }, tx);
+
+            // Guarded, not assumed — this function only runs while the
+            // disbursement was still INITIATED, so the account should
+            // still be DISBURSED, but assert it the same way
+            // cdlLoans.service.ts's synchronous activation does rather
+            // than skip the check.
+            if (existingAccount.status !== LOAN_STATUS.ACTIVE) {
+                assertTransition(existingAccount.id, existingAccount.status, LOAN_STATUS.ACTIVE);
+                await tx.loan_accounts.update({
+                    where: { id: existingAccount.id },
+                    data: { status: LOAN_STATUS.ACTIVE, updated_at: new Date() },
+                });
+            }
+
+            // Same as Path B — application-level bookkeeping that disbursal
+            // happened, independent of the account-level ACTIVE/DISBURSED
+            // distinction.
+            await tx.loan_applications.update({
+                where: { id: loan.id },
+                data: { status: LOAN_STATUS.DISBURSED, updated_at: new Date() },
+            });
+        });
+
+        setAuditContext(req, {
+            action: AUDIT_ACTION.LOAN_DISBURSED,
+            entityType: 'loan_accounts',
+            entityId: existingAccount.id,
+            after: {
+                accountNumber: existingAccount.accountNumber,
+                principalAmount: existingAccount.principalAmount,
+                interestRate: existingAccount.interestRate,
+                tenureMonths: existingAccount.tenureMonths,
+                monthlyEmi: existingAccount.monthlyEmi,
+                utrNumber,
+            },
+        });
+
+        disbursementEvents.completed({
+            disbursementId: record.id,
+            loanId: record.loanId,
+            loanAccountId: existingAccount.id,
+            userId: record.userId,
+            agentId: loan.agentId,
+            amount: record.netDisbursedAmount,
+            utrNumber,
+            requestId: req.requestId,
+        });
+
+        log.info('Disbursement fully completed (existing account activated)', {
+            disbursementId: record.id,
+            loanAccountId: existingAccount.id,
+            accountNumber: existingAccount.accountNumber,
+            utrNumber,
+        });
+    },
+
+    // ── 4b. PATH B — no account yet (gold/housing) ─────────────────────────
+    // Unchanged from the original behavior, other than the productType
+    // branch: gold loans are created directly as ACTIVE (by the time this
+    // runs, the webhook has already confirmed the payout — no reason to
+    // pass through DISBURSED even momentarily). Housing loans are
+    // unaffected — still DISBURSED, still waiting on the manual
+    // activateLoan call (builder-disbursement confirmation is a real,
+    // distinct business step for housing, not just bookkeeping).
+
+    async _completeDisbursementByCreatingAccount(
+        record: DisbursementRecord,
+        loan: Awaited<ReturnType<typeof loansRepository.findApplicationByIdOrThrow>>,
+        utrNumber: string,
+        disbursedAt: Date,
+        req: Request,
+    ): Promise<void> {
         // ── Fetch approved terms from underwriting ────────────────────────────
         const uwReport = await underwritingRepository.findLatestByLoanId(loan.id);
 
         const interestRate = uwReport?.recommendedRate ?? 18;
         const tenureMonths = loan.tenureMonths;
         const principalAmount = record.principalAmount;
+
+        // Gold loans skip DISBURSED entirely — "money confirmed moved" and
+        // "loan should activate" are the same event for a single-shot
+        // merchant/customer payout. Housing loans disburse to a builder in
+        // tranches, where a distinct real-world confirmation legitimately
+        // exists between "money moved" and "loan should be servicing" —
+        // stays DISBURSED, unchanged.
+        const initialStatus = loan.productType === PRODUCT_TYPE.GOLD_LOAN
+            ? LOAN_STATUS.ACTIVE
+            : LOAN_STATUS.DISBURSED;
 
         // ── Atomically: create loan account + update disbursement + update loan ─
         // All three writes succeed together or all roll back.
@@ -506,7 +660,7 @@ export const disbursementService = {
                     monthly_emi: 0, // Updated after EMI schedule creation
                     outstanding_balance: principalAmount,
                     total_interest: 0, // Updated after EMI schedule creation
-                    status: LOAN_STATUS.DISBURSED,
+                    status: initialStatus,
                     disbursed_at: disbursedAt,
                     created_at: new Date(),
                     updated_at: new Date(),
@@ -524,7 +678,7 @@ export const disbursementService = {
                 monthlyEmi: 0,
                 outstandingBalance: toNumber(accountRow.outstanding_balance),
                 totalInterest: 0,
-                status: LOAN_STATUS.DISBURSED,
+                status: initialStatus,
                 repaymentMode: DISBURSEMENT_MODE.IMPS,
                 razorpayMandateId: null,
                 disbursedAt,
@@ -642,9 +796,6 @@ export const disbursementService = {
             monthlyEmi: emiSchedule.monthlyEmi,
             firstEmiDate: emiSchedule.firstEmiDate,
         });
-
-        const finalRecord = await disbursementRepository.findByIdOrThrow(record.id);
-        return toResponse(finalRecord);
     },
 
     // ── 5. Retry failed disbursement ───────────────────────────────────────────

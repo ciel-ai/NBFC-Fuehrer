@@ -11,6 +11,7 @@ import { pdfService } from '@/modules/documents/pdf.service';
 import { getDocStorageProvider } from '@/providers/docStorage';
 import { getEncryptionProvider } from '@/providers/encryption';
 import { getESignProvider } from '@/providers/esign';
+import { assertTransition } from '@/utils/loanStateMachine.util';
 import { LOAN_STATUS, PRODUCT_TYPE, BUSINESS_RULES } from '@/config/constants';
 import type {
     CdlApplicationInput, CdlApplicationResult,
@@ -593,6 +594,24 @@ export const cdlLoansService = {
             },
         });
 
+        // CDL disburses to the merchant in a single shot — "money confirmed
+        // moved" and "loan should activate" are the same event, unlike
+        // housing loans' tranche-based builder disbursement (a real,
+        // distinct confirmation step there). Only activate on genuine
+        // synchronous completion; the async case (isSyncComplete false)
+        // is activated later by disbursement.service.ts's
+        // _completeDisbursement once the payout webhook confirms it —
+        // that function looks up this same account by application_id and
+        // does not create a second one for CDL.
+        //
+        // Guarded, not assumed, even though DISBURSED→ACTIVE is the only
+        // legal move from here — same safety pattern
+        // housingLoans.service.ts's activateLoan already uses.
+        if (isSyncComplete) {
+            assertTransition(account.id, account.status, LOAN_STATUS.ACTIVE);
+            await loansRepository.updateAccountStatus(account.id, LOAN_STATUS.ACTIVE);
+        }
+
         log.info('CDL disbursed to merchant', {
             applicationId,
             accountId: account.id,
@@ -711,14 +730,6 @@ export const cdlLoansService = {
             closedAt: new Date().toISOString(),
             note: 'CDL closed successfully.',
         };
-    },
-
-    // Still stub — disconnected from the rest of the CDL flow (doesn't take
-    // an application ID, invents a random loan). Needs a real spec before
-    // it's touched — see Part 4 Step D of the finish-line guide. Route
-    // stays behind stubGuard().
-    activateLoan(userId: string, input: Record<string, unknown>) {
-        return { loanId: `cdl_loan_${Date.now()}`, status: 'ACTIVE', activatedAt: new Date().toISOString(), ...input };
     },
 
     // ── Real: pdfService.generateNoc already exists (housing loans already
