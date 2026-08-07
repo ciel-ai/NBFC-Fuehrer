@@ -286,11 +286,12 @@ export const cdlLoansService = {
 
     // ── Real: generates an actual PDF (pdfService), uploads it to real
     // document storage, and opens a real Signzy eSign request — same
-    // pattern goldLoans.generateAgreement already uses. The eSign
-    // request/status is stored on kyc_documents (not loan_applications),
-    // matching where the existing eSign webhook (POST /webhooks/esign,
-    // /webhooks/signzy → kycService.processESignCallback) already looks it
-    // up — no webhook changes needed to wire this up. ─────────────────────────
+    // pattern goldLoans.generateAgreement already uses. eSign/eStamp
+    // request/status is stored on loan_applications (per-application —
+    // see the migration fixing the per-user-vs-per-application bug,
+    // 919f711), which the eSign webhook (POST /webhooks/esign,
+    // /webhooks/signzy → kycService.processESignCallback) has also been
+    // repointed at. ─────────────────────────────────────────────────────────
     async generateAgreement(applicationId: string): Promise<CdlAgreementResult> {
         log.info('Generating CDL agreement', { applicationId });
 
@@ -332,8 +333,12 @@ export const cdlLoansService = {
             purpose: 'Consumer Durable Loan Agreement Signature',
         });
 
-        await prisma.kyc_documents.update({
-            where: { user_id: application.user_id },
+        // esign_request_id/esign_status live on loan_applications, not
+        // kyc_documents — per-AGREEMENT state (one row per application),
+        // not per-user identity data. Fixed alongside the per-user-vs-
+        // per-application eSign/eStamp bug (919f711 + the migration after it).
+        await prisma.loan_applications.update({
+            where: { id: applicationId },
             data: {
                 esign_request_id: signRequest.requestId,
                 esign_status: signRequest.status,
@@ -361,20 +366,18 @@ export const cdlLoansService = {
     async completeESign(applicationId: string): Promise<CdlAgreementResult> {
         log.info('Checking eSign completion for CDL', { applicationId });
 
+        // esign_request_id/esign_status/estamp_id/estamp_status are on this
+        // same row now — no separate kyc_documents lookup needed for them.
         const application = await prisma.loan_applications.findUniqueOrThrow({
             where: { id: applicationId },
         });
 
-        const kyc = await prisma.kyc_documents.findUniqueOrThrow({
-            where: { user_id: application.user_id },
-        });
-
-        if (!kyc.esign_request_id) {
+        if (!application.esign_request_id) {
             throw new ValidationError('applicationId', 'No eSign request found — call the agreement step first');
         }
 
         const esign = getESignProvider();
-        const signStatus = await esign.getSignStatus(kyc.esign_request_id);
+        const signStatus = await esign.getSignStatus(application.esign_request_id);
 
         if (signStatus.status !== 'SIGNED') {
             return {
@@ -382,7 +385,7 @@ export const cdlLoansService = {
                 agreementId: `agreements/cdl/${applicationId}.pdf`,
                 agreementUrl: '',
                 status: 'PENDING',
-                eSignRequestId: kyc.esign_request_id,
+                eSignRequestId: application.esign_request_id,
                 stampDutyAmount: 100,
                 note: `Signing not yet complete — current status: ${signStatus.status}.`,
             };
@@ -394,12 +397,12 @@ export const cdlLoansService = {
         });
 
         const stampResult = await esign.applyEStamp({
-            requestId: kyc.esign_request_id,
+            requestId: application.esign_request_id,
             loanAmountRupees: Number(application.approved_amount ?? application.amount_requested),
             stateCode: customer?.state?.slice(0, 2).toUpperCase() ?? 'KA', // Placeholder mapping — pending a real state-name-to-code table, same as gold loan
         });
 
-        const signedDoc = await esign.getSignedDocument(kyc.esign_request_id);
+        const signedDoc = await esign.getSignedDocument(application.esign_request_id);
         const docStorage = getDocStorageProvider();
         const signedS3Key = `agreements/cdl/${applicationId}_signed.pdf`;
         await docStorage.upload({
@@ -409,15 +412,11 @@ export const cdlLoansService = {
         });
         const { url: agreementUrl } = await docStorage.getSignedUrl(signedS3Key);
 
-        await prisma.kyc_documents.update({
-            where: { user_id: application.user_id },
+        await prisma.loan_applications.update({
+            where: { id: applicationId },
             data: {
                 esign_status: 'SIGNED',
                 signed_agreement_s3_key: signedS3Key,
-                // Previously stampResult was used only for the response's
-                // stampDutyAmount and then discarded — nothing persisted
-                // whether the eStamp actually succeeded, so disburseToMerchant
-                // below could not verify it before releasing funds.
                 estamp_id: stampResult.stampId,
                 estamp_status: stampResult.status,
                 updated_at: new Date(),
@@ -431,7 +430,7 @@ export const cdlLoansService = {
             agreementId: signedS3Key,
             agreementUrl,
             status: 'SIGNED',
-            eSignRequestId: kyc.esign_request_id,
+            eSignRequestId: application.esign_request_id,
             stampDutyAmount: stampResult.stampDutyRupees ?? 100,
             note: 'Agreement signed & stored. Proceeding to NACH setup.',
         };
@@ -486,30 +485,20 @@ export const cdlLoansService = {
 
         // RBI Digital Lending Guidelines 2022: no disbursement without a
         // signed AND stamped agreement — see providers/esign/interface.ts.
-        // Was not checked at all before, because generateAgreement was a
-        // stub with nothing real to check against.
         //
-        // ⚠️ KNOWN GAP (proven via live testing, not yet fixed): esign_status
-        // /estamp_status live on kyc_documents, which is ONE ROW PER USER,
-        // not per application. A customer with an already-signed prior loan
-        // (any product — this same pattern exists in goldLoans.service.ts
-        // and the shared disbursement.service.ts) will pass this check for
-        // a BRAND NEW, never-signed application, because it reads the same
-        // shared row. Confirmed live: app #1 signed+disbursed correctly;
-        // app #2 (same customer, agreement never generated) disbursed
-        // anyway. Real fix needs esign/estamp tracked per-application (or
-        // a dedicated agreements table), which also means moving the
-        // POST /webhooks/esign lookup (kycService.processESignCallback,
-        // currently keyed by user via kyc_documents) — do not ship this
-        // check as sufficient for a repeat-customer population.
-        const kyc = await prisma.kyc_documents.findUnique({
-            where: { user_id: application.userId },
+        // RESOLVED (was a per-user-vs-per-application bug — see commit
+        // 919f711 for the original find and the migration that followed
+        // it): esign_status/estamp_status now live on loan_applications,
+        // one row per application, so this check can no longer be
+        // satisfied by a different loan belonging to the same customer.
+        const agreementStatus = await prisma.loan_applications.findUnique({
+            where: { id: applicationId },
             select: { esign_status: true, estamp_status: true },
         });
-        if (kyc?.esign_status !== 'SIGNED') {
+        if (agreementStatus?.esign_status !== 'SIGNED') {
             throw new ValidationError('applicationId', 'Loan agreement must be signed (eSign) before disbursement can proceed');
         }
-        if (kyc?.estamp_status !== 'APPLIED') {
+        if (agreementStatus?.estamp_status !== 'APPLIED') {
             throw new ValidationError('applicationId', 'Loan agreement must be eStamped before disbursement can proceed');
         }
 

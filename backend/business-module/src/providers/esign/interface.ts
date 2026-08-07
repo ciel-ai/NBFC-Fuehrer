@@ -55,7 +55,9 @@ export interface CreateSignRequestInput {
 }
 
 export interface CreateSignRequestResult {
-    /** Vendor-assigned request ID — store in kyc_documents.esign_request_id */
+    /** Vendor-assigned request ID — store in loan_applications.esign_request_id
+     *  (per-application, not kyc_documents — see commit 919f711 and the
+     *  migration that followed it). */
     requestId: string;
 
     /** URL to send the customer for signing (redirect or in-app WebView) */

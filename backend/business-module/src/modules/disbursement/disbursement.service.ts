@@ -82,9 +82,17 @@ export const disbursementService = {
     ): Promise<DisbursementChecklistResponse> {
         const loan = await loansRepository.findApplicationByIdOrThrow(loanId);
 
-        const [kycDoc, underwritingReport, existingDisbursement] =
+        // esign_status/estamp_status live on loan_applications (per
+        // application), not kyc_documents (per user) — see commit 919f711
+        // and the migration that followed it. kycDoc is still fetched for
+        // the genuinely per-user KYC-completeness gate below.
+        const [kycDoc, agreementStatus, underwritingReport, existingDisbursement] =
             await Promise.all([
                 kycRepository.findByUserId(loan.userId),
+                prisma.loan_applications.findUnique({
+                    where: { id: loanId },
+                    select: { esign_status: true, estamp_status: true },
+                }),
                 underwritingRepository.findLatestByLoanId(loanId),
                 disbursementRepository.findByLoanId(loanId),
             ]);
@@ -92,8 +100,8 @@ export const disbursementService = {
         const checklist: DisbursementChecklist = {
             loanApproved: loan.status === LOAN_STATUS.APPROVED,
             kycComplete: kycDoc?.overallStatus === KYC_STATUS.COMPLETE,
-            eSignComplete: kycDoc?.eSignStatus === 'SIGNED',
-            eStampComplete: kycDoc?.eStampStatus === 'APPLIED',
+            eSignComplete: agreementStatus?.esign_status === 'SIGNED',
+            eStampComplete: agreementStatus?.estamp_status === 'APPLIED',
             underwritingPassed: underwritingReport?.decision === 'APPROVED' ||
                 underwritingReport?.decision === 'REFERRED',
             noDuplicatePayout: !existingDisbursement ||
@@ -185,31 +193,28 @@ export const disbursementService = {
             );
         }
 
-        // ── Gate 4: eSign complete ────────────────────────────────────────────
+        // esign_status/estamp_status live on loan_applications (per
+        // application), not kyc_documents (per user) — the row is fetched
+        // once here and used for both Gate 4 and Gate 4b below.
         //
-        // ⚠️ KNOWN GAP (proven via live CDL testing, not yet fixed here):
-        // eSignStatus/eStampStatus live on kyc_documents, which is ONE ROW
-        // PER USER, not per loan application. A customer with an
-        // already-signed prior loan (any product) will pass Gate 4/4b for
-        // a BRAND NEW, never-signed application, because this reads the
-        // same shared row. Confirmed live in cdlLoansService's identical
-        // check (see cdlLoans.service.ts disburseToMerchant): a second
-        // application for a customer who'd already signed a first one
-        // disbursed without ever generating its own agreement. Real fix
-        // needs esign/estamp tracked per-application (or a dedicated
-        // agreements table), which also means moving the
-        // POST /webhooks/esign lookup (kycService.processESignCallback,
-        // currently keyed by user via kyc_documents). Do not treat these
-        // gates as sufficient for a repeat-customer population.
-        if (kycDoc.eSignStatus !== 'SIGNED') {
+        // RESOLVED (was a per-user-vs-per-application bug — see commit
+        // 919f711 for the original find and the migration that followed
+        // it): a customer's already-signed prior loan can no longer
+        // satisfy these gates for a different, never-signed application.
+        const agreementStatus = await prisma.loan_applications.findUnique({
+            where: { id: loanId },
+            select: { esign_status: true, estamp_status: true },
+        });
+
+        // ── Gate 4: eSign complete ────────────────────────────────────────────
+        if (agreementStatus?.esign_status !== 'SIGNED') {
             throw new ESignNotCompletedError(loanId);
         }
 
         // ── Gate 4b: eStamp applied ────────────────────────────────────────────
         // eStamp is legally separate from eSign — RBI requires both before
-        // disbursement (see providers/esign/interface.ts). Previously
-        // unchecked because the eStamp result was never persisted anywhere.
-        if (kycDoc.eStampStatus !== 'APPLIED') {
+        // disbursement (see providers/esign/interface.ts).
+        if (agreementStatus?.estamp_status !== 'APPLIED') {
             throw new EStampNotAppliedError(loanId);
         }
 

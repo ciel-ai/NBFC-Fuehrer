@@ -382,8 +382,12 @@ export const housingLoansService = {
             purpose: 'Housing Loan Agreement Signature',
         });
 
-        await prisma.kyc_documents.update({
-            where: { user_id: application.user_id },
+        // esign_request_id/esign_status live on loan_applications, not
+        // kyc_documents — per-AGREEMENT state (one row per application),
+        // not per-user identity data. See commit fixing the per-user-vs-
+        // per-application eSign/eStamp bug (919f711 + the migration after it).
+        await prisma.loan_applications.update({
+            where: { id: applicationId },
             data: { esign_request_id: signRequest.requestId, esign_status: signRequest.status, updated_at: new Date() },
         });
 
@@ -399,15 +403,16 @@ export const housingLoansService = {
     },
 
     async eSign(applicationId: string): Promise<HousingAgreementResult> {
+        // esign_request_id/esign_status/estamp_id/estamp_status are on this
+        // same row now — no separate kyc_documents lookup needed for them.
         const application = await prisma.loan_applications.findUniqueOrThrow({ where: { id: applicationId } });
-        const kyc = await prisma.kyc_documents.findUniqueOrThrow({ where: { user_id: application.user_id } });
 
-        if (!kyc.esign_request_id) {
+        if (!application.esign_request_id) {
             throw new LoanStateError(applicationId, application.status, LOAN_STATUS.ESIGN_PENDING);
         }
 
         const esign = getESignProvider();
-        const signStatus = await esign.getSignStatus(kyc.esign_request_id);
+        const signStatus = await esign.getSignStatus(application.esign_request_id);
 
         if (signStatus.status !== 'SIGNED') {
             return {
@@ -415,27 +420,35 @@ export const housingLoansService = {
                 agreementId: `agreements/housing/${applicationId}.pdf`,
                 agreementUrl: '',
                 status: 'PENDING',
-                eSignRequestId: kyc.esign_request_id,
+                eSignRequestId: application.esign_request_id,
                 stampDutyAmount: 500,
                 note: `Signing not yet complete — status: ${signStatus.status}.`,
             };
         }
 
         const stampResult = await esign.applyEStamp({
-            requestId: kyc.esign_request_id,
+            requestId: application.esign_request_id,
             loanAmountRupees: Number(application.approved_amount ?? application.amount_requested),
             stateCode: 'KA', // Placeholder — pending real state-code mapping
         });
 
-        const signedDoc = await esign.getSignedDocument(kyc.esign_request_id);
+        const signedDoc = await esign.getSignedDocument(application.esign_request_id);
         const docStorage = getDocStorageProvider();
         const signedS3Key = `agreements/housing/${applicationId}_signed.pdf`;
         await docStorage.upload({ key: signedS3Key, fileBuffer: Buffer.from(signedDoc.documentBase64, 'base64'), contentType: 'application/pdf' });
         const { url: agreementUrl } = await docStorage.getSignedUrl(signedS3Key);
 
-        await prisma.kyc_documents.update({
-            where: { user_id: application.user_id },
-            data: { esign_status: 'SIGNED', signed_agreement_s3_key: signedS3Key, updated_at: new Date() },
+        await prisma.loan_applications.update({
+            where: { id: applicationId },
+            data: {
+                esign_status: 'SIGNED',
+                signed_agreement_s3_key: signedS3Key,
+                // Same gap gold/CDL had before this fix: stampResult was
+                // computed and used only for the response, never persisted.
+                estamp_id: stampResult.stampId,
+                estamp_status: stampResult.status,
+                updated_at: new Date(),
+            },
         });
 
         return {
@@ -443,7 +456,7 @@ export const housingLoansService = {
             agreementId: signedS3Key,
             agreementUrl,
             status: 'SIGNED',
-            eSignRequestId: kyc.esign_request_id,
+            eSignRequestId: application.esign_request_id,
             stampDutyAmount: stampResult.stampDutyRupees ?? 500,
             note: 'Agreement signed and stored successfully.',
         };

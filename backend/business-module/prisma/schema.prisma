@@ -54,17 +54,22 @@ model kyc_documents {
   aadhaar_back_s3_key     String?   @db.VarChar(500)
   pan_s3_key              String?   @db.VarChar(500)
   bank_statement_s3_key   String?   @db.VarChar(500)
+  // DEPRECATED — see loan_applications.signed_agreement_s3_key. Agreement
+  // signing is a per-APPLICATION concept; kyc_documents is one row per
+  // USER, which let one loan's signed status silently satisfy another
+  // loan's disbursement gate. Left in place (unused by application code)
+  // rather than dropped — see migration 20260806040000_move_esign_to_loan_applications.
   signed_agreement_s3_key String?   @db.VarChar(500)
   liveness_score          Decimal?  @db.Decimal(5, 2)
   face_match_score        Decimal?  @db.Decimal(5, 2)
   fraud_score             Decimal?  @db.Decimal(5, 2)
   credit_score            Int?
+  // DEPRECATED — see loan_applications.esign_request_id / esign_status.
+  // Same per-user-vs-per-application reason as signed_agreement_s3_key above.
   esign_request_id        String?   @db.VarChar(100)
   esign_status            String?   @db.VarChar(30)
-  // eStamp is legally separate from eSign — RBI requires both before
-  // disbursement (see providers/esign/interface.ts). Previously the eStamp
-  // result came back from applyEStamp() and was discarded without being
-  // persisted anywhere, so nothing could actually verify it happened.
+  // DEPRECATED — see loan_applications.estamp_id / estamp_status. Same
+  // per-user-vs-per-application reason as esign_request_id above.
   estamp_id               String?   @db.VarChar(100)
   estamp_status           String?   @db.VarChar(30)
   signzy_responses        Json?
@@ -247,6 +252,14 @@ model loan_applications {
   reference_number     String?                @unique @db.VarChar(20)
   customer_id          String?                @db.Uuid
   customer             customers?             @relation(fields: [customer_id], references: [id])
+  // Moved from kyc_documents (was per-user, wrong granularity — see
+  // 20260806040000_move_esign_to_loan_applications). Agreement signing is
+  // per-application; kyc_documents.esign_status/estamp_status are DEPRECATED.
+  esign_request_id     String?                @unique @db.VarChar(100)
+  esign_status         String?                @db.VarChar(30)
+  estamp_id            String?                @db.VarChar(100)
+  estamp_status        String?                @db.VarChar(30)
+  signed_agreement_s3_key String?             @db.VarChar(500)
   bureau_reports       bureau_reports?
   collateral_gold      collateral_gold?
   collateral_property  collateral_property?
