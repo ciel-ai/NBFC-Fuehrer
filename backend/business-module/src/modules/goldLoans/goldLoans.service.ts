@@ -480,8 +480,13 @@ const finalLoan  = Math.round(valuation * (maxLtvPercent / 100));
             purpose: 'Gold Loan Agreement Signature',
         });
 
-        await prisma.kyc_documents.update({
-            where: { user_id: application.user_id },
+        // esign_request_id/esign_status live on loan_applications, not
+        // kyc_documents — this is per-AGREEMENT state (one row per loan
+        // application), not per-user identity data. See commit fixing the
+        // per-user-vs-per-application eSign/eStamp bug (919f711 and the
+        // migration that followed it).
+        await prisma.loan_applications.update({
+            where: { id: applicationId },
             data: {
                 esign_request_id: signRequest.requestId,
                 esign_status: signRequest.status,
@@ -506,20 +511,18 @@ const finalLoan  = Math.round(valuation * (maxLtvPercent / 100));
     ): Promise<GoldLoanAgreementResult> {
         log.info('Checking eSign completion for gold loan', { applicationId });
 
+        // esign_request_id/esign_status/estamp_id/estamp_status are on this
+        // same row now — no separate kyc_documents lookup needed for them.
         const application = await prisma.loan_applications.findUniqueOrThrow({
             where: { id: applicationId },
         });
 
-        const kyc = await prisma.kyc_documents.findUniqueOrThrow({
-            where: { user_id: application.user_id },
-        });
-
-        if (!kyc.esign_request_id) {
+        if (!application.esign_request_id) {
             throw new LoanStateError(applicationId, application.status, LOAN_STATUS.ESIGN_PENDING);
         }
 
         const esign = getESignProvider();
-        const signStatus = await esign.getSignStatus(kyc.esign_request_id);
+        const signStatus = await esign.getSignStatus(application.esign_request_id);
 
         if (signStatus.status !== 'SIGNED') {
             return {
@@ -527,7 +530,7 @@ const finalLoan  = Math.round(valuation * (maxLtvPercent / 100));
                 agreementId: `agreements/gold/${applicationId}.pdf`,
                 agreementUrl: '',
                 status: 'PENDING',
-                eSignRequestId: kyc.esign_request_id,
+                eSignRequestId: application.esign_request_id,
                 stampDutyAmount: 100,
                 note: `Signing not yet complete — current status: ${signStatus.status}.`,
             };
@@ -539,12 +542,12 @@ const finalLoan  = Math.round(valuation * (maxLtvPercent / 100));
         });
 
         const stampResult = await esign.applyEStamp({
-            requestId: kyc.esign_request_id,
+            requestId: application.esign_request_id,
             loanAmountRupees: Number(application.approved_amount ?? application.amount_requested),
             stateCode: customer?.state?.slice(0, 2).toUpperCase() ?? 'KA', // Placeholder mapping — pending a real state-name-to-code table
         });
 
-        const signedDoc = await esign.getSignedDocument(kyc.esign_request_id);
+        const signedDoc = await esign.getSignedDocument(application.esign_request_id);
         const docStorage = getDocStorageProvider();
         const signedS3Key = `agreements/gold/${applicationId}_signed.pdf`;
         await docStorage.upload({
@@ -554,15 +557,11 @@ const finalLoan  = Math.round(valuation * (maxLtvPercent / 100));
         });
         const { url: agreementUrl } = await docStorage.getSignedUrl(signedS3Key);
 
-        await prisma.kyc_documents.update({
-            where: { user_id: application.user_id },
+        await prisma.loan_applications.update({
+            where: { id: applicationId },
             data: {
                 esign_status: 'SIGNED',
                 signed_agreement_s3_key: signedS3Key,
-                // Previously stampResult was used only for the response's
-                // stampDutyAmount and then discarded — nothing persisted
-                // whether the eStamp actually succeeded, so no disbursement
-                // gate could verify it.
                 estamp_id: stampResult.stampId,
                 estamp_status: stampResult.status,
                 updated_at: new Date(),
@@ -576,7 +575,7 @@ const finalLoan  = Math.round(valuation * (maxLtvPercent / 100));
             agreementId: signedS3Key,
             agreementUrl,
             status: 'SIGNED',
-            eSignRequestId: kyc.esign_request_id,
+            eSignRequestId: application.esign_request_id,
             stampDutyAmount: stampResult.stampDutyRupees ?? 100,
             note: 'Agreement signed & stored. Proceeding to NACH setup.',
         };

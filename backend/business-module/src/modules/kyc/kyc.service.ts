@@ -925,7 +925,18 @@ async runGSTVerification(
             throw new KycIncompleteError(input.userId, ['KYC not completed']);
         }
 
-        if (doc.eSignStatus === 'SIGNED') {
+        // esign_status is checked per-LOAN here, not per-user — this route
+        // takes a loanId precisely because signing is a per-application
+        // concept. Previously this checked doc.eSignStatus (kyc_documents,
+        // one row per user), which meant an already-signed prior loan
+        // would block requesting a NEW eSign for a different loan entirely.
+        // See commit 919f711 and the migration that followed it.
+        const application = await prisma.loan_applications.findUniqueOrThrow({
+            where: { id: input.loanId },
+            select: { esign_status: true },
+        });
+
+        if (application.esign_status === 'SIGNED') {
             throw CONFLICT_ERRORS.kycAlreadyComplete(input.userId);
         }
 
@@ -951,9 +962,18 @@ async runGSTVerification(
             purpose: `Loan agreement for loan ${input.loanId}`,
         });
 
-        await kycRepository.saveESignRequest(
-            input.userId, result.requestId, result.status,
-        );
+        // Written to loan_applications (by loanId), not kyc_documents (by
+        // userId) — see the per-loan check above for why. kycRepository
+        // .saveESignRequest still exists but is unused now that this is
+        // the only caller; left in place rather than deleted.
+        await prisma.loan_applications.update({
+            where: { id: input.loanId },
+            data: {
+                esign_request_id: result.requestId,
+                esign_status: result.status,
+                updated_at: new Date(),
+            },
+        });
 
         log.info('eSign requested', {
             userId: input.userId,
@@ -975,18 +995,36 @@ async runGSTVerification(
         status: string,
         req: Request,
     ): Promise<void> {
-        // Find the KYC document by eSign request ID
-        const doc = await prisma.kyc_documents.findFirst({
+        // Find the loan application by eSign request ID. Was
+        // prisma.kyc_documents.findFirst (kyc_documents.esign_request_id
+        // had no unique constraint, since it was one row per user and
+        // could be overwritten by any loan's signing request) — now
+        // loan_applications.findUnique, since esign_request_id is
+        // per-application and genuinely @unique. See commit 919f711 and
+        // the migration that followed it.
+        const application = await prisma.loan_applications.findUnique({
             where: { esign_request_id: requestId },
-        }) as unknown as { user_id: string } | null;
+            select: { id: true, user_id: true },
+        });
 
-        if (!doc) {
+        if (!application) {
             log.warn('eSign callback for unknown request', { requestId });
             return;
         }
 
-        const userId = doc.user_id;
-        await kycRepository.updateESignStatus(userId, status);
+        const userId = application.user_id;
+
+        // esign_status is per-application now (loan_applications), not
+        // per-user (kyc_documents) — see above.
+        await prisma.loan_applications.update({
+            where: { id: application.id },
+            data: { esign_status: status, updated_at: new Date() },
+        });
+
+        // completed_checks/failed_checks remain genuinely per-user — this
+        // is the generic KYC identity-check tracking system (separate
+        // concern from per-loan agreement signing), out of scope for this
+        // fix.
         await kycRepository.recordCheckResult(
             userId, KYC_CHECK.ESIGN, status === 'SIGNED',
         );
