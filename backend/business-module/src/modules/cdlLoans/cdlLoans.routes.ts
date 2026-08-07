@@ -12,12 +12,11 @@ const A = ROLE.SUPER_ADMIN;
 
 // Most of this module is now wired to real persistence (loan_applications,
 // loan_accounts, emi_schedule, disbursements) — same tables/services gold
-// loans use. Agreement generation (+ eSign) is now real too — see
+// loans use. Agreement generation (+ eSign) is real — see
 // cdlLoansService.generateAgreement / completeESign, same pdfService +
 // docStorage + esign provider pipeline gold loans use. NOC generation is
-// the one route still genuinely stub (needs the same pdfService +
-// docStorage pipeline, no eSign step) and stays behind stubGuard() so that
-// limitation is explicit rather than silently faked.
+// real too now — same pdfService + docStorage pipeline, no eSign step —
+// see cdlLoansService.generateNoc.
 router.post('/loans', requireAuth(), allowRoles(C, F), stubGuard(), cdlLoansController.activateLoan);
 router.post('/applications', requireAuth(), allowRoles(C), cdlLoansController.submitApplication);
 router.post('/applications/:id/kyc', requireAuth(), allowRoles(C), cdlLoansController.runKycChecks);
@@ -37,6 +36,9 @@ router.post('/loans/:id/payments', requireAuth(), allowRoles(C), cdlLoansControl
 router.post('/loans/:id/payment-failure', requireAuth(), allowRoles(C), cdlLoansController.handlePaymentFailure);
 router.get('/loans/:id/overdue', requireAuth(), allowRoles(C, F), cdlLoansController.getOverdueStatus);
 router.post('/loans/:id/close', requireAuth(), allowRoles(C, F), cdlLoansController.closeLoan);
-router.post('/loans/:id/noc', requireAuth(), allowRoles(C), stubGuard(), cdlLoansController.generateNoc);
+// generateNoc is real now (pdfService + docStorage, gated on the loan
+// actually being CLOSED) — stubGuard() removed, same as disburseToMerchant
+// above.
+router.post('/loans/:id/noc', requireAuth(), allowRoles(C), cdlLoansController.generateNoc);
 
 export { router as cdlLoansRouter };
