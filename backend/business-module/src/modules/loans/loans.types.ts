@@ -53,6 +53,16 @@ export interface LoanApplication {
 
     // Repayment
     repaymentType: string;
+    // Customer's chosen auto-debit day of month (CDL: 4th/7th/12th only —
+    // see cdlLoans.service.ts's CDL_AUTO_DEBIT_DATES). Optional — gold/
+    // housing loans don't use this concept and never set it, leaving the
+    // DB default (loan_applications.preferred_debit_day, @default(4)) in
+    // place. Persisted so it's not silently discarded, but NOT YET wired
+    // into EMI schedule date generation — see the comment in
+    // cdlLoans.service.ts's disburseToMerchant for why (client spec
+    // section 1f explicitly flags loan repayment date configuration as
+    // "clarification required", not yet a settled policy to implement).
+    preferredDebitDay?: number | null;
 
     // Approval details — populated by credit manager
     approvedAmount: Rupees | null;

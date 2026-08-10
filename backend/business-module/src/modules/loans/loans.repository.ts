@@ -116,6 +116,7 @@ function mapApplication(row: Record<string, unknown>): LoanApplication {
         monthlyIncome: row.monthly_income
             ? toNumber(row.monthly_income as number) : null,
         repaymentType: (row.repayment_type as string) ?? 'MONTHLY_EMI',
+        preferredDebitDay: (row.preferred_debit_day as number | null) ?? null,
     };
 }
 
@@ -221,6 +222,13 @@ export const loansRepository = {
                 repayment_type:  data.repaymentType  ?? 'MONTHLY_EMI',
                 applied_at:      data.appliedAt,
                 updated_at:      new Date(),
+                // Only set when the caller actually provides one (CDL) —
+                // omitted entirely for gold/housing loans (undefined),
+                // leaving the column's own DB default (4) untouched
+                // rather than overriding it with an explicit null.
+                ...(data.preferredDebitDay !== undefined
+                    ? { preferred_debit_day: data.preferredDebitDay }
+                    : {}),
             },
         });
         return mapApplication(row as unknown as Record<string, unknown>);
