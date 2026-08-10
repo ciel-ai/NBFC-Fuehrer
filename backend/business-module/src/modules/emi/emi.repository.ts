@@ -119,7 +119,7 @@ export const emiRepository = {
         const row = await prisma.emi_schedule.findFirst({
             where: {
                 loan_account_id: loanAccountId,
-                status: { in: [EMI_STATUS.PENDING, EMI_STATUS.BOUNCED] },
+                status: { in: [EMI_STATUS.PENDING, EMI_STATUS.BOUNCED, EMI_STATUS.PARTIAL] },
             },
             orderBy: { due_date: 'asc' },
         });
@@ -139,11 +139,16 @@ export const emiRepository = {
                 _count: { id: true },
             }),
 
-            // Aggregate outstanding + penalty
+            // Aggregate outstanding + penalty. PARTIAL included — its
+            // emi_amount/penalty_amount already reflect the REMAINING
+            // balance after a partial settlement (recordPartialPayment
+            // decrements them, doesn't leave the original scheduled
+            // amounts), so this sum stays accurate rather than silently
+            // dropping a partially-paid EMI's outstanding remainder.
             prisma.emi_schedule.aggregate({
                 where: {
                     loan_account_id: loanAccountId,
-                    status: { in: [EMI_STATUS.PENDING, EMI_STATUS.OVERDUE, EMI_STATUS.BOUNCED] },
+                    status: { in: [EMI_STATUS.PENDING, EMI_STATUS.OVERDUE, EMI_STATUS.BOUNCED, EMI_STATUS.PARTIAL] },
                 },
                 _sum: { emi_amount: true, penalty_amount: true },
             }),
@@ -159,7 +164,7 @@ export const emiRepository = {
             prisma.emi_schedule.findFirst({
                 where: {
                     loan_account_id: loanAccountId,
-                    status: { in: [EMI_STATUS.PENDING, EMI_STATUS.BOUNCED] },
+                    status: { in: [EMI_STATUS.PENDING, EMI_STATUS.BOUNCED, EMI_STATUS.PARTIAL] },
                 },
                 orderBy: { due_date: 'asc' },
                 select: { due_date: true, emi_amount: true },
@@ -181,6 +186,7 @@ export const emiRepository = {
             paidEmis: (countMap[EMI_STATUS.PAID] as number) ?? 0,
             overdueEmis: (countMap[EMI_STATUS.OVERDUE] as number) ?? 0,
             pendingEmis: (countMap[EMI_STATUS.PENDING] as number) ?? 0,
+            partialEmis: (countMap[EMI_STATUS.PARTIAL] as number) ?? 0,
             nextDueDate: nextDue?.due_date ?? null,
             nextEmiAmount: nextDue?.emi_amount
                 ? toNumber(nextDue.emi_amount) : null,
@@ -210,6 +216,42 @@ export const emiRepository = {
                 status: EMI_STATUS.PAID,
                 paid_at: paidAt,
                 penalty_amount: residualPenalty,
+                collection_id: collectionId ?? null,
+                updated_at: new Date(),
+            },
+        });
+        return mapEntry(row as unknown as Record<string, unknown>);
+    },
+
+    // ── Partial settlement — a payment that doesn't cover the full
+    // EMI + penalty due. Previously there was no such path: any nonzero
+    // payment, however small, went through markPaid() above and was
+    // marked fully PAID regardless of amount, silently forgiving the
+    // principal/interest shortfall (only penalty had a residual-tracking
+    // mechanism). EMI_STATUS.PARTIAL already existed in the schema/enum
+    // but was never actually used anywhere in application code — this is
+    // the first real use of it. Decrements the remaining amounts by
+    // exactly what was settled this payment (never below 0, guaranteed
+    // by allocatePartialPayment's own Math.min clamping), rather than
+    // recomputing from scratch, so emi_amount/interest_component/
+    // principal_component always reflect what's still actually owed —
+    // getSummary's totalOutstanding (and everything downstream of it,
+    // including closeLoan's outstanding-balance gate) stays accurate.
+    // paid_at is deliberately NOT set here — this EMI isn't paid yet. ────
+
+    async recordPartialPayment(
+        id: string,
+        collectionId: string | undefined,
+        allocation: { penaltySettled: number; interestSettled: number; principalSettled: number },
+    ): Promise<EmiScheduleEntry> {
+        const row = await prisma.emi_schedule.update({
+            where: { id },
+            data: {
+                status: EMI_STATUS.PARTIAL,
+                penalty_amount: { decrement: allocation.penaltySettled },
+                interest_component: { decrement: allocation.interestSettled },
+                principal_component: { decrement: allocation.principalSettled },
+                emi_amount: { decrement: allocation.interestSettled + allocation.principalSettled },
                 collection_id: collectionId ?? null,
                 updated_at: new Date(),
             },
@@ -307,7 +349,7 @@ export const emiRepository = {
       FROM emi_schedule es
       JOIN loan_accounts la ON la.id = es.loan_account_id
       WHERE
-        es.status = 'PENDING'
+        es.status IN ('PENDING', 'PARTIAL')
         AND es.due_date BETWEEN ${dueFrom} AND ${dueTo}
         AND la.status  = 'ACTIVE'
       ORDER BY es.due_date ASC
@@ -352,7 +394,7 @@ export const emiRepository = {
       FROM emi_schedule   es
       JOIN loan_accounts  la ON la.id = es.loan_account_id
       WHERE
-        es.status       IN ('PENDING', 'OVERDUE')
+        es.status       IN ('PENDING', 'OVERDUE', 'PARTIAL')
         AND la.status    = 'ACTIVE'
         AND la.razorpay_mandate_id IS NOT NULL
         AND es.due_date BETWEEN ${from} AND ${debitDate}
@@ -405,7 +447,7 @@ export const emiRepository = {
       FROM emi_schedule  es
       JOIN loan_accounts la ON la.id = es.loan_account_id
       WHERE
-        es.status IN ('PENDING', 'BOUNCED')
+        es.status IN ('PENDING', 'BOUNCED', 'PARTIAL')
         AND la.status = 'ACTIVE'
         AND es.due_date < ${cutoff}
       ORDER BY es.due_date ASC
@@ -431,7 +473,7 @@ export const emiRepository = {
         return prisma.emi_schedule.count({
             where: {
                 loan_account_id: loanAccountId,
-                status: { in: [EMI_STATUS.PENDING, EMI_STATUS.OVERDUE, EMI_STATUS.BOUNCED] },
+                status: { in: [EMI_STATUS.PENDING, EMI_STATUS.OVERDUE, EMI_STATUS.BOUNCED, EMI_STATUS.PARTIAL] },
             },
         });
     },

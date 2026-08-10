@@ -111,7 +111,7 @@ export async function runBureauReportingJob(): Promise<void> {
                     (SELECT MAX(EXTRACT(DAY FROM NOW() - es.due_date))::int
                      FROM emi_schedule es
                      WHERE es.loan_account_id = la.id
-                       AND es.status IN ('OVERDUE', 'BOUNCED', 'PENDING')
+                       AND es.status IN ('OVERDUE', 'BOUNCED', 'PENDING', 'PARTIAL')
                        AND es.due_date < NOW()),
                     0
                 ) AS overdue_days,

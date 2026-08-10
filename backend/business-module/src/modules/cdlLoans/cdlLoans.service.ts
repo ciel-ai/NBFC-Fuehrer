@@ -1,8 +1,8 @@
 ﻿// src/modules/cdlLoans/cdlLoans.service.ts
 import { createModuleLogger } from '@/config/logger';
-import { prisma } from '@/config/database';
+import { prisma, withTransaction } from '@/config/database';
 import { ValidationError, NotFoundError, LoanStateError } from '@/errors';
-import { computeMonthlyEmi } from '@/modules/emi/emi.calculator';
+import { computeMonthlyEmi, buildAmortizationSchedule } from '@/modules/emi/emi.calculator';
 import { emiService } from '@/modules/emi';
 import { loansRepository } from '@/modules/loans/loans.repository';
 import { paymentsService } from '@/modules/payments';
@@ -14,7 +14,8 @@ import { getEncryptionProvider } from '@/providers/encryption';
 import { getESignProvider } from '@/providers/esign';
 import { assertTransition } from '@/utils/loanStateMachine.util';
 import { assertApplicationOwnership, assertAccountOwnership } from '@/utils/ownership.util';
-import { LOAN_STATUS, PRODUCT_TYPE, BUSINESS_RULES } from '@/config/constants';
+import { generateLoanAccountNumber } from '@/utils/referenceNumber.util';
+import { LOAN_STATUS, EMI_STATUS, PRODUCT_TYPE, BUSINESS_RULES } from '@/config/constants';
 import type { Role } from '@/config/constants';
 import type {
     CdlApplicationInput, CdlApplicationResult,
@@ -564,50 +565,105 @@ export const cdlLoansService = {
         const totalPayable = emi * application.tenureMonths;
         const totalInterest = Math.max(0, totalPayable - application.approvedAmount);
 
-        const account = await loansRepository.createAccount({
-            applicationId,
-            userId: application.userId,
-            principalAmount: application.approvedAmount,
-            interestRate: application.interestRate,
-            tenureMonths: application.tenureMonths,
-            monthlyEmi: emi,
-            totalInterest,
-        });
-
-        await emiService.createSchedule({
-            loanAccountId: account.id,
-            principal: application.approvedAmount,
-            annualRatePct: application.interestRate,
-            tenureMonths: application.tenureMonths,
-            disbursementDate: new Date(),
-        });
-
         const processingFee = application.processingFee ?? getCdlProcessingFee(application.approvedAmount);
         const processingFeeGst = Math.round(processingFee * BUSINESS_RULES.GST_ON_PROCESSING_FEE);
 
-        // CDL disbursement goes to the merchant/store, not the customer's
-        // bank account — account_number/ifsc are non-nullable in the shared
-        // disbursements table (designed for bank payouts), so merchant
-        // identity is recorded via beneficiary_name with placeholder
-        // account/IFSC values. Flag for a schema follow-up if CDL merchant
-        // payout details need to be tracked more precisely.
-        const disbursement = await prisma.disbursements.create({
-            data: {
-                loan_id: applicationId,
-                loan_account_id: account.id,
-                user_id: application.userId,
-                beneficiary_name: input.merchantName,
-                account_number: 'MERCHANT',
-                ifsc: 'MERCHANT',
-                mode: 'UPI',
-                principal_amount: application.approvedAmount,
-                processing_fee: processingFee,
-                processing_fee_gst: processingFeeGst,
-                net_disbursed_amount: input.amount,
-                status: 'PENDING',
-                initiated_by: input.initiatedBy,
-                initiated_at: new Date(),
-            },
+        // Previously three separate, non-transactional calls: createAccount
+        // (loansRepository, its own internal transaction) → createSchedule
+        // (emiService, its own separate internal transaction) →
+        // disbursements.create (a third, bare call). If createSchedule
+        // threw after createAccount had already committed, the result was
+        // a loan_accounts row in DISBURSED status with no EMI schedule and
+        // no disbursement record at all — and LOAN_STATUS's state machine
+        // has no transition out of DISBURSED except → ACTIVE, so that
+        // account was permanently stuck with no automated recovery path.
+        // Now atomic: account, EMI schedule, and the disbursement's
+        // initial PENDING row either all exist or none do. Inlined here
+        // (rather than threading a shared `tx` param through
+        // loansRepository.createAccount / emiService.createSchedule, which
+        // are used by gold/housing loans too) to avoid touching those
+        // shared call sites — the actual account-number generation and EMI
+        // math are the same real logic (generateLoanAccountNumber,
+        // buildAmortizationSchedule), just composed into one transaction
+        // instead of three separate ones. The payment-provider call stays
+        // OUTSIDE the transaction, after it commits — never hold a DB
+        // transaction open across a network call.
+        const accountNumber = await generateLoanAccountNumber();
+
+        const { account, disbursement } = await withTransaction(async (tx) => {
+            const accountRow = await tx.loan_accounts.create({
+                data: {
+                    application_id: applicationId,
+                    user_id: application.userId,
+                    account_number: accountNumber,
+                    principal_amount: application.approvedAmount!,
+                    interest_rate: application.interestRate!,
+                    tenure_months: application.tenureMonths,
+                    monthly_emi: emi,
+                    outstanding_balance: application.approvedAmount! + totalInterest,
+                    total_interest: totalInterest,
+                    status: LOAN_STATUS.DISBURSED,
+                    created_at: new Date(),
+                    updated_at: new Date(),
+                },
+            });
+
+            const schedule = buildAmortizationSchedule({
+                loanAccountId: accountRow.id,
+                principal: application.approvedAmount!,
+                annualRatePct: application.interestRate!,
+                tenureMonths: application.tenureMonths,
+                disbursementDate: new Date(),
+            });
+            await tx.emi_schedule.createMany({
+                data: schedule.entries.map((e) => ({
+                    loan_account_id: schedule.loanAccountId,
+                    emi_number: e.emiNumber,
+                    due_date: e.dueDate,
+                    emi_amount: e.emiAmount,
+                    principal_component: e.principalComponent,
+                    interest_component: e.interestComponent,
+                    outstanding_after: e.outstandingAfter,
+                    status: EMI_STATUS.PENDING,
+                    penalty_amount: 0,
+                    bounce_count: 0,
+                    created_at: new Date(),
+                    updated_at: new Date(),
+                })),
+            });
+
+            await tx.loan_applications.update({
+                where: { id: applicationId },
+                data: { status: LOAN_STATUS.DISBURSED, updated_at: new Date() },
+            });
+
+            // CDL disbursement goes to the merchant/store, not the
+            // customer's bank account — account_number/ifsc are
+            // non-nullable in the shared disbursements table (designed
+            // for bank payouts), so merchant identity is recorded via
+            // beneficiary_name with placeholder account/IFSC values. Flag
+            // for a schema follow-up if CDL merchant payout details need
+            // to be tracked more precisely.
+            const disbursementRow = await tx.disbursements.create({
+                data: {
+                    loan_id: applicationId,
+                    loan_account_id: accountRow.id,
+                    user_id: application.userId,
+                    beneficiary_name: input.merchantName,
+                    account_number: 'MERCHANT',
+                    ifsc: 'MERCHANT',
+                    mode: 'UPI',
+                    principal_amount: application.approvedAmount!,
+                    processing_fee: processingFee,
+                    processing_fee_gst: processingFeeGst,
+                    net_disbursed_amount: input.amount,
+                    status: 'PENDING',
+                    initiated_by: input.initiatedBy,
+                    initiated_at: new Date(),
+                },
+            });
+
+            return { account: accountRow, disbursement: disbursementRow };
         });
 
         // Real payout via the payment provider — this used to unconditionally
@@ -638,15 +694,6 @@ export const cdlLoansService = {
         }
 
         const isSyncComplete = payoutResult.status === 'DONE' && payoutResult.utrNumber;
-        const updatedDisbursement = await prisma.disbursements.update({
-            where: { id: disbursement.id },
-            data: {
-                status: isSyncComplete ? 'COMPLETED' : 'INITIATED',
-                razorpay_payout_id: payoutResult.payoutId,
-                utr_number: isSyncComplete ? payoutResult.utrNumber : null,
-                completed_at: isSyncComplete ? new Date() : null,
-            },
-        });
 
         // CDL disburses to the merchant in a single shot — "money confirmed
         // moved" and "loan should activate" are the same event, unlike
@@ -660,11 +707,32 @@ export const cdlLoansService = {
         //
         // Guarded, not assumed, even though DISBURSED→ACTIVE is the only
         // legal move from here — same safety pattern
-        // housingLoans.service.ts's activateLoan already uses.
+        // housingLoans.service.ts's activateLoan already uses. The
+        // disbursement-COMPLETED write and the account activation are now
+        // atomic together too — previously two separate calls, so a
+        // failure between them could leave the disbursement showing
+        // COMPLETED while the account was still stuck at DISBURSED.
         if (isSyncComplete) {
             assertTransition(account.id, account.status, LOAN_STATUS.ACTIVE);
-            await loansRepository.updateAccountStatus(account.id, LOAN_STATUS.ACTIVE);
         }
+        const updatedDisbursement = await withTransaction(async (tx) => {
+            const disbursementRow = await tx.disbursements.update({
+                where: { id: disbursement.id },
+                data: {
+                    status: isSyncComplete ? 'COMPLETED' : 'INITIATED',
+                    razorpay_payout_id: payoutResult.payoutId,
+                    utr_number: isSyncComplete ? payoutResult.utrNumber : null,
+                    completed_at: isSyncComplete ? new Date() : null,
+                },
+            });
+            if (isSyncComplete) {
+                await tx.loan_accounts.update({
+                    where: { id: account.id },
+                    data: { status: LOAN_STATUS.ACTIVE, updated_at: new Date() },
+                });
+            }
+            return disbursementRow;
+        });
 
         log.info('CDL disbursed to merchant', {
             applicationId,

@@ -205,18 +205,21 @@ export const collectionsRepository = {
         const emiStats = await prisma.emi_schedule.aggregate({
             where: {
                 loan_account_id: collCase.loanAccountId,
-                status: { in: ['OVERDUE', 'BOUNCED', 'PENDING'] },
+                status: { in: ['OVERDUE', 'BOUNCED', 'PENDING', 'PARTIAL'] },
                 due_date: { lt: new Date() },
             },
             _sum: { emi_amount: true, penalty_amount: true },
             _count: true,
         });
 
-        // Find oldest overdue EMI for DPD calculation
+        // Find oldest overdue EMI for DPD calculation. PARTIAL included —
+        // a partial payment against a previously OVERDUE/BOUNCED EMI
+        // doesn't make it current; due_date (not the status label) is
+        // what determines DPD here.
         const oldest = await prisma.emi_schedule.findFirst({
             where: {
                 loan_account_id: collCase.loanAccountId,
-                status: { in: ['OVERDUE', 'BOUNCED'] },
+                status: { in: ['OVERDUE', 'BOUNCED', 'PARTIAL'] },
             },
             orderBy: { due_date: 'asc' },
             select: { due_date: true },
