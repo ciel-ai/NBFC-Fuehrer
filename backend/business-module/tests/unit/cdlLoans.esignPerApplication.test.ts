@@ -102,12 +102,19 @@ jest.mock('@/providers/esign', () => ({
 
 import { cdlLoansService } from '@/modules/cdlLoans/cdlLoans.service';
 import { ValidationError, LoanStateError } from '@/errors';
+import { ROLE } from '@/config/constants';
 
 // Same customer, two different loan applications — this is the crux of
 // the bug: both share userId 'user-1', but must be gated independently.
 const APP_1 = 'app-11111111-1111-1111-1111-111111111111';
 const APP_2 = 'app-22222222-2222-2222-2222-222222222222';
 const USER_ID = 'user-1';
+// This file's focus is the per-application eSign/eStamp gate, not the
+// ownership check (covered separately in cdlLoans.ownership.test.ts) —
+// calling generateAgreement/completeESign as staff bypasses ownership
+// regardless of the mocks' field naming here.
+const STAFF_CALLER_ID = 'staff-1';
+const STAFF_ROLE = ROLE.SUPER_ADMIN;
 
 function approvedApplication(overrides: Partial<Record<string, unknown>> = {}) {
     return {
@@ -203,7 +210,7 @@ describe('CDL disburseToMerchant — eSign/eStamp gate is per-application', () =
             requestId: 'req-app-2', signingUrl: 'https://stub/sign/req-app-2', status: 'PENDING', expiresAt: new Date(),
         });
 
-        await cdlLoansService.generateAgreement(APP_2);
+        await cdlLoansService.generateAgreement(APP_2, STAFF_CALLER_ID, STAFF_ROLE);
 
         // Must write to loan_applications by id, never to kyc_documents.
         expect(mockLoanApplicationsUpdate).toHaveBeenCalledWith({
@@ -220,7 +227,7 @@ describe('CDL disburseToMerchant — eSign/eStamp gate is per-application', () =
         mockApplyEStamp.mockResolvedValue({ stampId: 'stamp-app-2', status: 'APPLIED', stampDutyRupees: 25 });
         mockGetSignedDocument.mockResolvedValue({ documentBase64: Buffer.from('signed-pdf').toString('base64') });
 
-        const signResult = await cdlLoansService.completeESign(APP_2);
+        const signResult = await cdlLoansService.completeESign(APP_2, STAFF_CALLER_ID, STAFF_ROLE);
 
         expect(signResult.status).toBe('SIGNED');
         expect(mockLoanApplicationsUpdate).toHaveBeenCalledWith({

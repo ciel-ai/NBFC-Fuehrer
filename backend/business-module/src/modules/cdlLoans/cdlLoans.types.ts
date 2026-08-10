@@ -51,7 +51,11 @@ export interface CdlFoirInput {
 }
 
 export interface CdlCreditAssessmentInput {
-    cibilScore: number;
+    // cibilScore deliberately NOT here — it's no longer client-supplied.
+    // The service reads it server-side from kyc_documents.credit_score
+    // (the real, bureau-verified score), not from request input. Previously
+    // a client could submit any value 300-900 directly and the assessment
+    // would trust it outright.
     monthlyIncome: number;
     existingEmis: number;
     proposedEmi: number;

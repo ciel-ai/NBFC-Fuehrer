@@ -43,9 +43,16 @@ jest.mock('@/providers/docStorage', () => ({
 
 import { cdlLoansService } from '@/modules/cdlLoans/cdlLoans.service';
 import { LoanStateError } from '@/errors';
-import { LOAN_STATUS } from '@/config/constants';
+import { LOAN_STATUS, ROLE } from '@/config/constants';
 
 const LOAN_ID = 'loan-account-1';
+// These tests exercise generateNoc/closeLoan's own business logic, not the
+// ownership check (that gets its own dedicated coverage in
+// cdlLoans.ownership.test.ts) — calling as staff bypasses the ownership
+// check regardless of the mocked account's userId, same as every other
+// pre-existing mock here that doesn't set one.
+const STAFF_CALLER_ID = 'staff-1';
+const STAFF_ROLE = ROLE.SUPER_ADMIN;
 
 describe('cdlLoansService.generateNoc', () => {
     beforeEach(() => jest.clearAllMocks());
@@ -59,7 +66,7 @@ describe('cdlLoansService.generateNoc', () => {
             expiresAt: new Date(),
         });
 
-        const result = await cdlLoansService.generateNoc(LOAN_ID);
+        const result = await cdlLoansService.generateNoc(LOAN_ID, STAFF_CALLER_ID, STAFF_ROLE);
 
         expect(mockGeneratePdfNoc).toHaveBeenCalledWith(LOAN_ID);
         expect(mockUpload).toHaveBeenCalledWith(
@@ -74,7 +81,7 @@ describe('cdlLoansService.generateNoc', () => {
     test('(b) on a loan that is NOT closed: rejected, never touches the PDF/storage pipeline', async () => {
         mockFindAccountByIdOrThrow.mockResolvedValue({ status: LOAN_STATUS.ACTIVE });
 
-        await expect(cdlLoansService.generateNoc(LOAN_ID)).rejects.toThrow(LoanStateError);
+        await expect(cdlLoansService.generateNoc(LOAN_ID, STAFF_CALLER_ID, STAFF_ROLE)).rejects.toThrow(LoanStateError);
 
         expect(mockGeneratePdfNoc).not.toHaveBeenCalled();
         expect(mockUpload).not.toHaveBeenCalled();
@@ -86,7 +93,7 @@ describe('cdlLoansService.generateNoc', () => {
         mockUpload.mockResolvedValue({ key: `noc/cdl_${LOAN_ID}.pdf`, eTag: 'etag-1' });
         mockGetSignedUrl.mockResolvedValue({ url: 'https://stub/s3/noc/cdl_loan-account-1.pdf', expiresAt: new Date() });
 
-        const result = await cdlLoansService.generateNoc(LOAN_ID);
+        const result = await cdlLoansService.generateNoc(LOAN_ID, STAFF_CALLER_ID, STAFF_ROLE);
 
         expect(Object.keys(result).sort()).toEqual(['nocRef', 'nocS3Url']);
         expect(typeof result.nocRef).toBe('string');
@@ -103,7 +110,7 @@ describe('cdlLoansService.closeLoan — outstanding-balance guard', () => {
         mockFindAccountByIdOrThrow.mockResolvedValue({ status: LOAN_STATUS.ACTIVE, interestRate: 13 });
         mockGetSummary.mockResolvedValue({ totalOutstanding: 5000 });
 
-        await expect(cdlLoansService.closeLoan(LOAN_ID)).rejects.toThrow(LoanStateError);
+        await expect(cdlLoansService.closeLoan(LOAN_ID, STAFF_CALLER_ID, STAFF_ROLE)).rejects.toThrow(LoanStateError);
         expect(mockUpdateAccountStatus).not.toHaveBeenCalled();
     });
 
@@ -113,7 +120,7 @@ describe('cdlLoansService.closeLoan — outstanding-balance guard', () => {
         mockGetForeclosureQuote.mockResolvedValue({ total: 0 });
         mockUpdateAccountStatus.mockResolvedValue({ status: LOAN_STATUS.CLOSED });
 
-        const result = await cdlLoansService.closeLoan(LOAN_ID);
+        const result = await cdlLoansService.closeLoan(LOAN_ID, STAFF_CALLER_ID, STAFF_ROLE);
 
         expect(mockUpdateAccountStatus).toHaveBeenCalledWith(
             LOAN_ID, LOAN_STATUS.CLOSED, expect.objectContaining({ closed_at: expect.any(Date) }),

@@ -104,50 +104,59 @@ describe('cdlSubmitApplicationSchema', () => {
 });
 
 describe('cdlCreditAssessmentSchema', () => {
-    const valid = { cibilScore: 780, monthlyIncome: 60000, existingEmis: 5000, proposedEmi: 2233 };
+    // cibilScore is deliberately NOT part of this schema any more — the
+    // service reads it server-side from kyc_documents.credit_score, never
+    // from the client (previously a client-supplied cibilScore 300-900 was
+    // trusted outright for the actual credit decision).
+    const valid = { monthlyIncome: 60000, existingEmis: 5000, proposedEmi: 2233 };
 
     test('accepts a valid assessment', () => {
         expect(cdlCreditAssessmentSchema.validate(valid, OPTS).error).toBeUndefined();
     });
 
-    test('rejects a cibilScore outside the real 300-900 range', () => {
-        const { error } = cdlCreditAssessmentSchema.validate({ ...valid, cibilScore: 1200 }, OPTS);
-        expect(error).toBeDefined();
+    test('strips a client-supplied cibilScore rather than accepting it', () => {
+        const { error, value } = cdlCreditAssessmentSchema.validate(
+            { ...valid, cibilScore: 900 }, OPTS,
+        );
+        expect(error).toBeUndefined();
+        expect(value.cibilScore).toBeUndefined();
     });
 
     test('rejects a negative proposedEmi', () => {
         const { error } = cdlCreditAssessmentSchema.validate({ ...valid, proposedEmi: -100 }, OPTS);
         expect(error).toBeDefined();
     });
+
+    test('rejects missing required fields', () => {
+        const { error } = cdlCreditAssessmentSchema.validate({}, OPTS);
+        expect(error).toBeDefined();
+    });
 });
 
 describe('cdlCreditDecisionSchema', () => {
-    test('accepts just the two fields the service actually reads', () => {
-        const { error } = cdlCreditDecisionSchema.validate(
-            { creditStatus: 'PASS', maxLoanAmount: 25000 }, OPTS,
-        );
+    // Previously required a client-echoed creditStatus/maxLoanAmount and
+    // trusted those values directly for the approval decision — a
+    // customer could self-approve their own loan by calling this endpoint
+    // directly. Now takes the same income inputs as /credit-assessment;
+    // the decision itself is computed server-side, never client-supplied.
+    const valid = { monthlyIncome: 60000, existingEmis: 5000, proposedEmi: 2233 };
+
+    test('accepts valid income inputs', () => {
+        const { error } = cdlCreditDecisionSchema.validate(valid, OPTS);
         expect(error).toBeUndefined();
     });
 
-    test('also accepts the full echoed assessment object (existing client behavior)', () => {
-        const { error } = cdlCreditDecisionSchema.validate({
-            applicationId: '11111111-1111-4111-8111-111111111111',
-            cibilScore: 780, foir: 12.1, foirStatus: 'PASS',
-            creditStatus: 'PASS', maxLoanAmount: 1134431,
-            note: 'CIBIL 780, FOIR 12.1% — PASS.',
-        }, OPTS);
-        expect(error).toBeUndefined();
-    });
-
-    test('rejects a creditStatus that is not PASS/FAIL/REVIEW', () => {
-        const { error } = cdlCreditDecisionSchema.validate(
-            { creditStatus: 'MAYBE', maxLoanAmount: 25000 }, OPTS,
+    test('strips a client-supplied creditStatus/maxLoanAmount rather than accepting them', () => {
+        const { error, value } = cdlCreditDecisionSchema.validate(
+            { ...valid, creditStatus: 'PASS', maxLoanAmount: 100000 }, OPTS,
         );
-        expect(error).toBeDefined();
+        expect(error).toBeUndefined();
+        expect(value.creditStatus).toBeUndefined();
+        expect(value.maxLoanAmount).toBeUndefined();
     });
 
-    test('rejects a missing maxLoanAmount', () => {
-        const { error } = cdlCreditDecisionSchema.validate({ creditStatus: 'PASS' }, OPTS);
+    test('rejects missing required fields', () => {
+        const { error } = cdlCreditDecisionSchema.validate({}, OPTS);
         expect(error).toBeDefined();
     });
 });
