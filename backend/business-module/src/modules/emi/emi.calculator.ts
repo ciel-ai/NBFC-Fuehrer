@@ -218,6 +218,17 @@ export function computeForeclosureAmount(params: {
     settlementDate: Date;
     foreclosureFeePct: number;     // e.g. 2% foreclosure fee
     accumulatedPenalty: Rupees;
+    // Minimum interest rule ("10 days interest or ₹500, whichever is
+    // higher") is a Gold-Loan-specific rule per this function's own
+    // original comment — but it was being applied unconditionally to
+    // EVERY caller, including CDL (via the shared getForeclosureQuote),
+    // where the client's spec states foreclosure is simply "5% of
+    // principal outstanding + GST", nothing about a minimum-interest
+    // floor. For a small CDL loan foreclosed early, a flat ₹500 floor
+    // could be a disproportionate share of the real payoff. No default —
+    // every caller must say explicitly which product's rules apply,
+    // rather than silently inheriting gold loan's floor.
+    applyMinimumInterestFloor: boolean;
 }): {
     outstandingPrincipal: Rupees;
     accruedInterest: Rupees;
@@ -233,6 +244,7 @@ export function computeForeclosureAmount(params: {
         settlementDate,
         foreclosureFeePct,
         accumulatedPenalty,
+        applyMinimumInterestFloor,
     } = params;
 
     // Pro-rata daily interest from last EMI to settlement date
@@ -248,12 +260,16 @@ export function computeForeclosureAmount(params: {
         Math.ceil(toPaisa(outstandingPrincipal) * dailyRate * daysSinceLastEmi),
     );
 
-    // Minimum interest rule for Gold Loans — 10 days interest or ₹500, whichever is higher
-    const tenDaysInterest = toRupees(
-        Math.ceil(toPaisa(outstandingPrincipal) * dailyRate * 10),
-    );
-    const minimumInterest = Math.max(tenDaysInterest, 500);
-    const accruedInterest = Math.max(rawAccruedInterest, minimumInterest);
+    // Minimum interest rule for Gold Loans — 10 days interest or ₹500,
+    // whichever is higher. Only applied when the caller says so.
+    let accruedInterest = rawAccruedInterest;
+    if (applyMinimumInterestFloor) {
+        const tenDaysInterest = toRupees(
+            Math.ceil(toPaisa(outstandingPrincipal) * dailyRate * 10),
+        );
+        const minimumInterest = Math.max(tenDaysInterest, 500);
+        accruedInterest = Math.max(rawAccruedInterest, minimumInterest);
+    }
 
     const foreclosureFee = toRupees(
         Math.ceil(toPaisa(outstandingPrincipal) * (foreclosureFeePct / 100)),
