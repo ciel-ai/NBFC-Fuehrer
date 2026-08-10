@@ -203,6 +203,27 @@ export const cdlAutoApprovalService = {
             };
         }
 
+        // Auto-approval-specific amount ceiling (client's Consumer Loan
+        // Product Configuration spec, section 4.1 "Auto Approval Criteria":
+        // ₹7,000-₹40,000) — narrower than the general CDL range just
+        // checked above (₹7,000-₹1,00,000, spec section 1e/2). A loan above
+        // ₹40,000 is still a valid CDL loan, just outside auto-approval's
+        // scope — the spec doesn't say to reject it, only to route it to
+        // manual review.
+        if (input.requestedAmount > 40000) {
+            reasons.push(`Loan amount ₹${input.requestedAmount.toLocaleString('en-IN')} exceeds auto-approval limit of ₹40,000 — requires manual review`);
+            log.info('CDL manual review — amount exceeds auto-approval limit', {
+                loanApplicationId: input.loanApplicationId,
+                requestedAmount:   input.requestedAmount,
+            });
+            return {
+                decision:    'MANUAL_REVIEW',
+                creditScore: input.creditScore,
+                foir:        null,
+                reasons,
+            };
+        }
+
         // ── Step 3: FOIR calculation ───────────────────────────────────────────
         const interestRate   = getInterestRate(input.employmentType, input.creditScore);
         const proposedEmi    = calculateEmi(input.requestedAmount, interestRate, input.tenureMonths);
@@ -296,14 +317,14 @@ export const cdlAutoApprovalService = {
     },
 
     // ── Save auto approval result to underwriting report ─────────────────────
-    // Previously wrote status only — approvedAmountRupees/interestRate/
-    // processingFeeRupees were computed above but silently discarded, so an
-    // AUTO_APPROVE decision left approved_amount/interest_rate NULL in the
-    // DB. cdlLoans.service.ts's disburseToMerchant hard-gates on both being
-    // non-null, so a loan "approved" through this admin path could never
-    // actually be disbursed. Now persists the same figures the response
-    // already reported. REJECT/MANUAL_REVIEW have no approved figures to
-    // persist, so they're unchanged.
+    // Previously wrote status only — approvedAmountRupees/processingFeeRupees
+    // were computed above but silently discarded, so an AUTO_APPROVE
+    // decision left approved_amount NULL in the DB. cdlLoans.service.ts's
+    // disburseToMerchant hard-gates on approved_amount being non-null, so a
+    // loan "approved" through this admin path could never actually be
+    // disbursed. Now persists the figures the response already reported.
+    // REJECT/MANUAL_REVIEW have no approved figures to persist, so they're
+    // unchanged.
 
     async saveResult(
         loanApplicationId: string,
@@ -317,8 +338,18 @@ export const cdlAutoApprovalService = {
                           : 'PENDING_APPROVAL',
                 ...(result.decision === 'AUTO_APPROVE' ? {
                     approved_amount: result.approvedAmountRupees,
-                    interest_rate:   result.interestRate,
                     processing_fee:  result.processingFeeRupees,
+                    // interest_rate deliberately NOT persisted here.
+                    // result.interestRate comes from this file's
+                    // getInterestRate(), which derives rate from CIBIL
+                    // score — confirmed against the client's Consumer Loan
+                    // Product Configuration spec (sections 1b/2b) to have
+                    // no basis there; that spec's rate table is flat by
+                    // customer type only, with no credit-score dimension.
+                    // The correct rate model (this vs. cdlLoans.service.ts's
+                    // CDL_INTEREST_RATES) is still pending client
+                    // confirmation. Persisting a rate already known to
+                    // possibly be wrong would be worse than leaving it null.
                 } : {}),
                 updated_at: new Date(),
             },
