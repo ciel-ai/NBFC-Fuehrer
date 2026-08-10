@@ -20,6 +20,7 @@ import {
     EMI_STATUS,
     BUSINESS_RULES,
     AUDIT_ACTION,
+    PRODUCT_TYPE,
 } from '@/config/constants';
 import {
     roundRupees,
@@ -413,6 +414,22 @@ export const emiService = {
         // Last paid EMI date as starting point for accrued interest
         const lastPaidDate = summary.lastPaidAt ?? new Date();
 
+        // This is the single shared entry point for CDL, gold, and
+        // housing loans' foreclosure quotes (cdlLoans.service.ts's
+        // closeLoan, goldLoans.service.ts, the generic /emi/:id/
+        // foreclosure-quote route, and the LMS portal all route through
+        // here) — the minimum-interest floor is Gold-Loan-specific
+        // (computeForeclosureAmount's own documented scope), so it's only
+        // applied when this account's product actually is a gold loan,
+        // not blanket-applied to every product that happens to call this
+        // shared function. Same lookup pattern applyOverduePenalty above
+        // already uses (product_type isn't denormalized onto loan_accounts).
+        const account = await loansRepository.findAccountByIdOrThrow(loanAccountId);
+        const application = await prisma.loan_applications.findUniqueOrThrow({
+            where: { id: account.applicationId },
+            select: { product_type: true },
+        });
+
         return computeForeclosureAmount({
             outstandingPrincipal: summary.totalOutstanding,
             annualRatePct,
@@ -420,6 +437,7 @@ export const emiService = {
             settlementDate: new Date(),
             foreclosureFeePct: 5,   // 5% per client requirements (principal outstanding + GST)
             accumulatedPenalty: summary.totalPenalty,
+            applyMinimumInterestFloor: application.product_type === PRODUCT_TYPE.GOLD_LOAN,
         });
     },
 

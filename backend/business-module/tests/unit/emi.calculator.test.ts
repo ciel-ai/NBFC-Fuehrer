@@ -221,13 +221,14 @@ describe('computeForeclosureAmount', () => {
             settlementDate: new Date('2026-01-11'), // 10 days later
             foreclosureFeePct: 5,
             accumulatedPenalty: 0,
+            applyMinimumInterestFloor: true,
         });
         // At 18% p.a. over 10 days on ₹1,00,000, accrued interest must be > 0.
         // A 0%-rate bug would make this exactly 0.
         expect(result.accruedInterest).toBeGreaterThan(0);
     });
 
-    test('minimum interest rule — 10 days interest or ₹500, whichever higher (short outstanding period)', () => {
+    test('minimum interest rule — 10 days interest or ₹500, whichever higher (short outstanding period) — WHEN the floor applies', () => {
         const result = computeForeclosureAmount({
             outstandingPrincipal: 10_000,
             annualRatePct: 12,
@@ -235,10 +236,33 @@ describe('computeForeclosureAmount', () => {
             settlementDate: new Date('2026-01-02'), // 1 day later — real interest would be tiny
             foreclosureFeePct: 5,
             accumulatedPenalty: 0,
+            applyMinimumInterestFloor: true,
         });
         // Real 1-day interest on ₹10,000 @ 12% is a few rupees — the ₹500
         // minimum interest rule must kick in and dominate.
         expect(result.accruedInterest).toBeGreaterThanOrEqual(500);
+    });
+
+    // Audit finding #9: this floor is Gold-Loan-specific per the
+    // function's own documented scope, but was being applied
+    // unconditionally to every caller — including CDL, whose spec states
+    // foreclosure is simply "5% of principal outstanding + GST", nothing
+    // about a minimum-interest floor. Same inputs as the test above,
+    // just with the flag off, to prove the floor is now opt-in.
+    test('the same short-outstanding-period scenario does NOT apply the floor when applyMinimumInterestFloor is false', () => {
+        const result = computeForeclosureAmount({
+            outstandingPrincipal: 10_000,
+            annualRatePct: 12,
+            lastEmiDate: new Date('2026-01-01'),
+            settlementDate: new Date('2026-01-02'),
+            foreclosureFeePct: 5,
+            accumulatedPenalty: 0,
+            applyMinimumInterestFloor: false,
+        });
+        // Real 1-day interest on ₹10,000 @ 12% is a few rupees — must NOT
+        // be inflated to the ₹500 floor.
+        expect(result.accruedInterest).toBeLessThan(500);
+        expect(result.accruedInterest).toBeGreaterThan(0);
     });
 
     test('foreclosure fee is 5% of outstanding principal plus GST', () => {
@@ -249,6 +273,7 @@ describe('computeForeclosureAmount', () => {
             settlementDate: new Date('2026-01-11'),
             foreclosureFeePct: 5,
             accumulatedPenalty: 0,
+            applyMinimumInterestFloor: true,
         });
         // 5% of 100,000 = 5,000; +18% GST = 5,900
         expect(result.foreclosureFee).toBeCloseTo(5_000, 0);
@@ -262,6 +287,7 @@ describe('computeForeclosureAmount', () => {
             settlementDate: new Date('2026-01-11'),
             foreclosureFeePct: 5,
             accumulatedPenalty: 1_000,
+            applyMinimumInterestFloor: true,
         });
         const withoutPenalty = computeForeclosureAmount({
             outstandingPrincipal: 50_000,
@@ -270,6 +296,7 @@ describe('computeForeclosureAmount', () => {
             settlementDate: new Date('2026-01-11'),
             foreclosureFeePct: 5,
             accumulatedPenalty: 0,
+            applyMinimumInterestFloor: true,
         });
         expect(withPenalty.total - withoutPenalty.total).toBeCloseTo(1_000, 0);
     });
