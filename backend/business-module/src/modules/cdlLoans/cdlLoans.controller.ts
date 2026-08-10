@@ -5,7 +5,7 @@ import { getValidatedBody, getValidatedParams } from '@/types/express';
 import { HTTP } from '@/config/constants';
 import { successResponse } from '@/types/common.types';
 import { cdlLoansService } from './cdlLoans.service';
-import type { CdlApplicationInput, CdlCreditAssessmentInput, CdlCreditAssessment } from './cdlLoans.types';
+import type { CdlApplicationInput, CdlCreditAssessmentInput } from './cdlLoans.types';
 
 export const cdlLoansController = {
 
@@ -21,7 +21,9 @@ export const cdlLoansController = {
     async runKycChecks(req: AuthRequest, res: Response, next: NextFunction) {
         try {
             const { id } = getValidatedParams<{ id: string }>(req);
-            const result = await cdlLoansService.runKycChecks(id);
+            const callerId = req.user!.id;
+            const callerRole = req.user!.role;
+            const result = await cdlLoansService.runKycChecks(id, callerId, callerRole);
             res.status(HTTP.OK).json(successResponse(result));
         } catch (err) { next(err); }
     },
@@ -29,7 +31,9 @@ export const cdlLoansController = {
     async runComplianceChecks(req: AuthRequest, res: Response, next: NextFunction) {
         try {
             const { id } = getValidatedParams<{ id: string }>(req);
-            const result = await cdlLoansService.runComplianceChecks(id);
+            const callerId = req.user!.id;
+            const callerRole = req.user!.role;
+            const result = await cdlLoansService.runComplianceChecks(id, callerId, callerRole);
             res.status(HTTP.OK).json(successResponse(result));
         } catch (err) { next(err); }
     },
@@ -38,7 +42,9 @@ export const cdlLoansController = {
         try {
             const { id } = getValidatedParams<{ id: string }>(req);
             const body = getValidatedBody<CdlCreditAssessmentInput>(req);
-            const result = cdlLoansService.runCreditAssessment(id, body);
+            const callerId = req.user!.id;
+            const callerRole = req.user!.role;
+            const result = await cdlLoansService.runCreditAssessment(id, body, callerId, callerRole);
             res.status(HTTP.OK).json(successResponse(result));
         } catch (err) { next(err); }
     },
@@ -46,12 +52,17 @@ export const cdlLoansController = {
     async getCreditDecision(req: AuthRequest, res: Response, next: NextFunction) {
         try {
             const { id } = getValidatedParams<{ id: string }>(req);
-            // cdlCreditDecisionSchema only requires creditStatus/maxLoanAmount
-            // (the only two fields the service actually reads) — the rest of
-            // CdlCreditAssessment is accepted but optional, since the client
-            // conventionally echoes the whole assessment result back.
-            const body = getValidatedBody<CdlCreditAssessment>(req);
-            const result = await cdlLoansService.getCreditDecision(id, body);
+            // Previously accepted a client-echoed CdlCreditAssessment
+            // (creditStatus/maxLoanAmount trusted directly from the
+            // request body — a customer could self-approve their own
+            // loan). getCreditDecision now derives the decision itself
+            // from server-side income inputs + the real bureau score —
+            // see cdlLoans.service.ts. Only income inputs remain
+            // client-supplied, same shape as /credit-assessment.
+            const body = getValidatedBody<CdlCreditAssessmentInput>(req);
+            const callerId = req.user!.id;
+            const callerRole = req.user!.role;
+            const result = await cdlLoansService.getCreditDecision(id, body, callerId, callerRole);
             res.status(HTTP.OK).json(successResponse(result));
         } catch (err) { next(err); }
     },
@@ -59,7 +70,9 @@ export const cdlLoansController = {
     async generateAgreement(req: AuthRequest, res: Response, next: NextFunction) {
         try {
             const { id } = getValidatedParams<{ id: string }>(req);
-            const result = await cdlLoansService.generateAgreement(id);
+            const callerId = req.user!.id;
+            const callerRole = req.user!.role;
+            const result = await cdlLoansService.generateAgreement(id, callerId, callerRole);
             res.status(HTTP.OK).json(successResponse(result, 'Agreement generated'));
         } catch (err) { next(err); }
     },
@@ -67,7 +80,9 @@ export const cdlLoansController = {
     async completeESign(req: AuthRequest, res: Response, next: NextFunction) {
         try {
             const { id } = getValidatedParams<{ id: string }>(req);
-            const result = await cdlLoansService.completeESign(id);
+            const callerId = req.user!.id;
+            const callerRole = req.user!.role;
+            const result = await cdlLoansService.completeESign(id, callerId, callerRole);
             res.status(HTTP.OK).json(successResponse(result));
         } catch (err) { next(err); }
     },
@@ -76,11 +91,15 @@ export const cdlLoansController = {
         try {
             const { id } = getValidatedParams<{ id: string }>(req);
             const { bankAccount, ifsc } = getValidatedBody<{ bankAccount: string; ifsc: string }>(req);
-            const result = await cdlLoansService.registerNachMandate(id, { bankAccount, ifsc });
+            const callerId = req.user!.id;
+            const callerRole = req.user!.role;
+            const result = await cdlLoansService.registerNachMandate(id, { bankAccount, ifsc }, callerId, callerRole);
             res.status(HTTP.OK).json(successResponse(result, 'NACH initiated'));
         } catch (err) { next(err); }
     },
 
+    // Finance/admin-only (see routes) — no ownership check needed here,
+    // staff can act on any customer's application. Unchanged from before.
     async disburseToMerchant(req: AuthRequest, res: Response, next: NextFunction) {
         try {
             const { id } = getValidatedParams<{ id: string }>(req);
@@ -94,7 +113,9 @@ export const cdlLoansController = {
     async getEmiSchedule(req: AuthRequest, res: Response, next: NextFunction) {
         try {
             const { id } = getValidatedParams<{ id: string }>(req);
-            const result = await cdlLoansService.getEmiSchedule(id);
+            const callerId = req.user!.id;
+            const callerRole = req.user!.role;
+            const result = await cdlLoansService.getEmiSchedule(id, callerId, callerRole);
             res.status(HTTP.OK).json(successResponse(result));
         } catch (err) { next(err); }
     },
@@ -103,8 +124,10 @@ export const cdlLoansController = {
         try {
             const { id } = getValidatedParams<{ id: string }>(req);
             const collectedBy = req.user!.id;
+            const callerId = req.user!.id;
+            const callerRole = req.user!.role;
             const { emiId, amount, collectionId } = getValidatedBody<{ emiId: string; amount: number; collectionId?: string }>(req);
-            const result = await cdlLoansService.processManualPayment(id, emiId, amount, collectedBy, collectionId, req);
+            const result = await cdlLoansService.processManualPayment(id, emiId, amount, collectedBy, collectionId, req, callerId, callerRole);
             res.status(HTTP.OK).json(successResponse(result, 'Payment recorded'));
         } catch (err) { next(err); }
     },
@@ -113,7 +136,9 @@ export const cdlLoansController = {
         try {
             const { id } = getValidatedParams<{ id: string }>(req);
             const { emiId } = getValidatedBody<{ emiId: string }>(req);
-            const result = await cdlLoansService.handlePaymentFailure(id, emiId, req);
+            const callerId = req.user!.id;
+            const callerRole = req.user!.role;
+            const result = await cdlLoansService.handlePaymentFailure(id, emiId, req, callerId, callerRole);
             res.status(HTTP.OK).json(successResponse(result));
         } catch (err) { next(err); }
     },
@@ -121,7 +146,9 @@ export const cdlLoansController = {
     async getOverdueStatus(req: AuthRequest, res: Response, next: NextFunction) {
         try {
             const { id } = getValidatedParams<{ id: string }>(req);
-            const result = await cdlLoansService.getOverdueStatus(id);
+            const callerId = req.user!.id;
+            const callerRole = req.user!.role;
+            const result = await cdlLoansService.getOverdueStatus(id, callerId, callerRole);
             res.status(HTTP.OK).json(successResponse(result));
         } catch (err) { next(err); }
     },
@@ -129,7 +156,9 @@ export const cdlLoansController = {
     async closeLoan(req: AuthRequest, res: Response, next: NextFunction) {
         try {
             const { id } = getValidatedParams<{ id: string }>(req);
-            const result = await cdlLoansService.closeLoan(id);
+            const callerId = req.user!.id;
+            const callerRole = req.user!.role;
+            const result = await cdlLoansService.closeLoan(id, callerId, callerRole);
             res.status(HTTP.OK).json(successResponse(result, 'Loan closed'));
         } catch (err) { next(err); }
     },
@@ -137,7 +166,9 @@ export const cdlLoansController = {
     async generateNoc(req: AuthRequest, res: Response, next: NextFunction) {
         try {
             const { id } = getValidatedParams<{ id: string }>(req);
-            const result = await cdlLoansService.generateNoc(id);
+            const callerId = req.user!.id;
+            const callerRole = req.user!.role;
+            const result = await cdlLoansService.generateNoc(id, callerId, callerRole);
             res.status(HTTP.OK).json(successResponse(result));
         } catch (err) { next(err); }
     },

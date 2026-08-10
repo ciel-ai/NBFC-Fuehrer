@@ -6,13 +6,16 @@ import { computeMonthlyEmi } from '@/modules/emi/emi.calculator';
 import { emiService } from '@/modules/emi';
 import { loansRepository } from '@/modules/loans/loans.repository';
 import { paymentsService } from '@/modules/payments';
+import { kycRepository } from '@/modules/kyc';
 import { getPaymentProvider } from '@/providers';
 import { pdfService } from '@/modules/documents/pdf.service';
 import { getDocStorageProvider } from '@/providers/docStorage';
 import { getEncryptionProvider } from '@/providers/encryption';
 import { getESignProvider } from '@/providers/esign';
 import { assertTransition } from '@/utils/loanStateMachine.util';
+import { assertApplicationOwnership, assertAccountOwnership } from '@/utils/ownership.util';
 import { LOAN_STATUS, PRODUCT_TYPE, BUSINESS_RULES } from '@/config/constants';
+import type { Role } from '@/config/constants';
 import type {
     CdlApplicationInput, CdlApplicationResult,
     CdlKycResult, CdlComplianceResult,
@@ -152,8 +155,9 @@ export const cdlLoansService = {
     },
 
     // ── Real: reads the actual kyc_documents row for this applicant. ─────────
-    async runKycChecks(applicationId: string): Promise<CdlKycResult> {
+    async runKycChecks(applicationId: string, callerId: string, callerRole: Role): Promise<CdlKycResult> {
         const application = await loansRepository.findApplicationByIdOrThrow(applicationId);
+        assertApplicationOwnership(callerId, application, callerRole);
 
         const kyc = await prisma.kyc_documents.findUnique({
             where: { user_id: application.userId },
@@ -188,8 +192,9 @@ export const cdlLoansService = {
     // ── Real, with the same honest limitation as gold loans: AML is
     // inferred from the KYC outcome since that's genuinely where the AML
     // check runs and hard-rejects today. ──────────────────────────────────────
-    async runComplianceChecks(applicationId: string): Promise<CdlComplianceResult> {
+    async runComplianceChecks(applicationId: string, callerId: string, callerRole: Role): Promise<CdlComplianceResult> {
         const application = await loansRepository.findApplicationByIdOrThrow(applicationId);
+        assertApplicationOwnership(callerId, application, callerRole);
 
         const kyc = await prisma.kyc_documents.findUnique({
             where: { user_id: application.userId },
@@ -222,10 +227,31 @@ export const cdlLoansService = {
         };
     },
 
-    // Pure calculation — matches client's FOIR formula and CIBIL decision
-    // table exactly. No DB writes; the decision step below persists the
-    // outcome once a final credit decision is made.
-    runCreditAssessment(applicationId: string, input: CdlCreditAssessmentInput): CdlCreditAssessment {
+    // ── Real: FOIR is still a pure calculation from caller-supplied income
+    // figures (income verification isn't sourced from anywhere more
+    // authoritative in this codebase yet — a separate, larger gap, not
+    // addressed here). cibilScore is NOT caller-supplied any more: it's
+    // read from the real, bureau-verified score already sitting in
+    // kyc_documents.credit_score (populated by the actual bureau pull in
+    // kyc.service.ts). Previously this took cibilScore directly from the
+    // request body — a customer-role caller could submit any score from
+    // 300-900 and the "assessment" would trust it outright, with no
+    // independent verification at all. ───────────────────────────────────────
+    async runCreditAssessment(
+        applicationId: string,
+        input: CdlCreditAssessmentInput,
+        callerId: string,
+        callerRole: Role,
+    ): Promise<CdlCreditAssessment> {
+        const application = await loansRepository.findApplicationByIdOrThrow(applicationId);
+        assertApplicationOwnership(callerId, application, callerRole);
+
+        const kyc = await kycRepository.findByUserId(application.userId);
+        if (kyc?.creditScore == null) {
+            throw new ValidationError('creditScore', 'Credit bureau check has not been completed for this application');
+        }
+        const cibilScore = kyc.creditScore;
+
         const foir = Math.round(((input.existingEmis + input.proposedEmi) / input.monthlyIncome) * 100 * 10) / 10;
         const foirStatus = foir <= CDL_FOIR_LIMIT ? 'PASS' : 'FAIL';
 
@@ -233,8 +259,8 @@ export const cdlLoansService = {
         // 750+ auto-approve, 700-749 manual review, 650-699 reject, <650 reject,
         // no-hit/new-to-credit → manual review.
         const cibilDecision: 'PASS' | 'REVIEW' | 'FAIL' =
-            input.cibilScore >= 750 ? 'PASS' :
-            input.cibilScore >= 700 ? 'REVIEW' :
+            cibilScore >= 750 ? 'PASS' :
+            cibilScore >= 700 ? 'REVIEW' :
             'FAIL';
 
         const creditStatus: 'PASS' | 'FAIL' | 'REVIEW' =
@@ -249,18 +275,38 @@ export const cdlLoansService = {
 
         return {
             applicationId,
-            cibilScore: input.cibilScore,
+            cibilScore,
             foir,
             foirStatus,
             creditStatus,
             maxLoanAmount: creditStatus === 'PASS' ? maxLoan : 0,
-            note: `CIBIL ${input.cibilScore}, FOIR ${foir}% — ${creditStatus}.`,
+            note: `CIBIL ${cibilScore}, FOIR ${foir}% — ${creditStatus}.`,
         };
     },
 
     // ── Real: persists the actual decision onto loan_applications. ───────────
-    async getCreditDecision(applicationId: string, assessment: CdlCreditAssessment): Promise<CdlCreditDecision> {
+    // Previously took `assessment: CdlCreditAssessment` — including
+    // creditStatus and maxLoanAmount — directly from the request body and
+    // used those values, completely trusted, for the actual approval
+    // decision and DB write. A customer-role caller could call this
+    // endpoint directly (skipping /credit-assessment entirely) with
+    // {creditStatus:'PASS', maxLoanAmount:100000} and self-approve their
+    // own application for the full requested amount, with zero real
+    // underwriting. Now computes the decision itself via
+    // runCreditAssessment (server-derived cibilScore, same ownership
+    // check), so the client can no longer influence the outcome by what
+    // it sends — only monthlyIncome/existingEmis/proposedEmi remain
+    // caller-supplied, same as /credit-assessment. ───────────────────────────
+    async getCreditDecision(
+        applicationId: string,
+        input: CdlCreditAssessmentInput,
+        callerId: string,
+        callerRole: Role,
+    ): Promise<CdlCreditDecision> {
         const application = await loansRepository.findApplicationByIdOrThrow(applicationId);
+        assertApplicationOwnership(callerId, application, callerRole);
+
+        const assessment = await cdlLoansService.runCreditAssessment(applicationId, input, callerId, callerRole);
 
         const approved = assessment.creditStatus === 'PASS';
         const inReview = assessment.creditStatus === 'REVIEW';
@@ -296,13 +342,14 @@ export const cdlLoansService = {
     // 919f711), which the eSign webhook (POST /webhooks/esign,
     // /webhooks/signzy → kycService.processESignCallback) has also been
     // repointed at. ─────────────────────────────────────────────────────────
-    async generateAgreement(applicationId: string): Promise<CdlAgreementResult> {
+    async generateAgreement(applicationId: string, callerId: string, callerRole: Role): Promise<CdlAgreementResult> {
         log.info('Generating CDL agreement', { applicationId });
 
         const application = await prisma.loan_applications.findUniqueOrThrow({
             where: { id: applicationId },
             include: { user: { select: { full_name: true, phone: true } } },
         });
+        assertApplicationOwnership(callerId, { userId: application.user_id }, callerRole);
 
         const kyc = await prisma.kyc_documents.findUnique({
             where: { user_id: application.user_id },
@@ -367,7 +414,7 @@ export const cdlLoansService = {
     // and stores the signed+stamped PDF — same pattern as
     // goldLoans.completeESign. Customer polls this after visiting the
     // signingUrl from generateAgreement (or after the eSign webhook fires). ──
-    async completeESign(applicationId: string): Promise<CdlAgreementResult> {
+    async completeESign(applicationId: string, callerId: string, callerRole: Role): Promise<CdlAgreementResult> {
         log.info('Checking eSign completion for CDL', { applicationId });
 
         // esign_request_id/esign_status/estamp_id/estamp_status are on this
@@ -375,6 +422,7 @@ export const cdlLoansService = {
         const application = await prisma.loan_applications.findUniqueOrThrow({
             where: { id: applicationId },
         });
+        assertApplicationOwnership(callerId, { userId: application.user_id }, callerRole);
 
         if (!application.esign_request_id) {
             throw new ValidationError('applicationId', 'No eSign request found — call the agreement step first');
@@ -442,11 +490,17 @@ export const cdlLoansService = {
 
     // ── Real: creates an actual Razorpay mandate via paymentsService, same
     // pattern gold loans already use. ─────────────────────────────────────────
-    async registerNachMandate(applicationId: string, input: { bankAccount: string; ifsc: string }): Promise<CdlNachResult> {
+    async registerNachMandate(
+        applicationId: string,
+        input: { bankAccount: string; ifsc: string },
+        callerId: string,
+        callerRole: Role,
+    ): Promise<CdlNachResult> {
         const application = await prisma.loan_applications.findUniqueOrThrow({
             where: { id: applicationId },
             include: { user: { select: { full_name: true, phone: true } } },
         });
+        assertApplicationOwnership(callerId, { userId: application.user_id }, callerRole);
 
         const principal = Number(application.approved_amount ?? application.amount_requested);
         const estimatedMonthlyEmi = principal / application.tenure_months;
@@ -641,7 +695,10 @@ export const cdlLoansService = {
     },
 
     // ── Real: reads the actual emi_schedule table for this loan account. ────
-    async getEmiSchedule(loanId: string) {
+    async getEmiSchedule(loanId: string, callerId: string, callerRole: Role) {
+        const account = await loansRepository.findAccountByIdOrThrow(loanId);
+        assertAccountOwnership(callerId, account, callerRole);
+
         const schedule = await emiService.getSchedule({ loanAccountId: loanId });
         return schedule.map(e => ({
             emiNumber: e.emiNumber,
@@ -657,12 +714,22 @@ export const cdlLoansService = {
     // penalty/interest/principal allocation, posts GL entries and fires the
     // payment.received event. Previously this hardcoded paidAmount: 0 regardless
     // of what the customer actually paid. ───────────────────────────────────────
-    async processManualPayment(loanId: string, emiId: string, amount: number, collectedBy: string, collectionId: string | undefined, req: any) {
+    async processManualPayment(
+        loanId: string,
+        emiId: string,
+        amount: number,
+        collectedBy: string,
+        collectionId: string | undefined,
+        req: any,
+        callerId: string,
+        callerRole: Role,
+    ) {
         if (!amount || amount <= 0) {
             throw new ValidationError('amount', 'Payment amount must be greater than zero');
         }
 
         const account = await loansRepository.findAccountByIdOrThrow(loanId);
+        assertAccountOwnership(callerId, account, callerRole);
 
         const payment = await paymentsService.recordCashPayment({
             loanAccountId: loanId,
@@ -688,13 +755,19 @@ export const cdlLoansService = {
         };
     },
 
-    async handlePaymentFailure(loanId: string, emiId: string, req: any) {
+    async handlePaymentFailure(loanId: string, emiId: string, req: any, callerId: string, callerRole: Role) {
+        const account = await loansRepository.findAccountByIdOrThrow(loanId);
+        assertAccountOwnership(callerId, account, callerRole);
+
         const updated = await emiService.applyBounce(emiId, 'CDL EMI auto-debit failed', req);
         return { loanId, emiId, status: updated.status, retryDate: updated.nextRetryAt?.toISOString() ?? new Date().toISOString() };
     },
 
     // ── Real: reads real outstanding/overdue figures from emi_schedule. ──────
-    async getOverdueStatus(loanId: string): Promise<CdlOverdueStatus> {
+    async getOverdueStatus(loanId: string, callerId: string, callerRole: Role): Promise<CdlOverdueStatus> {
+        const account = await loansRepository.findAccountByIdOrThrow(loanId);
+        assertAccountOwnership(callerId, account, callerRole);
+
         const summary = await emiService.getSummary(loanId);
         const overdueAgg = await prisma.emi_schedule.aggregate({
             where: { loan_account_id: loanId, status: 'OVERDUE' },
@@ -725,8 +798,9 @@ export const cdlLoansService = {
 
     // ── Real: reuses the same foreclosure formula (5% + GST) already
     // correct and tested for gold/CDL via the shared calculator. ────────────
-    async closeLoan(loanId: string): Promise<CdlClosureResult> {
+    async closeLoan(loanId: string, callerId: string, callerRole: Role): Promise<CdlClosureResult> {
         const account = await loansRepository.findAccountByIdOrThrow(loanId);
+        assertAccountOwnership(callerId, account, callerRole);
 
         // Same check housingLoans.service.ts's closeLoan already has —
         // this one had no equivalent, so it closed unconditionally
@@ -752,8 +826,9 @@ export const cdlLoansService = {
     // ── Real: pdfService.generateNoc already exists (housing loans already
     // use it) — this was just never actually calling it. Same pattern as
     // housingLoans.service.ts's generateNoc. ─────────────────────────────────
-    async generateNoc(loanId: string): Promise<{ nocRef: string; nocS3Url: string }> {
+    async generateNoc(loanId: string, callerId: string, callerRole: Role): Promise<{ nocRef: string; nocS3Url: string }> {
         const account = await loansRepository.findAccountByIdOrThrow(loanId);
+        assertAccountOwnership(callerId, account, callerRole);
         if (account.status !== LOAN_STATUS.CLOSED) {
             throw new LoanStateError(loanId, account.status, LOAN_STATUS.CLOSED);
         }

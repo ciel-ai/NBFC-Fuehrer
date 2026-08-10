@@ -99,33 +99,35 @@ export const cdlSubmitApplicationSchema = Joi.object({
 });
 
 // ─── POST /applications/:id/credit-assessment ──────────────────────────────────
-// Body fields match CdlCreditAssessmentInput exactly — all four are read
-// by cdlLoansService.runCreditAssessment.
+// Body fields match CdlCreditAssessmentInput exactly — all three are read
+// by cdlLoansService.runCreditAssessment. cibilScore is deliberately NOT
+// part of this schema — it's read server-side from kyc_documents
+// .credit_score (the real bureau-verified score), never from the client.
+// Previously accepted a client-supplied cibilScore (300-900) and trusted
+// it outright for the actual credit decision.
 
 export const cdlCreditAssessmentSchema = Joi.object({
-    cibilScore: Joi.number().integer().min(300).max(900).required(),
     monthlyIncome: Joi.number().positive().precision(2).required(),
     existingEmis: Joi.number().min(0).precision(2).required(),
     proposedEmi: Joi.number().positive().precision(2).required(),
 });
 
 // ─── POST /applications/:id/credit-decision ────────────────────────────────────
-// The client conventionally echoes back the full credit-assessment result
-// (CdlCreditAssessment) it just received — but cdlLoansService
-// .getCreditDecision only actually reads creditStatus and maxLoanAmount
-// (confirmed by reading the function body, not assumed from the type).
-// Those two are required; the rest are accepted (not stripped, so the
-// echo pattern the client already uses keeps working) but not required,
-// since the server doesn't depend on them.
+// Previously accepted a client-echoed creditStatus/maxLoanAmount and wrote
+// those trusted values directly to the DB as the approval decision — a
+// customer could call this endpoint directly with {creditStatus:'PASS',
+// maxLoanAmount:100000} and self-approve their own loan, skipping
+// /credit-assessment entirely. getCreditDecision now computes the
+// decision itself (same server-derived cibilScore as /credit-assessment),
+// so the only trusted client input is the same income data
+// /credit-assessment already takes — deliberately identical shape to
+// cdlCreditAssessmentSchema, kept as a separate named export since it
+// documents a distinct route/intent.
 
 export const cdlCreditDecisionSchema = Joi.object({
-    creditStatus: Joi.string().valid('PASS', 'FAIL', 'REVIEW').required(),
-    maxLoanAmount: Joi.number().min(0).precision(2).required(),
-    applicationId: Joi.string().uuid({ version: 'uuidv4' }).optional(),
-    cibilScore: Joi.number().integer().optional(),
-    foir: Joi.number().optional(),
-    foirStatus: Joi.string().valid('PASS', 'FAIL').optional(),
-    note: Joi.string().max(500).optional(),
+    monthlyIncome: Joi.number().positive().precision(2).required(),
+    existingEmis: Joi.number().min(0).precision(2).required(),
+    proposedEmi: Joi.number().positive().precision(2).required(),
 });
 
 // ─── POST /applications/:id/nach ────────────────────────────────────────────────

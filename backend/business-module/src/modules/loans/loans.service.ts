@@ -5,13 +5,14 @@ import { isStaffRole } from '@/constants/roles.constants';
 import { loanEvents } from './loans.events';
 import { setAuditContext } from '@/middlewares';
 import { kycRepository } from '@/modules/kyc';
+import { assertAccountOwnership } from '@/utils/ownership.util';
 import {
     LOAN_STATUS,
     AUDIT_ACTION,
     BUSINESS_RULES,
     LOAN_TRANSITIONS,
 } from '@/config/constants';
-import type { LoanStatus } from '@/config/constants';
+import type { LoanStatus, Role } from '@/config/constants';
 import {
     LoanStateError,
     LoanAmountOutOfRangeError,
@@ -555,10 +556,13 @@ export const loansService = {
     ): Promise<LoanAccountResponse> {
         const account = await loansRepository.findAccountByIdOrThrow(accountId);
 
-        // Central staff predicate — includes the web-portal staff vocabulary
-        if (!isStaffRole(role as never) && account.userId !== userId) {
-            throw new ForbiddenError('You can only view your own loan account');
-        }
+        // Previously a hand-rolled equivalent of this exact check, despite
+        // ownership.util.ts's own header comment claiming this was already
+        // the one place the pattern lived correctly — it wasn't actually
+        // routed through the shared utility. Now it is, matching every
+        // other ownership check in the codebase (CDL, goldLoans,
+        // housingLoans, payments, grievances).
+        assertAccountOwnership(userId, account, role as Role);
 
         return toAccountResponse(account);
     },
