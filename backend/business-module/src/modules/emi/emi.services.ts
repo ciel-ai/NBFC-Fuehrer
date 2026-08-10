@@ -10,6 +10,7 @@ import {
     computeTieredOverduePenalty,
     computeBouncePenalty,
     computeForeclosureAmount,
+    allocatePartialPayment,
 } from './emi.calculator';
 
 import { eventBus } from '@/events';
@@ -106,6 +107,26 @@ export const emiService = {
     // ── 5. Mark EMI as paid ───────────────────────────────────────────────────
     // Called by payments.service on successful payment capture.
     // Also called by collections module for cash/UPI collections.
+    //
+    // Previously: any nonzero paidAmount, however small, unconditionally
+    // set status: PAID via emiRepository.markPaid — a ₹1 payment against a
+    // ₹5,000 EMI marked it fully paid, silently forgiving the principal/
+    // interest shortfall (only the penalty component had a residual-
+    // tracking mechanism). That cascaded into getSummary's
+    // totalOutstanding (which sums by status), so a systematically
+    // underpaid loan could show ₹0 outstanding and pass closeLoan's
+    // balance gate, generating a real NOC for a loan that was never
+    // actually repaid. allocatePartialPayment was already computing the
+    // correct penalty/interest/principal/shortfall/fullySettled split —
+    // every field except penaltySettled was being discarded.
+    //
+    // Now branches on allocation.fullySettled: full settlement behaves
+    // exactly as before (status PAID, full GL posting). An insufficient
+    // payment instead records a REAL partial settlement — remaining
+    // amounts decremented by exactly what was collected, status PARTIAL
+    // (an EMI_STATUS value that already existed in the schema/enum but
+    // was never actually used anywhere), and GL entries posted only for
+    // what actually moved this time, not the full scheduled split.
 
     async markPaid(
         input: MarkEmiPaidInput,
@@ -122,13 +143,12 @@ export const emiService = {
             );
         }
 
-        // Compute what's left owed after this payment, rather than
-        // unconditionally forgiving the entire penalty on any payment.
-        // A payment that covers the EMI but not the full penalty leaves a
-        // correct residual, instead of always zeroing it out regardless of
-        // amount actually collected.
-        const totalOwed = emi.emiAmount + emi.penaltyAmount;
-        const residualPenalty = Math.max(0, totalOwed - input.paidAmount);
+        const allocation = allocatePartialPayment({
+            paymentAmount: input.paidAmount,
+            penaltyDue: emi.penaltyAmount,
+            interestDue: emi.interestComponent,
+            principalDue: emi.principalComponent,
+        });
 
         // Resolve the real userId for the payment.received event —
         // previously hardcoded to an empty string with a comment claiming
@@ -136,20 +156,6 @@ export const emiService = {
         // resolved it.
         const loanAccount = await loansRepository.findAccountByIdOrThrow(emi.loanAccountId);
 
-        const updated = await emiRepository.markPaid(
-            emi.id,
-            input.paidAt,
-            input.collectionId,
-            residualPenalty,
-        );
-
-        // Post the GL entries for this collection. Previously only
-        // postDisbursement() was ever called from a live code path —
-        // postEmiCollection() existed but nothing invoked it, so every
-        // recurring EMI collection (the actual subject of "repayments must
-        // go on") created zero ledger entries. Uses the EMI's stored
-        // principal/interest split, which is the authoritative split for a
-        // full EMI payment across all channels (cash, payment link, eNACH).
         // productType isn't denormalized onto loan_accounts — same lookup
         // pattern already used in applyOverduePenalty below.
         const application = await prisma.loan_applications.findUniqueOrThrow({
@@ -157,23 +163,88 @@ export const emiService = {
             select: { product_type: true },
         });
 
-        await accountingService.postEmiCollection({
-            paymentId:   input.paymentId ?? emi.id,
-            productType: application.product_type,
-            principal:   emi.principalComponent,
-            interest:    emi.interestComponent,
-            postedBy:    'system:emi-collection',
-        });
+        let updated: EmiScheduleEntry;
 
-        setAuditContext(req, {
-            action: AUDIT_ACTION.EMI_PAID,
-            entityType: 'emi_schedule',
-            entityId: emi.id,
-            before: { status: emi.status, penaltyAmount: emi.penaltyAmount },
-            after: { status: EMI_STATUS.PAID, paidAt: input.paidAt },
-        });
+        if (allocation.fullySettled) {
+            updated = await emiRepository.markPaid(
+                emi.id,
+                input.paidAt,
+                input.collectionId,
+                0, // fully settled — no residual penalty left
+            );
 
-        // Emit payment.received — loan handlers check for loan closure
+            // Post the GL entries for this collection. Previously only
+            // postDisbursement() was ever called from a live code path —
+            // postEmiCollection() existed but nothing invoked it, so
+            // every recurring EMI collection created zero ledger entries.
+            // Uses the EMI's stored principal/interest split, the
+            // authoritative full-settlement split.
+            await accountingService.postEmiCollection({
+                paymentId:   input.paymentId ?? emi.id,
+                productType: application.product_type,
+                principal:   emi.principalComponent,
+                interest:    emi.interestComponent,
+                postedBy:    'system:emi-collection',
+            });
+
+            setAuditContext(req, {
+                action: AUDIT_ACTION.EMI_PAID,
+                entityType: 'emi_schedule',
+                entityId: emi.id,
+                before: { status: emi.status, penaltyAmount: emi.penaltyAmount },
+                after: { status: EMI_STATUS.PAID, paidAt: input.paidAt },
+            });
+
+            log.info('EMI marked paid', {
+                emiId: emi.id,
+                emiNumber: emi.emiNumber,
+                loanAccountId: emi.loanAccountId,
+                channel: input.channel,
+            });
+        } else {
+            updated = await emiRepository.recordPartialPayment(
+                emi.id,
+                input.collectionId,
+                {
+                    penaltySettled: allocation.penaltySettled,
+                    interestSettled: allocation.interestSettled,
+                    principalSettled: allocation.principalSettled,
+                },
+            );
+
+            // Only post GL entries for what was actually collected this
+            // time — postEmiCollection already no-ops on a 0 amount for
+            // either leg, so passing the real settled figures (not the
+            // full scheduled split) is safe even when one leg is 0.
+            await accountingService.postEmiCollection({
+                paymentId:   input.paymentId ?? emi.id,
+                productType: application.product_type,
+                principal:   allocation.principalSettled,
+                interest:    allocation.interestSettled,
+                postedBy:    'system:emi-collection',
+            });
+
+            setAuditContext(req, {
+                action: AUDIT_ACTION.EMI_PARTIALLY_PAID,
+                entityType: 'emi_schedule',
+                entityId: emi.id,
+                before: { status: emi.status, penaltyAmount: emi.penaltyAmount },
+                after: { status: EMI_STATUS.PARTIAL, shortfall: allocation.shortfall },
+            });
+
+            log.warn('EMI partially paid — shortfall remains', {
+                emiId: emi.id,
+                emiNumber: emi.emiNumber,
+                loanAccountId: emi.loanAccountId,
+                channel: input.channel,
+                paidAmount: input.paidAmount,
+                shortfall: allocation.shortfall,
+            });
+        }
+
+        // Emit payment.received either way — real money moved even on a
+        // partial payment. Loan-closure handlers already key off the
+        // account's actual outstanding balance, not this event alone.
         eventBus.emit('payment.received', {
             paymentId: input.emiId,   // Placeholder; real paymentId from payments module
             loanAccountId: emi.loanAccountId,
@@ -185,13 +256,6 @@ export const emiService = {
             gatewayTxnId: '',
             paidAt: input.paidAt,
             requestId: req.requestId,
-        });
-
-        log.info('EMI marked paid', {
-            emiId: emi.id,
-            emiNumber: emi.emiNumber,
-            loanAccountId: emi.loanAccountId,
-            channel: input.channel,
         });
 
         return updated;

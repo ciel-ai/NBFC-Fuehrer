@@ -48,10 +48,12 @@ export async function runNachDebitJob(): Promise<void> {
         const tomorrow = new Date(today);
         tomorrow.setDate(tomorrow.getDate() + 1);
 
-        // EMIs due today, not yet attempted
+        // EMIs due today, not yet fully settled — includes PARTIAL so a
+        // remaining balance after a partial cash payment still gets
+        // auto-debited rather than silently dropping out of collection.
         const dueEmis = await prisma.emi_schedule.findMany({
             where: {
-                status: EMI_STATUS.PENDING,
+                status: { in: [EMI_STATUS.PENDING, EMI_STATUS.PARTIAL] },
                 due_date: { gte: today, lt: tomorrow },
             },
             include: {

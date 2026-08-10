@@ -63,6 +63,7 @@ export interface EmiScheduleSummary {
     paidEmis: number;
     overdueEmis: number;
     pendingEmis: number;
+    partialEmis: number;
     nextDueDate: Date | null;
     nextEmiAmount: Rupees | null;
     totalOutstanding: Rupees;
