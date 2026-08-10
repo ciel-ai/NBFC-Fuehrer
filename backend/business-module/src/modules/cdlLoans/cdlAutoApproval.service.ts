@@ -65,6 +65,15 @@ function getProcessingFee(loanAmount: number): number {
 }
 
 // ─── Interest rate by customer type (from client requirements) ────────────────
+//
+// KNOWN CONFLICT, NOT RESOLVED HERE: this derives the rate from CIBIL score
+// at approval time. cdlLoans.service.ts's CDL_INTEREST_RATES instead treats
+// the rate as a discrete value the customer/agent chooses at application
+// time (0/13/14% salaried, 0/14/15% self-employed), validated against that
+// fixed list rather than computed from score. The two disagree on how CDL's
+// interest rate is actually decided. That's a product-spec question for
+// whoever owns CDL underwriting — flagging it here so the next person to
+// touch either file sees it instead of rediscovering it.
 
 function getInterestRate(
     employmentType: 'SALARIED' | 'SELF_EMPLOYED',
@@ -287,6 +296,14 @@ export const cdlAutoApprovalService = {
     },
 
     // ── Save auto approval result to underwriting report ─────────────────────
+    // Previously wrote status only — approvedAmountRupees/interestRate/
+    // processingFeeRupees were computed above but silently discarded, so an
+    // AUTO_APPROVE decision left approved_amount/interest_rate NULL in the
+    // DB. cdlLoans.service.ts's disburseToMerchant hard-gates on both being
+    // non-null, so a loan "approved" through this admin path could never
+    // actually be disbursed. Now persists the same figures the response
+    // already reported. REJECT/MANUAL_REVIEW have no approved figures to
+    // persist, so they're unchanged.
 
     async saveResult(
         loanApplicationId: string,
@@ -298,6 +315,11 @@ export const cdlAutoApprovalService = {
                 status:     result.decision === 'AUTO_APPROVE' ? 'APPROVED'
                           : result.decision === 'REJECT'       ? 'REJECTED'
                           : 'PENDING_APPROVAL',
+                ...(result.decision === 'AUTO_APPROVE' ? {
+                    approved_amount: result.approvedAmountRupees,
+                    interest_rate:   result.interestRate,
+                    processing_fee:  result.processingFeeRupees,
+                } : {}),
                 updated_at: new Date(),
             },
         });
