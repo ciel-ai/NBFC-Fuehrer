@@ -124,6 +124,14 @@ export const cdlLoansService = {
             monthlyIncome: input.monthlyIncome,
             repaymentType: 'MONTHLY_EMI',
             appliedAt: new Date(),
+            // Previously validated (must be one of CDL_AUTO_DEBIT_DATES)
+            // then silently discarded — never persisted anywhere. Real
+            // fix is only half done: this stores the customer's choice
+            // (loan_applications.preferred_debit_day) so it's not thrown
+            // away. It is NOT yet used to align EMI schedule due dates —
+            // see disburseToMerchant below for why that half is
+            // deliberately still open.
+            preferredDebitDay: input.autoDebitDate,
         });
 
         // Persist the computed terms onto the application row.
@@ -608,6 +616,21 @@ export const cdlLoansService = {
                 },
             });
 
+            // NOT aligned to application.preferredDebitDay (the customer's
+            // chosen 4th/7th/12th) — firstEmiDate defaults to
+            // disbursementDate + 1 month, whatever day-of-month that lands
+            // on, same as before. Deliberately left this way: the
+            // client's own Consumer Loan Product Configuration spec,
+            // section 1f "Loan Repayment Date", literally states
+            // "Clarification required regarding repayment date
+            // configuration" — this isn't a settled policy to implement,
+            // it's an open question the client hasn't answered (e.g. if a
+            // customer picks the 7th but disburses on the 20th, is the
+            // first EMI the 7th ~18 days later, or the 7th of the month
+            // after that, preserving a full month's grace?). Picking one
+            // silently here would present a guess as a decided behavior.
+            // preferredDebitDay IS now persisted (see submitApplication)
+            // so it's available the moment this gets answered.
             const schedule = buildAmortizationSchedule({
                 loanAccountId: accountRow.id,
                 principal: application.approvedAmount!,
