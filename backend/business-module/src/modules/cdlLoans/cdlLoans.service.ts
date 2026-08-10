@@ -625,10 +625,18 @@ export const cdlLoansService = {
             amount: input.amount,
             mode: 'UPI',
             merchantName: input.merchantName,
-            status: 'COMPLETED',
-            utrNumber: disbursement.utr_number,
-            disbursedAt: disbursement.completed_at?.toISOString() ?? null,
-            note: `₹${input.amount.toLocaleString('en-IN')} disbursed to ${input.merchantName} via UPI.`,
+            // Previously hardcoded 'COMPLETED' with the pre-update `disbursement`
+            // object's (always-null) utr_number/completed_at, regardless of
+            // whether the payout actually confirmed synchronously — a real,
+            // successful async disbursement would still report
+            // status: 'COMPLETED', utrNumber: null. Now reflects what actually
+            // happened, from the post-update row.
+            status: isSyncComplete ? 'COMPLETED' : 'PENDING',
+            utrNumber: updatedDisbursement.utr_number,
+            disbursedAt: updatedDisbursement.completed_at?.toISOString() ?? null,
+            note: isSyncComplete
+                ? `₹${input.amount.toLocaleString('en-IN')} disbursed to ${input.merchantName} via UPI.`
+                : `₹${input.amount.toLocaleString('en-IN')} payout to ${input.merchantName} initiated; awaiting provider confirmation.`,
         };
     },
 
@@ -691,14 +699,23 @@ export const cdlLoansService = {
         const overdueAgg = await prisma.emi_schedule.aggregate({
             where: { loan_account_id: loanId, status: 'OVERDUE' },
             _sum: { emi_amount: true, penalty_amount: true },
+            _min: { due_date: true },
         });
         const overdueAmount = Number(overdueAgg._sum.emi_amount ?? 0);
         const penaltyCharges = Number(overdueAgg._sum.penalty_amount ?? 0);
+        // Account-level DPD = days since the oldest overdue EMI's due date —
+        // same formula collections.repository.ts's syncOverdueFigures already
+        // uses (findFirst by due_date asc there; _min here since we already
+        // aggregate this table for the amount figures above).
+        const oldestDueDate = overdueAgg._min.due_date;
+        const overdueDays = oldestDueDate
+            ? Math.floor((Date.now() - oldestDueDate.getTime()) / (1000 * 60 * 60 * 24))
+            : 0;
 
         return {
             loanId,
             overdueAmount,
-            overdueDays: 0, // per-EMI DPD requires a specific EMI id; account-level DPD needs the collections module's bucket logic (out of tonight's scope)
+            overdueDays,
             penaltyCharges,
             totalDue: overdueAmount + penaltyCharges,
             status: overdueAmount > 0 ? 'OVERDUE' : 'CURRENT',
