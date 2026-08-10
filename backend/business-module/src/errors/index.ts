@@ -37,6 +37,7 @@ export {
     EmiAlreadyPaidError,
     EmiNotDueYetError,
     ESignNotCompletedError,
+    EStampNotAppliedError,
     DisbursementAlreadyDoneError,
     AgentNotActiveError,
     CommissionClawbackError,

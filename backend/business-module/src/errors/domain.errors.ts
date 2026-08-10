@@ -135,6 +135,16 @@ export class ESignNotCompletedError extends DomainError {
     }
 }
 
+export class EStampNotAppliedError extends DomainError {
+    constructor(loanId: string) {
+        super(
+            'Loan agreement must be eStamped before disbursement',
+            'ESTAMP_NOT_APPLIED',
+            { loanId },
+        );
+    }
+}
+
 export class DisbursementAlreadyDoneError extends DomainError {
     constructor(loanId: string) {
         super(

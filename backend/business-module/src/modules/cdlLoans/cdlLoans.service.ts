@@ -1,13 +1,17 @@
 ﻿// src/modules/cdlLoans/cdlLoans.service.ts
 import { createModuleLogger } from '@/config/logger';
-import { env } from '@/config/env';
 import { prisma } from '@/config/database';
-import { ValidationError, NotFoundError } from '@/errors';
+import { ValidationError, NotFoundError, LoanStateError } from '@/errors';
 import { computeMonthlyEmi } from '@/modules/emi/emi.calculator';
 import { emiService } from '@/modules/emi';
 import { loansRepository } from '@/modules/loans/loans.repository';
 import { paymentsService } from '@/modules/payments';
 import { getPaymentProvider } from '@/providers';
+import { pdfService } from '@/modules/documents/pdf.service';
+import { getDocStorageProvider } from '@/providers/docStorage';
+import { getEncryptionProvider } from '@/providers/encryption';
+import { getESignProvider } from '@/providers/esign';
+import { assertTransition } from '@/utils/loanStateMachine.util';
 import { LOAN_STATUS, PRODUCT_TYPE, BUSINESS_RULES } from '@/config/constants';
 import type {
     CdlApplicationInput, CdlApplicationResult,
@@ -22,8 +26,12 @@ const log = createModuleLogger('cdlLoans.service');
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
+// Exported (not just for this file's own use) so cdlLoans.dto.ts's Joi
+// schemas can validate against the exact same bounds instead of
+// duplicating literal numbers that could drift out of sync.
+
 // Discrete allowed rates per employment type — per client spec, not a range.
-const CDL_INTEREST_RATES: Record<'SALARIED' | 'SELF_EMPLOYED' | 'STUDENT', number[]> = {
+export const CDL_INTEREST_RATES: Record<'SALARIED' | 'SELF_EMPLOYED' | 'STUDENT', number[]> = {
     SALARIED: [0, 13, 14],
     SELF_EMPLOYED: [0, 14, 15],
     // Client's rate table only covers Salaried/Self-Employed — STUDENT has
@@ -39,11 +47,11 @@ const CDL_PROCESSING_FEE_TIERS: { max: number; fee: number }[] = [
     { max: 100000, fee: 2466 },
 ];
 
-const CDL_MIN_LOAN_AMOUNT = 7000;
-const CDL_MAX_LOAN_AMOUNT = 100000;
-const CDL_MIN_TENURE_MONTHS = 6;
-const CDL_MAX_TENURE_MONTHS = 12;
-const CDL_AUTO_DEBIT_DATES = [4, 7, 12];
+export const CDL_MIN_LOAN_AMOUNT = 7000;
+export const CDL_MAX_LOAN_AMOUNT = 100000;
+export const CDL_MIN_TENURE_MONTHS = 6;
+export const CDL_MAX_TENURE_MONTHS = 12;
+export const CDL_AUTO_DEBIT_DATES = [4, 7, 12];
 const CDL_FOIR_LIMIT = 60; // per this CDL-specific spec (platform default elsewhere is 55%)
 
 function getCdlInterestRate(employmentType: keyof typeof CDL_INTEREST_RATES, requested?: number): number {
@@ -280,16 +288,155 @@ export const cdlLoansService = {
         };
     },
 
-    // Still stub — real eSign integration (like gold loan's) is a separate,
-    // larger scope not covered tonight. Route stays behind stubGuard().
-    generateAgreement(applicationId: string): CdlAgreementResult {
+    // ── Real: generates an actual PDF (pdfService), uploads it to real
+    // document storage, and opens a real Signzy eSign request — same
+    // pattern goldLoans.generateAgreement already uses. eSign/eStamp
+    // request/status is stored on loan_applications (per-application —
+    // see the migration fixing the per-user-vs-per-application bug,
+    // 919f711), which the eSign webhook (POST /webhooks/esign,
+    // /webhooks/signzy → kycService.processESignCallback) has also been
+    // repointed at. ─────────────────────────────────────────────────────────
+    async generateAgreement(applicationId: string): Promise<CdlAgreementResult> {
+        log.info('Generating CDL agreement', { applicationId });
+
+        const application = await prisma.loan_applications.findUniqueOrThrow({
+            where: { id: applicationId },
+            include: { user: { select: { full_name: true, phone: true } } },
+        });
+
+        const kyc = await prisma.kyc_documents.findUnique({
+            where: { user_id: application.user_id },
+            select: { aadhaar_encrypted: true },
+        });
+
+        if (!kyc?.aadhaar_encrypted) {
+            throw new ValidationError('applicationId', 'Aadhaar verification must be complete before the agreement can be generated');
+        }
+
+        const pdfBuffer = await pdfService.generateCdlLoanAgreement(applicationId);
+
+        const docStorage = getDocStorageProvider();
+        const s3Key = `agreements/cdl/${applicationId}.pdf`;
+        await docStorage.upload({
+            key: s3Key,
+            fileBuffer: pdfBuffer,
+            contentType: 'application/pdf',
+        });
+        const { url: agreementUrl } = await docStorage.getSignedUrl(s3Key);
+
+        const encryption = getEncryptionProvider();
+        const aadhaarPlain = await encryption.decrypt(kyc.aadhaar_encrypted);
+
+        const esign = getESignProvider();
+        const signRequest = await esign.createSignRequest({
+            documentId: `cdl-agreement-${applicationId}`,
+            documentBase64: pdfBuffer.toString('base64'),
+            signerName: application.user?.full_name ?? '',
+            signerPhone: application.user?.phone ?? '',
+            signerAadhaar: aadhaarPlain,
+            purpose: 'Consumer Durable Loan Agreement Signature',
+        });
+
+        // esign_request_id/esign_status live on loan_applications, not
+        // kyc_documents — per-AGREEMENT state (one row per application),
+        // not per-user identity data. Fixed alongside the per-user-vs-
+        // per-application eSign/eStamp bug (919f711 + the migration after it).
+        await prisma.loan_applications.update({
+            where: { id: applicationId },
+            data: {
+                esign_request_id: signRequest.requestId,
+                esign_status: signRequest.status,
+                updated_at: new Date(),
+            },
+        });
+
+        log.info('CDL agreement generated, eSign request created', { applicationId, requestId: signRequest.requestId });
+
         return {
             applicationId,
-            agreementId: `agr_cdl_${Date.now()}`,
-            agreementUrl: `https://${env.aws.s3Bucket}.s3.${env.aws.region}.amazonaws.com/agreements/cdl_${applicationId}.pdf`,
+            agreementId: s3Key,
+            agreementUrl: signRequest.signingUrl || agreementUrl,
             status: 'GENERATED',
-            eSignRequestId: null,
-            note: 'Agreement generated. Please sign to proceed.',
+            eSignRequestId: signRequest.requestId,
+            stampDutyAmount: 100, // Placeholder — pending client confirmation of actual stamp duty rate, same as gold/housing loans
+            note: 'Agreement generated. Please review and sign using Aadhaar OTP.',
+        };
+    },
+
+    // ── Real: checks real eSign status, applies a real eStamp once signed,
+    // and stores the signed+stamped PDF — same pattern as
+    // goldLoans.completeESign. Customer polls this after visiting the
+    // signingUrl from generateAgreement (or after the eSign webhook fires). ──
+    async completeESign(applicationId: string): Promise<CdlAgreementResult> {
+        log.info('Checking eSign completion for CDL', { applicationId });
+
+        // esign_request_id/esign_status/estamp_id/estamp_status are on this
+        // same row now — no separate kyc_documents lookup needed for them.
+        const application = await prisma.loan_applications.findUniqueOrThrow({
+            where: { id: applicationId },
+        });
+
+        if (!application.esign_request_id) {
+            throw new ValidationError('applicationId', 'No eSign request found — call the agreement step first');
+        }
+
+        const esign = getESignProvider();
+        const signStatus = await esign.getSignStatus(application.esign_request_id);
+
+        if (signStatus.status !== 'SIGNED') {
+            return {
+                applicationId,
+                agreementId: `agreements/cdl/${applicationId}.pdf`,
+                agreementUrl: '',
+                status: 'PENDING',
+                eSignRequestId: application.esign_request_id,
+                stampDutyAmount: 100,
+                note: `Signing not yet complete — current status: ${signStatus.status}.`,
+            };
+        }
+
+        const customer = await prisma.customers.findUnique({
+            where: { user_id: application.user_id },
+            select: { state: true },
+        });
+
+        const stampResult = await esign.applyEStamp({
+            requestId: application.esign_request_id,
+            loanAmountRupees: Number(application.approved_amount ?? application.amount_requested),
+            stateCode: customer?.state?.slice(0, 2).toUpperCase() ?? 'KA', // Placeholder mapping — pending a real state-name-to-code table, same as gold loan
+        });
+
+        const signedDoc = await esign.getSignedDocument(application.esign_request_id);
+        const docStorage = getDocStorageProvider();
+        const signedS3Key = `agreements/cdl/${applicationId}_signed.pdf`;
+        await docStorage.upload({
+            key: signedS3Key,
+            fileBuffer: Buffer.from(signedDoc.documentBase64, 'base64'),
+            contentType: 'application/pdf',
+        });
+        const { url: agreementUrl } = await docStorage.getSignedUrl(signedS3Key);
+
+        await prisma.loan_applications.update({
+            where: { id: applicationId },
+            data: {
+                esign_status: 'SIGNED',
+                signed_agreement_s3_key: signedS3Key,
+                estamp_id: stampResult.stampId,
+                estamp_status: stampResult.status,
+                updated_at: new Date(),
+            },
+        });
+
+        log.info('CDL agreement signed and stamped', { applicationId });
+
+        return {
+            applicationId,
+            agreementId: signedS3Key,
+            agreementUrl,
+            status: 'SIGNED',
+            eSignRequestId: application.esign_request_id,
+            stampDutyAmount: stampResult.stampDutyRupees ?? 100,
+            note: 'Agreement signed & stored. Proceeding to NACH setup.',
         };
     },
 
@@ -338,6 +485,25 @@ export const cdlLoansService = {
 
         if (!application.approvedAmount || !application.interestRate) {
             throw new ValidationError('applicationId', 'Application has not been approved yet');
+        }
+
+        // RBI Digital Lending Guidelines 2022: no disbursement without a
+        // signed AND stamped agreement — see providers/esign/interface.ts.
+        //
+        // RESOLVED (was a per-user-vs-per-application bug — see commit
+        // 919f711 for the original find and the migration that followed
+        // it): esign_status/estamp_status now live on loan_applications,
+        // one row per application, so this check can no longer be
+        // satisfied by a different loan belonging to the same customer.
+        const agreementStatus = await prisma.loan_applications.findUnique({
+            where: { id: applicationId },
+            select: { esign_status: true, estamp_status: true },
+        });
+        if (agreementStatus?.esign_status !== 'SIGNED') {
+            throw new ValidationError('applicationId', 'Loan agreement must be signed (eSign) before disbursement can proceed');
+        }
+        if (agreementStatus?.estamp_status !== 'APPLIED') {
+            throw new ValidationError('applicationId', 'Loan agreement must be eStamped before disbursement can proceed');
         }
 
         const emi = calcEmi(application.approvedAmount, application.interestRate, application.tenureMonths);
@@ -428,6 +594,24 @@ export const cdlLoansService = {
             },
         });
 
+        // CDL disburses to the merchant in a single shot — "money confirmed
+        // moved" and "loan should activate" are the same event, unlike
+        // housing loans' tranche-based builder disbursement (a real,
+        // distinct confirmation step there). Only activate on genuine
+        // synchronous completion; the async case (isSyncComplete false)
+        // is activated later by disbursement.service.ts's
+        // _completeDisbursement once the payout webhook confirms it —
+        // that function looks up this same account by application_id and
+        // does not create a second one for CDL.
+        //
+        // Guarded, not assumed, even though DISBURSED→ACTIVE is the only
+        // legal move from here — same safety pattern
+        // housingLoans.service.ts's activateLoan already uses.
+        if (isSyncComplete) {
+            assertTransition(account.id, account.status, LOAN_STATUS.ACTIVE);
+            await loansRepository.updateAccountStatus(account.id, LOAN_STATUS.ACTIVE);
+        }
+
         log.info('CDL disbursed to merchant', {
             applicationId,
             accountId: account.id,
@@ -459,16 +643,41 @@ export const cdlLoansService = {
         }));
     },
 
-    // ── Real: reuses the platform's real EMI payment/bounce handling. ────────
-    async processManualPayment(loanId: string, emiId: string, req: any) {
-        const updated = await emiService.markPaid({
+    // ── Real: reuses the platform's real cash-payment pipeline
+    // (paymentsService.recordCashPayment) instead of calling emiService.markPaid
+    // directly — this is what actually creates the payments row, does
+    // penalty/interest/principal allocation, posts GL entries and fires the
+    // payment.received event. Previously this hardcoded paidAmount: 0 regardless
+    // of what the customer actually paid. ───────────────────────────────────────
+    async processManualPayment(loanId: string, emiId: string, amount: number, collectedBy: string, collectionId: string | undefined, req: any) {
+        if (!amount || amount <= 0) {
+            throw new ValidationError('amount', 'Payment amount must be greater than zero');
+        }
+
+        const account = await loansRepository.findAccountByIdOrThrow(loanId);
+
+        const payment = await paymentsService.recordCashPayment({
+            loanAccountId: loanId,
+            userId: account.userId,
             emiId,
-            paidAt: new Date(),
-            paidAmount: 0, // caller supplies the real amount via the payments module; see route wiring note
-            collectionId: undefined as any,
-            channel: 'CASH' as any,
+            amount,
+            collectedBy,
+            collectionId: collectionId ?? '',
         }, req);
-        return { loanId, emiId, status: updated.status, paidAt: updated.paidAt?.toISOString() ?? new Date().toISOString() };
+
+        log.info('CDL manual EMI payment recorded', { loanId, emiId, amount, paymentId: payment.id });
+
+        return {
+            loanId,
+            emiId,
+            paymentId: payment.id,
+            amountPaid: payment.amount,
+            penaltyPaid: payment.penaltyAmount,
+            totalCollected: payment.totalCollected,
+            status: payment.status,
+            paidAt: (payment.settledAt ?? payment.initiatedAt).toISOString(),
+            note: `₹${amount.toLocaleString('en-IN')} recorded against EMI.`,
+        };
     },
 
     async handlePaymentFailure(loanId: string, emiId: string, req: any) {
@@ -501,6 +710,15 @@ export const cdlLoansService = {
     // correct and tested for gold/CDL via the shared calculator. ────────────
     async closeLoan(loanId: string): Promise<CdlClosureResult> {
         const account = await loansRepository.findAccountByIdOrThrow(loanId);
+
+        // Same check housingLoans.service.ts's closeLoan already has —
+        // this one had no equivalent, so it closed unconditionally
+        // regardless of remaining balance.
+        const summary = await emiService.getSummary(loanId);
+        if (summary.totalOutstanding > 0) {
+            throw new LoanStateError(loanId, account.status, LOAN_STATUS.CLOSED);
+        }
+
         const quote = await emiService.getForeclosureQuote(loanId, account.interestRate);
 
         await loansRepository.updateAccountStatus(loanId, LOAN_STATUS.CLOSED, { closed_at: new Date() });
@@ -514,15 +732,31 @@ export const cdlLoansService = {
         };
     },
 
-    // Still stub — same as generateAgreement, needs a real document
-    // generation pipeline. Route stays behind stubGuard().
-    activateLoan(userId: string, input: Record<string, unknown>) {
-        return { loanId: `cdl_loan_${Date.now()}`, status: 'ACTIVE', activatedAt: new Date().toISOString(), ...input };
-    },
-    generateNoc(loanId: string): { nocRef: string; nocS3Url: string } {
+    // ── Real: pdfService.generateNoc already exists (housing loans already
+    // use it) — this was just never actually calling it. Same pattern as
+    // housingLoans.service.ts's generateNoc. ─────────────────────────────────
+    async generateNoc(loanId: string): Promise<{ nocRef: string; nocS3Url: string }> {
+        const account = await loansRepository.findAccountByIdOrThrow(loanId);
+        if (account.status !== LOAN_STATUS.CLOSED) {
+            throw new LoanStateError(loanId, account.status, LOAN_STATUS.CLOSED);
+        }
+
+        const pdfBuffer = await pdfService.generateNoc(loanId);
+
+        const docStorage = getDocStorageProvider();
+        const s3Key = `noc/cdl_${loanId}.pdf`;
+        await docStorage.upload({
+            key: s3Key,
+            fileBuffer: pdfBuffer,
+            contentType: 'application/pdf',
+        });
+        const { url } = await docStorage.getSignedUrl(s3Key);
+
+        log.info('CDL NOC generated', { loanId });
+
         return {
             nocRef: `NOC-CDL-${loanId}-${Date.now()}`,
-            nocS3Url: `https://${env.aws.s3Bucket}.s3.${env.aws.region}.amazonaws.com/noc/cdl_${loanId}.pdf`,
+            nocS3Url: url,
         };
     },
 };

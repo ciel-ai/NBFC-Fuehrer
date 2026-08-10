@@ -40,6 +40,8 @@ function mapToKycDocument(row: Record<string, unknown>): KycDocument {
         creditScore: row.credit_score as number | null,
         eSignRequestId: row.esign_request_id as string | null,
         eSignStatus: row.esign_status as string | null,
+        eStampId: row.estamp_id as string | null,
+        eStampStatus: row.estamp_status as string | null,
         signzyResponses: row.signzy_responses
             ? (typeof row.signzy_responses === 'string'
                 ? JSON.parse(row.signzy_responses)
@@ -274,6 +276,12 @@ export const kycRepository = {
 
     // ── eSign fields ───────────────────────────────────────────────────────────
 
+    // DEPRECATED — writes to kyc_documents.esign_request_id/esign_status,
+    // which are per-user and no longer the source of truth (see commit
+    // 919f711 and the migration that followed it). kyc.service.ts's
+    // requestESign — the only caller — now writes to loan_applications
+    // directly instead of calling this. Left in place, unused, rather
+    // than deleted.
     async saveESignRequest(
         userId: string,
         requestId: string,
@@ -289,6 +297,12 @@ export const kycRepository = {
         });
     },
 
+    // DEPRECATED — writes to kyc_documents.esign_status/
+    // signed_agreement_s3_key, which are per-user and no longer the
+    // source of truth (see commit 919f711 and the migration that followed
+    // it). kyc.service.ts's processESignCallback — the only caller — now
+    // writes to loan_applications directly instead of calling this. Left
+    // in place, unused, rather than deleted.
     async updateESignStatus(
         userId: string,
         status: string,

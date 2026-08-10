@@ -7,6 +7,19 @@ import { housingLoansService } from './housingLoans.service';
 import { assertApplicationOwnership, assertAccountOwnership } from '@/utils/ownership.util';
 import { loansRepository } from '@/modules/loans/loans.repository';
 
+// Every housingLoansService.<method>() call below is now awaited where the
+// underlying method is actually async — 10 of them (generateAgreement,
+// eSign, registerNach, applyPmaySubsidy, disburseToBuilder, getEmiSchedule,
+// getPrepaymentQuote, processPrepayment, getOverdueStatus, closeLoan, plus
+// generateNoc fixed earlier) previously weren't. Without await,
+// successResponse() wraps an unresolved Promise, res.json() serializes it
+// as `{}`, and the real work (PDF generation, disbursement, DB writes) runs
+// fire-and-forget, detached from the request — any error inside becomes an
+// unhandled promise rejection, which crashes the whole process (see
+// server.ts's process.on('unhandledRejection', ...)). Found while building
+// CDL's NOC generation off this file's (real) generateNoc as a template.
+// runKyc/runCompliance/runCreditAssessment are genuinely synchronous in
+// housingLoans.service.ts — correctly not awaited.
 export const housingLoansController = {
 
     // POST /housing-loans/applications
@@ -127,7 +140,7 @@ export const housingLoansController = {
             const application = await loansRepository.findApplicationByIdOrThrow(id);
             assertApplicationOwnership(user.id, application, user.role, 'housing loan application');
 
-            const result = housingLoansService.generateAgreement(id);
+            const result = await housingLoansService.generateAgreement(id);
             res.status(HTTP.OK).json(successResponse(result, 'Agreement generated'));
         } catch (err) { next(err); }
     },
@@ -140,7 +153,7 @@ export const housingLoansController = {
             const application = await loansRepository.findApplicationByIdOrThrow(id);
             assertApplicationOwnership(user.id, application, user.role, 'housing loan application');
 
-            const result = housingLoansService.eSign(id);
+            const result = await housingLoansService.eSign(id);
             res.status(HTTP.OK).json(successResponse(result, 'Agreement signed'));
         } catch (err) { next(err); }
     },
@@ -153,7 +166,7 @@ export const housingLoansController = {
             const application = await loansRepository.findApplicationByIdOrThrow(id);
             assertApplicationOwnership(user.id, application, user.role, 'housing loan application');
 
-            const result = housingLoansService.registerNach(id, req.body);
+            const result = await housingLoansService.registerNach(id, req.body);
             res.status(HTTP.OK).json(successResponse(result, 'NACH initiated'));
         } catch (err) { next(err); }
     },
@@ -166,7 +179,7 @@ export const housingLoansController = {
             const application = await loansRepository.findApplicationByIdOrThrow(id);
             assertApplicationOwnership(user.id, application, user.role, 'housing loan application');
 
-            const result = housingLoansService.applyPmaySubsidy(id, req.body);
+            const result = await housingLoansService.applyPmaySubsidy(id, req.body);
             res.status(HTTP.OK).json(successResponse(result));
         } catch (err) { next(err); }
     },
@@ -175,7 +188,7 @@ export const housingLoansController = {
     async disburseToBuilder(req: AuthRequest, res: Response, next: NextFunction) {
         try {
             const id = req.params['id'] as string;
-            const result = housingLoansService.disburseToBuilder(id, req.body);
+            const result = await housingLoansService.disburseToBuilder(id, req.body);
             res.status(HTTP.OK).json(successResponse(result, 'Disbursed successfully'));
         } catch (err) { next(err); }
     },
@@ -188,7 +201,7 @@ export const housingLoansController = {
             const account = await loansRepository.findAccountByIdOrThrow(id);
             assertAccountOwnership(user.id, account, user.role, 'housing loan account');
 
-            const result = housingLoansService.getEmiSchedule(id);
+            const result = await housingLoansService.getEmiSchedule(id);
             res.status(HTTP.OK).json(successResponse(result));
         } catch (err) { next(err); }
     },
@@ -202,7 +215,7 @@ export const housingLoansController = {
             assertAccountOwnership(user.id, account, user.role, 'housing loan account');
 
             const amount = Number(req.query['amount'] ?? 0);
-            const result = housingLoansService.getPrepaymentQuote(id, amount);
+            const result = await housingLoansService.getPrepaymentQuote(id, amount);
             res.status(HTTP.OK).json(successResponse(result));
         } catch (err) { next(err); }
     },
@@ -215,7 +228,7 @@ export const housingLoansController = {
             const account = await loansRepository.findAccountByIdOrThrow(id);
             assertAccountOwnership(user.id, account, user.role, 'housing loan account');
 
-            const result = housingLoansService.processPrepayment(id, req.body);
+            const result = await housingLoansService.processPrepayment(id, req.body);
             res.status(HTTP.OK).json(successResponse(result));
         } catch (err) { next(err); }
     },
@@ -228,7 +241,7 @@ export const housingLoansController = {
             const account = await loansRepository.findAccountByIdOrThrow(id);
             assertAccountOwnership(user.id, account, user.role, 'housing loan account');
 
-            const result = housingLoansService.getOverdueStatus(id);
+            const result = await housingLoansService.getOverdueStatus(id);
             res.status(HTTP.OK).json(successResponse(result));
         } catch (err) { next(err); }
     },
@@ -241,7 +254,7 @@ export const housingLoansController = {
             const account = await loansRepository.findAccountByIdOrThrow(id);
             assertAccountOwnership(user.id, account, user.role, 'housing loan account');
 
-            const result = housingLoansService.closeLoan(id);
+            const result = await housingLoansService.closeLoan(id);
             res.status(HTTP.OK).json(successResponse(result, 'Loan closed'));
         } catch (err) { next(err); }
     },
@@ -254,7 +267,7 @@ export const housingLoansController = {
             const account = await loansRepository.findAccountByIdOrThrow(id);
             assertAccountOwnership(user.id, account, user.role, 'housing loan account');
 
-            const result = housingLoansService.generateNoc(id);
+            const result = await housingLoansService.generateNoc(id);
             res.status(HTTP.OK).json(successResponse(result));
         } catch (err) { next(err); }
     },

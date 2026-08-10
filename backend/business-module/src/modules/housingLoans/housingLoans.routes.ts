@@ -30,6 +30,13 @@ router.get('/loans/:id/prepayment-quote', requireAuth(), allowRoles(CUSTOMER), s
 router.post('/loans/:id/prepayment', requireAuth(), allowRoles(CUSTOMER), stubGuard(), housingLoansController.processPrepayment);
 router.get('/loans/:id/overdue', requireAuth(), allowRoles(CUSTOMER, FINANCE), stubGuard(), housingLoansController.getOverdueStatus);
 router.post('/loans/:id/close', requireAuth(), allowRoles(CUSTOMER, FINANCE), stubGuard(), housingLoansController.closeLoan);
-router.post('/loans/:id/noc', requireAuth(), allowRoles(CUSTOMER), stubGuard(), housingLoansController.generateNoc);
+// generateNoc is real, wired code (real pdfService + docStorage calls,
+// confirmed while building CDL's equivalent off this function) — stubGuard()
+// was blocking it unconditionally, same as CDL's disburseToMerchant
+// earlier. NOTE: most of the other routes in this file are ALSO real,
+// wired code still sitting behind stubGuard() (generateAgreement, eSign,
+// closeLoan, disburseToBuilder, etc.) — this fix covers NOC only; the rest
+// need their own dedicated pass, not folded into this one.
+router.post('/loans/:id/noc', requireAuth(), allowRoles(CUSTOMER), housingLoansController.generateNoc);
 
 export { router as housingLoansRouter };
