@@ -1,7 +1,7 @@
 ﻿// src/modules/cdlLoans/cdlLoans.service.ts
 import { createModuleLogger } from '@/config/logger';
 import { prisma, withTransaction } from '@/config/database';
-import { ValidationError, NotFoundError, LoanStateError } from '@/errors';
+import { ValidationError, NotFoundError, LoanStateError, ConflictError } from '@/errors';
 import { computeMonthlyEmi, buildAmortizationSchedule } from '@/modules/emi/emi.calculator';
 import { emiService } from '@/modules/emi';
 import { loansRepository } from '@/modules/loans/loans.repository';
@@ -359,6 +359,45 @@ export const cdlLoansService = {
             include: { user: { select: { full_name: true, phone: true } } },
         });
         assertApplicationOwnership(callerId, { userId: application.user_id }, callerRole);
+
+        // Idempotency guard — previously none at all. Calling this twice
+        // (retry, double-tap, or just calling it again) would silently
+        // generate a SECOND real eSign request and overwrite esign_status
+        // back to the new request's unsigned initial state. If the
+        // customer had already completed Aadhaar-OTP signing on the first
+        // request, that completed signature was orphaned: the DB now
+        // pointed at a new, never-signed request, and completeESign's
+        // poll would check the wrong one forever.
+        if (application.esign_status === 'SIGNED') {
+            if (!application.signed_agreement_s3_key) {
+                // Shouldn't happen — SIGNED is only ever set alongside
+                // signed_agreement_s3_key, in completeESign — but fail
+                // loudly rather than silently regenerating if it did.
+                throw new ConflictError('Application is marked SIGNED but has no stored signed agreement on file — data inconsistency, contact support');
+            }
+            const { url: signedUrl } = await getDocStorageProvider().getSignedUrl(application.signed_agreement_s3_key);
+            log.info('generateAgreement called on an already-signed application — returning existing signed document, not regenerating', { applicationId });
+            return {
+                applicationId,
+                agreementId: application.signed_agreement_s3_key,
+                agreementUrl: signedUrl,
+                status: 'SIGNED',
+                eSignRequestId: application.esign_request_id,
+                stampDutyAmount: 100,
+                note: 'Agreement already signed — returning the existing signed document.',
+            };
+        }
+        if (application.esign_request_id && application.esign_status === 'PENDING') {
+            // A signing request already exists and hasn't resolved yet —
+            // don't burn a second real eSign-provider call or hand out a
+            // second, confusing signing link. FAILED/EXPIRED/CANCELLED
+            // are deliberately NOT blocked here — those are genuine dead
+            // ends the customer needs a fresh request to recover from.
+            throw new ConflictError(
+                'A signing request for this agreement is already in progress — check its status via the eSign endpoint instead of generating a new one.',
+                { applicationId, existingEsignRequestId: application.esign_request_id, existingStatus: application.esign_status },
+            );
+        }
 
         const kyc = await prisma.kyc_documents.findUnique({
             where: { user_id: application.user_id },
