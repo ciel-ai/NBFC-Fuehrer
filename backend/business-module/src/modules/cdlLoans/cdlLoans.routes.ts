@@ -167,4 +167,37 @@ router.post(
     cdlLoansController.generateNoc,
 );
 
+// On-demand document endpoints (audit finding #14) — pdfService already
+// had real generateLoanStatement/generateRepaymentSchedule/
+// generateInterestCertificate functions, already used by other loan
+// products, that CDL never called. Same GET pattern as
+// getEmiSchedule/getOverdueStatus above: requireAuth, allowRoles(C),
+// account-ownership check inside the service, no idempotency() — these
+// are reads, nothing to deduplicate. Each regenerates the document fresh
+// on every call rather than caching (a statement/schedule can go stale
+// as EMIs get paid, and this module has no document-versioning story).
+router.get(
+    '/loans/:id/statement',
+    requireAuth(), allowRoles(C),
+    validateParams(cdlIdParamSchema),
+    cdlLoansController.getLoanStatement,
+);
+router.get(
+    '/loans/:id/repayment-schedule',
+    requireAuth(), allowRoles(C),
+    validateParams(cdlIdParamSchema),
+    cdlLoansController.getRepaymentSchedule,
+);
+// financialYear is an optional ?financialYear=2025-26 query param —
+// pdfService.generateInterestCertificate requires one, and interest
+// certificates are typically needed for a specific past tax year, not
+// just "now"; defaults to the current Indian financial year (April-
+// March) inside the service when omitted.
+router.get(
+    '/loans/:id/interest-certificate',
+    requireAuth(), allowRoles(C),
+    validateParams(cdlIdParamSchema),
+    cdlLoansController.getInterestCertificate,
+);
+
 export { router as cdlLoansRouter };

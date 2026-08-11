@@ -24,6 +24,7 @@ import type {
     CdlCreditDecision, CdlAgreementResult,
     CdlNachResult, CdlDisbursalResult,
     CdlOverdueStatus, CdlClosureResult,
+    CdlManualPaymentResult, CdlDocumentResult,
 } from './cdlLoans.types';
 
 const log = createModuleLogger('cdlLoans.service');
@@ -875,7 +876,7 @@ export const cdlLoansService = {
         req: any,
         callerId: string,
         callerRole: Role,
-    ) {
+    ): Promise<CdlManualPaymentResult> {
         if (!amount || amount <= 0) {
             throw new ValidationError('amount', 'Payment amount must be greater than zero');
         }
@@ -894,6 +895,21 @@ export const cdlLoansService = {
 
         log.info('CDL manual EMI payment recorded', { loanId, emiId, amount, paymentId: payment.id });
 
+        // Audit finding #14 — pdfService.generatePaymentReceipt already
+        // existed, real and working, but CDL never called it. Same
+        // generate → upload → getSignedUrl shape generateNoc already
+        // uses. Keyed by payment.id specifically (not emiId/loanId) —
+        // this is the actual payment record the receipt describes.
+        const receiptBuffer = await pdfService.generatePaymentReceipt(payment.id);
+        const docStorage = getDocStorageProvider();
+        const receiptKey = `receipts/cdl_${payment.id}.pdf`;
+        await docStorage.upload({
+            key: receiptKey,
+            fileBuffer: receiptBuffer,
+            contentType: 'application/pdf',
+        });
+        const { url: receiptUrl } = await docStorage.getSignedUrl(receiptKey);
+
         return {
             loanId,
             emiId,
@@ -903,6 +919,7 @@ export const cdlLoansService = {
             totalCollected: payment.totalCollected,
             status: payment.status,
             paidAt: (payment.settledAt ?? payment.initiatedAt).toISOString(),
+            receiptUrl,
             note: `₹${amount.toLocaleString('en-IN')} recorded against EMI.`,
         };
     },
@@ -966,11 +983,27 @@ export const cdlLoansService = {
 
         await loansRepository.updateAccountStatus(loanId, LOAN_STATUS.CLOSED, { closed_at: new Date() });
 
+        // Audit finding #14 — pdfService.generateClosureLetter already
+        // existed but CDL never called it. Deliberately generated AFTER
+        // the status update above succeeds, not before — if that update
+        // were to fail, no closure letter should exist for a loan that
+        // isn't actually closed.
+        const letterBuffer = await pdfService.generateClosureLetter(loanId);
+        const docStorage = getDocStorageProvider();
+        const letterKey = `closure-letters/cdl_${loanId}.pdf`;
+        await docStorage.upload({
+            key: letterKey,
+            fileBuffer: letterBuffer,
+            contentType: 'application/pdf',
+        });
+        const { url: closureLetterUrl } = await docStorage.getSignedUrl(letterKey);
+
         return {
             loanId,
             closureId: `closure_cdl_${Date.now()}`,
             totalAmountPaid: quote.total,
             closedAt: new Date().toISOString(),
+            closureLetterUrl,
             note: 'CDL closed successfully.',
         };
     },
@@ -1003,4 +1036,110 @@ export const cdlLoansService = {
             nocS3Url: url,
         };
     },
+
+    // ── Real: pdfService.generateLoanStatement already exists but CDL
+    // never called it (audit finding #14). On-demand, not tied to a
+    // lifecycle action — a customer can want their statement at any
+    // point, not just at one moment. Generates a fresh document + URL on
+    // every call rather than caching: a statement goes stale as EMIs get
+    // paid, and this module has no document-versioning story, so
+    // regenerating is the safe default. ──────────────────────────────────
+    async getLoanStatement(loanId: string, callerId: string, callerRole: Role): Promise<CdlDocumentResult> {
+        const account = await loansRepository.findAccountByIdOrThrow(loanId);
+        assertAccountOwnership(callerId, account, callerRole);
+
+        const pdfBuffer = await pdfService.generateLoanStatement(loanId);
+
+        const docStorage = getDocStorageProvider();
+        const s3Key = `statements/cdl_${loanId}_${Date.now()}.pdf`;
+        await docStorage.upload({
+            key: s3Key,
+            fileBuffer: pdfBuffer,
+            contentType: 'application/pdf',
+        });
+        const { url } = await docStorage.getSignedUrl(s3Key);
+
+        log.info('CDL loan statement generated', { loanId });
+
+        return {
+            documentRef: s3Key,
+            documentUrl: url,
+        };
+    },
+
+    // ── Real: pdfService.generateRepaymentSchedule already exists but CDL
+    // never called it (audit finding #14). Same on-demand,
+    // always-regenerate reasoning as getLoanStatement above. Unlike
+    // getEmiSchedule (returns the raw schedule as JSON for in-app
+    // display), this returns a downloadable PDF — the spec's "Repayment
+    // schedule download" item specifically. ──────────────────────────────
+    async getRepaymentSchedule(loanId: string, callerId: string, callerRole: Role): Promise<CdlDocumentResult> {
+        const account = await loansRepository.findAccountByIdOrThrow(loanId);
+        assertAccountOwnership(callerId, account, callerRole);
+
+        const pdfBuffer = await pdfService.generateRepaymentSchedule(loanId);
+
+        const docStorage = getDocStorageProvider();
+        const s3Key = `repayment-schedules/cdl_${loanId}.pdf`;
+        await docStorage.upload({
+            key: s3Key,
+            fileBuffer: pdfBuffer,
+            contentType: 'application/pdf',
+        });
+        const { url } = await docStorage.getSignedUrl(s3Key);
+
+        log.info('CDL repayment schedule generated', { loanId });
+
+        return {
+            documentRef: s3Key,
+            documentUrl: url,
+        };
+    },
+
+    // ── Real: pdfService.generateInterestCertificate already exists but
+    // CDL never called it (audit finding #14). Unlike the other document
+    // generators here, this one takes a financialYear (e.g. "2025-26"),
+    // not just loanAccountId — interest certificates are typically needed
+    // for a specific past tax year, not just "now", so financialYear is
+    // accepted as an optional param and defaults to the current Indian
+    // financial year (April-March) when the caller doesn't specify one. ──
+    async getInterestCertificate(
+        loanId: string,
+        financialYear: string | undefined,
+        callerId: string,
+        callerRole: Role,
+    ): Promise<CdlDocumentResult> {
+        const account = await loansRepository.findAccountByIdOrThrow(loanId);
+        assertAccountOwnership(callerId, account, callerRole);
+
+        const fy = financialYear ?? getCurrentFinancialYear();
+        const pdfBuffer = await pdfService.generateInterestCertificate(loanId, fy);
+
+        const docStorage = getDocStorageProvider();
+        const s3Key = `interest-certificates/cdl_${loanId}_${fy}.pdf`;
+        await docStorage.upload({
+            key: s3Key,
+            fileBuffer: pdfBuffer,
+            contentType: 'application/pdf',
+        });
+        const { url } = await docStorage.getSignedUrl(s3Key);
+
+        log.info('CDL interest certificate generated', { loanId, financialYear: fy });
+
+        return {
+            documentRef: s3Key,
+            documentUrl: url,
+        };
+    },
 };
+
+// India's financial year runs April 1 - March 31, formatted "YYYY-YY"
+// (e.g. "2026-27"). Used only as getInterestCertificate's default when
+// the caller doesn't specify one explicitly.
+function getCurrentFinancialYear(): string {
+    const now = new Date();
+    const year = now.getFullYear();
+    const isBeforeApril = now.getMonth() < 3; // getMonth() is 0-indexed; 3 = April
+    const startYear = isBeforeApril ? year - 1 : year;
+    return `${startYear}-${String(startYear + 1).slice(-2)}`;
+}

@@ -173,6 +173,41 @@ export const cdlLoansController = {
         } catch (err) { next(err); }
     },
 
+    // On-demand document endpoints (audit finding #14) — reads, not tied
+    // to a lifecycle action, so no idempotency() (see routes.ts).
+    async getLoanStatement(req: AuthRequest, res: Response, next: NextFunction) {
+        try {
+            const { id } = getValidatedParams<{ id: string }>(req);
+            const callerId = req.user!.id;
+            const callerRole = req.user!.role;
+            const result = await cdlLoansService.getLoanStatement(id, callerId, callerRole);
+            res.status(HTTP.OK).json(successResponse(result));
+        } catch (err) { next(err); }
+    },
+
+    async getRepaymentSchedule(req: AuthRequest, res: Response, next: NextFunction) {
+        try {
+            const { id } = getValidatedParams<{ id: string }>(req);
+            const callerId = req.user!.id;
+            const callerRole = req.user!.role;
+            const result = await cdlLoansService.getRepaymentSchedule(id, callerId, callerRole);
+            res.status(HTTP.OK).json(successResponse(result));
+        } catch (err) { next(err); }
+    },
+
+    async getInterestCertificate(req: AuthRequest, res: Response, next: NextFunction) {
+        try {
+            const { id } = getValidatedParams<{ id: string }>(req);
+            // Optional — defaults to the current financial year inside
+            // the service when omitted. e.g. ?financialYear=2025-26
+            const financialYear = req.query['financialYear'] as string | undefined;
+            const callerId = req.user!.id;
+            const callerRole = req.user!.role;
+            const result = await cdlLoansService.getInterestCertificate(id, financialYear, callerId, callerRole);
+            res.status(HTTP.OK).json(successResponse(result));
+        } catch (err) { next(err); }
+    },
+
     // activateLoan (POST /loans) removed — loan activation is now automatic:
     // disburseToMerchant transitions DISBURSED -> ACTIVE on synchronous
     // payout confirmation, and disbursement.service.ts's

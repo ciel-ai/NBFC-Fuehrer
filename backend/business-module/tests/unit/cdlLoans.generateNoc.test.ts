@@ -28,8 +28,12 @@ jest.mock('@/modules/emi', () => ({
 }));
 
 const mockGeneratePdfNoc = jest.fn();
+const mockGenerateClosureLetter = jest.fn();
 jest.mock('@/modules/documents/pdf.service', () => ({
-    pdfService: { generateNoc: (...args: unknown[]) => mockGeneratePdfNoc(...args) },
+    pdfService: {
+        generateNoc: (...args: unknown[]) => mockGeneratePdfNoc(...args),
+        generateClosureLetter: (...args: unknown[]) => mockGenerateClosureLetter(...args),
+    },
 }));
 
 const mockUpload = jest.fn();
@@ -119,6 +123,9 @@ describe('cdlLoansService.closeLoan — outstanding-balance guard', () => {
         mockGetSummary.mockResolvedValue({ totalOutstanding: 0 });
         mockGetForeclosureQuote.mockResolvedValue({ total: 0 });
         mockUpdateAccountStatus.mockResolvedValue({ status: LOAN_STATUS.CLOSED });
+        mockGenerateClosureLetter.mockResolvedValue(Buffer.from('pdf-bytes'));
+        mockUpload.mockResolvedValue({ key: `closure-letters/cdl_${LOAN_ID}.pdf`, eTag: 'etag-1' });
+        mockGetSignedUrl.mockResolvedValue({ url: 'https://stub/s3/closure-letters/cdl_loan-account-1.pdf', expiresAt: new Date() });
 
         const result = await cdlLoansService.closeLoan(LOAN_ID, STAFF_CALLER_ID, STAFF_ROLE);
 
@@ -126,5 +133,23 @@ describe('cdlLoansService.closeLoan — outstanding-balance guard', () => {
             LOAN_ID, LOAN_STATUS.CLOSED, expect.objectContaining({ closed_at: expect.any(Date) }),
         );
         expect(result.loanId).toBe(LOAN_ID);
+        // Audit finding #14 — real closure letter URL, not fabricated.
+        expect(result.closureLetterUrl).toBe('https://stub/s3/closure-letters/cdl_loan-account-1.pdf');
+    });
+
+    // Regression test for the specific ordering the task called out: if
+    // the status update fails, no closure letter should be generated for
+    // a loan that isn't actually closed.
+    test('does NOT generate a closure letter if the account status update fails', async () => {
+        mockFindAccountByIdOrThrow.mockResolvedValue({ status: LOAN_STATUS.ACTIVE, interestRate: 13 });
+        mockGetSummary.mockResolvedValue({ totalOutstanding: 0 });
+        mockGetForeclosureQuote.mockResolvedValue({ total: 0 });
+        mockUpdateAccountStatus.mockRejectedValue(new Error('DB write failed'));
+
+        await expect(
+            cdlLoansService.closeLoan(LOAN_ID, STAFF_CALLER_ID, STAFF_ROLE),
+        ).rejects.toThrow('DB write failed');
+
+        expect(mockGenerateClosureLetter).not.toHaveBeenCalled();
     });
 });
