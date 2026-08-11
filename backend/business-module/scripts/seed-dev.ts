@@ -1,5 +1,5 @@
 // scripts/seed-dev.ts
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../src/generated/prisma-client';
 import { assertNotProduction } from './_seedGuard';
 
 assertNotProduction('seed-dev.ts');

@@ -39,11 +39,12 @@ router.post(
 );
 
 // ── eSign callback from Signzy ────────────────────────────────────────────────
-// Signzy sends parsed JSON — express.json() already ran globally.
-// rawBodyCapture not needed here since we verify via payload fields, not
-// a request-level signature header.
+// This router is mounted before express.json() in app.ts (see file header),
+// so req.body is never populated by anything else. rawBodyCapture() parses
+// the body here, same as the /razorpay route above.
 router.post(
     '/esign',
+    rawBodyCapture(),
     webhookLimiter,
     webhooksController.eSign,
 );
@@ -51,6 +52,7 @@ router.post(
 // ── Signzy async check callbacks ──────────────────────────────────────────────
 router.post(
     '/signzy',
+    rawBodyCapture(),
     webhookLimiter,
     webhooksController.signzy,
 );
