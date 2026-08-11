@@ -237,6 +237,7 @@ export const paymentsService = {
         const { emiId, loanAccountId, mandateId, amount, penaltyAmount } = input;
 
         const emi = await emiRepository.findByIdOrThrow(emiId);
+        const loanAccount = await loansRepository.findAccountByIdOrThrow(emi.loanAccountId);
 
         if (emi.status === EMI_STATUS.PAID) {
             throw new EmiAlreadyPaidError(emi.id, emi.emiNumber);
@@ -247,7 +248,7 @@ export const paymentsService = {
         // Write PENDING payment record before calling gateway
         const payment = await paymentsRepository.createPayment({
             loanAccountId,
-            userId: emi.loanAccountId, // Resolved via account
+                userId: loanAccount.userId, // Resolved via account
             emiId,
             paymentType: 'EMI',
             amount,

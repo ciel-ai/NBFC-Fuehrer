@@ -282,6 +282,18 @@ if (value.NODE_ENV === 'production' && value.ENABLE_UNWIRED_LOAN_STUBS === true)
     process.exit(1);
 }
 
+// A payment provider of 'stub' fabricates successful debits and payouts —
+// no real money moves, but the response looks identical to a real gateway
+// call. Booting production on this default is a silent, catastrophic
+// misconfiguration: EMIs would be marked collected and disbursements would
+// carry a fake UTR while no real transaction ever happened.
+if (value.NODE_ENV === 'production' && value.PAYMENT_PROVIDER === 'stub') {
+    console.error(
+        '\n❌  FATAL: PAYMENT_PROVIDER cannot be "stub" in production.\n',
+    );
+    process.exit(1);
+}
+
 // Regulatory identity fields (CoR number, NBFC registration number,
 // grievance officer contact) must never reach real customer-facing legal
 // documents (KFS, loan agreements) while still set to their placeholder

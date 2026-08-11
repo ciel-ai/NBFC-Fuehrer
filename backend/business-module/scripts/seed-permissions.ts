@@ -7,7 +7,7 @@
 //
 // Run: DATABASE_URL=... npx tsx scripts/seed-permissions.ts
 
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../src/generated/prisma-client';
 import { assertNotProduction } from './_seedGuard';
 
 assertNotProduction('seed-permissions.ts');
