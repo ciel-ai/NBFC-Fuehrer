@@ -12,6 +12,7 @@ import {
     cdlDisburseSchema,
     cdlManualPaymentSchema,
     cdlPaymentFailureSchema,
+    cdlPartPaymentSchema,
     cdlIdParamSchema,
 } from './cdlLoans.dto';
 
@@ -135,6 +136,18 @@ router.post(
     idempotency(),
     ...validateAll({ params: cdlIdParamSchema, body: cdlManualPaymentSchema }),
     cdlLoansController.processManualPayment,
+);
+// Audit finding #15 — generic lump-sum part-payment, applied across
+// whichever EMIs are actually due, oldest first (client spec Section 8,
+// "Foreclosure & Part Payment"). Real money moving across potentially
+// multiple EMIs in one call — same idempotency() reasoning as every
+// other money-moving CDL route above.
+router.post(
+    '/loans/:id/part-payment',
+    requireAuth(), allowRoles(C),
+    idempotency(),
+    ...validateAll({ params: cdlIdParamSchema, body: cdlPartPaymentSchema }),
+    cdlLoansController.partPayment,
 );
 router.post(
     '/loans/:id/payment-failure',
