@@ -116,7 +116,7 @@ jest.mock('@/providers/esign', () => ({
 }));
 
 import { cdlLoansService } from '@/modules/cdlLoans/cdlLoans.service';
-import { ForbiddenError } from '@/errors';
+import { ForbiddenError, LoanStateError } from '@/errors';
 import { ROLE } from '@/config/constants';
 
 const APPLICATION_ID = 'app-1';
@@ -126,7 +126,7 @@ const OTHER_ID = 'user-2';
 const STAFF_ROLE = ROLE.SUPER_ADMIN;
 
 const ownedApplication = { id: APPLICATION_ID, userId: OWNER_ID, interestRate: 13, tenureMonths: 12, amountRequested: 25000, processingFee: 1463 };
-const ownedApplicationRaw = { id: APPLICATION_ID, user_id: OWNER_ID, approved_amount: 25000, amount_requested: 25000, tenure_months: 12, esign_request_id: 'req-1', user: { full_name: 'X', phone: '+911234567890' } };
+const ownedApplicationRaw = { id: APPLICATION_ID, user_id: OWNER_ID, status: 'APPROVED', approved_amount: 25000, amount_requested: 25000, tenure_months: 12, esign_request_id: 'req-1', user: { full_name: 'X', phone: '+911234567890' } };
 const ownedAccount = { id: LOAN_ID, userId: OWNER_ID, status: 'ACTIVE', interestRate: 13 };
 
 beforeEach(() => {
@@ -250,6 +250,51 @@ describe('CDL ownership checks — application-scoped methods', () => {
         await expect(
             cdlLoansService.registerNachMandate(APPLICATION_ID, { bankAccount: '123456789012', ifsc: 'HDFC0001234' }, OTHER_ID, STAFF_ROLE),
         ).resolves.toBeDefined();
+    });
+});
+
+// Regression test for CDL audit finding #13: registerNachMandate never
+// checked application.status — a real Razorpay mandate could be
+// registered against a DRAFT or REJECTED application, one that was never
+// approved.
+describe('registerNachMandate — application-status guard (audit finding #13)', () => {
+    const MANDATE_INPUT = { bankAccount: '123456789012', ifsc: 'HDFC0001234' };
+
+    test('throws LoanStateError when the application is DRAFT', async () => {
+        mockLoanApplicationsFindUniqueOrThrow.mockResolvedValue({ ...ownedApplicationRaw, status: 'DRAFT' });
+
+        await expect(
+            cdlLoansService.registerNachMandate(APPLICATION_ID, MANDATE_INPUT, OWNER_ID, ROLE.CUSTOMER),
+        ).rejects.toThrow(LoanStateError);
+        expect(mockCreateMandateForApplication).not.toHaveBeenCalled();
+    });
+
+    test('throws LoanStateError when the application is REJECTED', async () => {
+        mockLoanApplicationsFindUniqueOrThrow.mockResolvedValue({ ...ownedApplicationRaw, status: 'REJECTED' });
+
+        await expect(
+            cdlLoansService.registerNachMandate(APPLICATION_ID, MANDATE_INPUT, OWNER_ID, ROLE.CUSTOMER),
+        ).rejects.toThrow(LoanStateError);
+        expect(mockCreateMandateForApplication).not.toHaveBeenCalled();
+    });
+
+    test('succeeds when the application is APPROVED — regression, the existing happy path still works', async () => {
+        mockLoanApplicationsFindUniqueOrThrow.mockResolvedValue({ ...ownedApplicationRaw, status: 'APPROVED' });
+        mockCreateMandateForApplication.mockResolvedValue({ id: 'mandate-1', bankAccount: '123456789012', razorpayMandateId: 'rzp-1' });
+
+        await expect(
+            cdlLoansService.registerNachMandate(APPLICATION_ID, MANDATE_INPUT, OWNER_ID, ROLE.CUSTOMER),
+        ).resolves.toBeDefined();
+        expect(mockCreateMandateForApplication).toHaveBeenCalledTimes(1);
+    });
+
+    test('ownership is checked BEFORE status — a non-owner gets ForbiddenError, not a LoanStateError that would reveal the application\'s status to them', async () => {
+        mockLoanApplicationsFindUniqueOrThrow.mockResolvedValue({ ...ownedApplicationRaw, status: 'DRAFT' });
+
+        await expect(
+            cdlLoansService.registerNachMandate(APPLICATION_ID, MANDATE_INPUT, OTHER_ID, ROLE.CUSTOMER),
+        ).rejects.toThrow(ForbiddenError);
+        expect(mockCreateMandateForApplication).not.toHaveBeenCalled();
     });
 });
 

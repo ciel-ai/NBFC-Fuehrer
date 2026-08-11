@@ -16,12 +16,14 @@
 const mockFindCustomerByUserId = jest.fn();
 const mockCreateApplication = jest.fn();
 const mockUpdateApplicationStatus = jest.fn();
+const mockHasActiveApplication = jest.fn();
 
 jest.mock('@/modules/loans/loans.repository', () => ({
     loansRepository: {
         findCustomerByUserId: (...args: unknown[]) => mockFindCustomerByUserId(...args),
         createApplication: (...args: unknown[]) => mockCreateApplication(...args),
         updateApplicationStatus: (...args: unknown[]) => mockUpdateApplicationStatus(...args),
+        hasActiveApplication: (...args: unknown[]) => mockHasActiveApplication(...args),
     },
 }));
 
@@ -54,6 +56,7 @@ const baseInput = {
 beforeEach(() => {
     jest.clearAllMocks();
     mockFindCustomerByUserId.mockResolvedValue({ id: 'cust-1' });
+    mockHasActiveApplication.mockResolvedValue(false);
     mockCreateApplication.mockResolvedValue({
         id: 'app-1', referenceNumber: 'FHR-2026-000001', appliedAt: new Date(),
     });
@@ -100,5 +103,53 @@ describe('submitApplication persists the customer\'s chosen auto-debit date', ()
             cdlLoansService.submitApplication(USER_ID, { ...baseInput, autoDebitDate: 15 as any }),
         ).rejects.toThrow();
         expect(mockCreateApplication).not.toHaveBeenCalled();
+    });
+});
+
+// Regression test for CDL audit finding #12: a customer could previously
+// submit unlimited simultaneous CDL applications — submitApplication
+// never checked loansRepository.hasActiveApplication before creating a
+// new one, unlike the generic loans.service.ts, which already did.
+describe('submitApplication — duplicate-active-application guard (audit finding #12)', () => {
+    // loansRepository.hasActiveApplication is mocked wholesale here (same
+    // pattern every other test in this file already uses) — it already
+    // decides what counts as "active" (anything NOT REJECTED/CLOSED/
+    // WRITTEN_OFF — e.g. DRAFT, KYC_PENDING, UNDERWRITING, APPROVED,
+    // DISBURSED, ACTIVE) via loans.repository.ts's own status exclusion
+    // list, untouched by this fix. What's actually being tested here is
+    // that submitApplication honors that boolean at all — it previously
+    // never called this function, so it made no difference what it would
+    // have returned.
+    test('throws (does not reach createApplication) when the user has any live application — e.g. UNDERWRITING or APPROVED, not just DRAFT', async () => {
+        mockHasActiveApplication.mockResolvedValue(true);
+
+        await expect(
+            cdlLoansService.submitApplication(USER_ID, baseInput),
+        ).rejects.toThrow('An active loan application already exists for this user');
+        expect(mockCreateApplication).not.toHaveBeenCalled();
+    });
+
+    test('succeeds when the user has zero prior applications (baseline)', async () => {
+        mockHasActiveApplication.mockResolvedValue(false);
+
+        await expect(
+            cdlLoansService.submitApplication(USER_ID, baseInput),
+        ).resolves.toBeDefined();
+        expect(mockCreateApplication).toHaveBeenCalledTimes(1);
+    });
+
+    test('succeeds when the user\'s only prior application is REJECTED/CLOSED/WRITTEN_OFF — hasActiveApplication itself would return false for these, regression check that submitApplication doesn\'t second-guess it', async () => {
+        // hasActiveApplication's own REJECTED/CLOSED/WRITTEN_OFF exclusion
+        // is loans.repository.ts's concern, not re-tested here — this
+        // confirms submitApplication trusts a false return and proceeds,
+        // rather than e.g. accidentally always blocking on ANY prior
+        // application regardless of status.
+        mockHasActiveApplication.mockResolvedValue(false);
+
+        await expect(
+            cdlLoansService.submitApplication(USER_ID, baseInput),
+        ).resolves.toBeDefined();
+        expect(mockHasActiveApplication).toHaveBeenCalledWith(USER_ID);
+        expect(mockCreateApplication).toHaveBeenCalledTimes(1);
     });
 });
