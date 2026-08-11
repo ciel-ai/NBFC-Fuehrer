@@ -2,6 +2,7 @@
 import { Router } from 'express';
 import { cdlLoansController } from './cdlLoans.controller';
 import { requireAuth, allowRoles, validateBody, validateParams, validateAll } from '@/middlewares';
+import { idempotency } from '@/middlewares/idempotency.middleware';
 import { ROLE } from '@/config/constants';
 import {
     cdlSubmitApplicationSchema,
@@ -29,54 +30,85 @@ const A = ROLE.SUPER_ADMIN;
 // :id param and body via cdlLoans.dto.ts, same pattern loans.routes.ts
 // already uses.
 //
+// idempotency() (audit finding #10) — every state-changing route below
+// now carries it, same requireAuth()/allowRoles()/idempotency()/
+// validate* ordering disbursement.routes.ts and payments.routes.ts
+// already use. It's opt-in per request (a no-op unless the client sends
+// an Idempotency-Key header), so this is non-breaking for any client
+// that doesn't send one yet. GET routes (emi-schedule, overdue) don't
+// get it — reads have nothing to deduplicate.
+//
 // POST /loans (activateLoan) removed — activation is automatic now, see
 // disburseToMerchant (sync) and disbursement.service.ts's
 // _completeDisbursement (async webhook confirmation).
 router.post(
     '/applications',
     requireAuth(), allowRoles(C),
+    idempotency(),
     validateBody(cdlSubmitApplicationSchema),
     cdlLoansController.submitApplication,
 );
 router.post(
     '/applications/:id/kyc',
     requireAuth(), allowRoles(C),
+    idempotency(),
     validateParams(cdlIdParamSchema),
     cdlLoansController.runKycChecks,
 );
 router.post(
     '/applications/:id/compliance',
     requireAuth(), allowRoles(C),
+    idempotency(),
     validateParams(cdlIdParamSchema),
     cdlLoansController.runComplianceChecks,
 );
 router.post(
     '/applications/:id/credit-assessment',
     requireAuth(), allowRoles(C),
+    idempotency(),
     ...validateAll({ params: cdlIdParamSchema, body: cdlCreditAssessmentSchema }),
     cdlLoansController.runCreditAssessment,
 );
 router.post(
     '/applications/:id/credit-decision',
     requireAuth(), allowRoles(C),
+    idempotency(),
     ...validateAll({ params: cdlIdParamSchema, body: cdlCreditDecisionSchema }),
     cdlLoansController.getCreditDecision,
 );
+// generateAgreement already has its own purpose-built re-entrancy guard
+// (checks esign_status: returns the existing signed doc if already
+// SIGNED, rejects if a request is still PENDING, allows retry after
+// FAILED/EXPIRED/CANCELLED — see cdlLoansService.generateAgreement). That
+// guard is DB-state-based (check-then-act against the current row) and
+// closes the SEQUENTIAL re-call case — but it cannot close a genuine
+// CONCURRENT race: two simultaneous requests can both read
+// esign_status as not-yet-set before either has written anything, both
+// pass the guard, and both proceed to call the real PDF generator and
+// eSign provider. idempotency() reserves the key atomically (a DB
+// unique-constraint insert) before either request does any real work, so
+// the second concurrent request gets 409 immediately — a gap the
+// state-based guard structurally can't cover on its own. Added here too,
+// not redundant with the earlier fix — the two protect different windows
+// (concurrent vs. sequential re-entry).
 router.post(
     '/applications/:id/agreement',
     requireAuth(), allowRoles(C),
+    idempotency(),
     validateParams(cdlIdParamSchema),
     cdlLoansController.generateAgreement,
 );
 router.post(
     '/applications/:id/esign',
     requireAuth(), allowRoles(C),
+    idempotency(),
     validateParams(cdlIdParamSchema),
     cdlLoansController.completeESign,
 );
 router.post(
     '/applications/:id/nach',
     requireAuth(), allowRoles(C),
+    idempotency(),
     ...validateAll({ params: cdlIdParamSchema, body: cdlNachSchema }),
     cdlLoansController.registerNachMandate,
 );
@@ -87,6 +119,7 @@ router.post(
 router.post(
     '/applications/:id/disburse',
     requireAuth(), allowRoles(F, A),
+    idempotency(),
     ...validateAll({ params: cdlIdParamSchema, body: cdlDisburseSchema }),
     cdlLoansController.disburseToMerchant,
 );
@@ -99,12 +132,14 @@ router.get(
 router.post(
     '/loans/:id/payments',
     requireAuth(), allowRoles(C),
+    idempotency(),
     ...validateAll({ params: cdlIdParamSchema, body: cdlManualPaymentSchema }),
     cdlLoansController.processManualPayment,
 );
 router.post(
     '/loans/:id/payment-failure',
     requireAuth(), allowRoles(C),
+    idempotency(),
     ...validateAll({ params: cdlIdParamSchema, body: cdlPaymentFailureSchema }),
     cdlLoansController.handlePaymentFailure,
 );
@@ -117,6 +152,7 @@ router.get(
 router.post(
     '/loans/:id/close',
     requireAuth(), allowRoles(C, F),
+    idempotency(),
     validateParams(cdlIdParamSchema),
     cdlLoansController.closeLoan,
 );
@@ -126,6 +162,7 @@ router.post(
 router.post(
     '/loans/:id/noc',
     requireAuth(), allowRoles(C),
+    idempotency(),
     validateParams(cdlIdParamSchema),
     cdlLoansController.generateNoc,
 );
