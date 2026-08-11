@@ -1,6 +1,7 @@
 // src/modules/reconciliation/reconciliation.service.ts
 import { prisma } from '@/config/database';
 import { createModuleLogger } from '@/config/logger';
+import { PAYMENT_CHANNEL } from '@/config/constants';
 
 const log = createModuleLogger('reconciliation.service');
 
@@ -25,7 +26,7 @@ export const reconciliationService = {
 
         const todayPayments = await prisma.payments.findMany({
             where: {
-                channel: { in: ['NACH', 'RAZORPAY', 'UPI'] },
+                channel: { in: Object.values(PAYMENT_CHANNEL) },
                 created_at: {
                     gte: new Date(dateStr),
                     lt:  new Date(new Date(dateStr).getTime() + 24 * 60 * 60 * 1000),
@@ -124,7 +125,7 @@ export const reconciliationService = {
 
         const gatewayPayments = await prisma.payments.findMany({
             where: {
-                channel: { in: ['NACH', 'RAZORPAY', 'UPI'] },
+                channel: { in: Object.values(PAYMENT_CHANNEL) },
                 created_at: {
                     gte: new Date(dateStr),
                     lt:  new Date(new Date(dateStr).getTime() + 24 * 60 * 60 * 1000),
