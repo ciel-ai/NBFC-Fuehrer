@@ -1,7 +1,7 @@
 ﻿// src/modules/cdlLoans/cdlLoans.service.ts
 import { createModuleLogger } from '@/config/logger';
 import { prisma, withTransaction } from '@/config/database';
-import { ValidationError, NotFoundError, LoanStateError, ConflictError } from '@/errors';
+import { ValidationError, NotFoundError, LoanStateError, ConflictError, CONFLICT_ERRORS } from '@/errors';
 import { computeMonthlyEmi, buildAmortizationSchedule } from '@/modules/emi/emi.calculator';
 import { emiService } from '@/modules/emi';
 import { loansRepository } from '@/modules/loans/loans.repository';
@@ -104,6 +104,15 @@ export const cdlLoansService = {
     // CONSUMER_DURABLE, same table gold/housing loans use. ───────────────────
     async submitApplication(userId: string, input: CdlApplicationInput): Promise<CdlApplicationResult> {
         validateCdlLoanParams(input.loanAmount, input.tenureMonths, input.autoDebitDate);
+
+        // Previously missing entirely — a customer could submit unlimited
+        // simultaneous CDL applications. loansRepository.hasActiveApplication
+        // already exists and is already used by the generic loans.service.ts
+        // for this exact check; reused as-is, same error, so this reads as
+        // the same validation the rest of the platform already gives
+        // customers, not a CDL-specific variant.
+        const hasActive = await loansRepository.hasActiveApplication(userId);
+        if (hasActive) throw CONFLICT_ERRORS.duplicateApplication(userId);
 
         const interestRate = getCdlInterestRate(input.employmentType, input.interestRatePct);
         const emi = calcEmi(input.loanAmount, interestRate, input.tenureMonths);
@@ -549,6 +558,19 @@ export const cdlLoansService = {
             include: { user: { select: { full_name: true, phone: true } } },
         });
         assertApplicationOwnership(callerId, { userId: application.user_id }, callerRole);
+
+        // Previously missing entirely — a real Razorpay mandate could be
+        // registered against a DRAFT or REJECTED application, one that
+        // was never approved. Ownership is checked first, deliberately —
+        // a caller who doesn't own this application gets ForbiddenError,
+        // not a LoanStateError that would reveal the application's status
+        // to them. Same state-guard idiom housingLoans.service.ts already
+        // uses for its own preconditions (LoanStateError doesn't take a
+        // free-text message — its constructor derives one from
+        // current/expected status).
+        if (application.status !== LOAN_STATUS.APPROVED) {
+            throw new LoanStateError(applicationId, application.status, LOAN_STATUS.APPROVED);
+        }
 
         const principal = Number(application.approved_amount ?? application.amount_requested);
         const estimatedMonthlyEmi = principal / application.tenure_months;
