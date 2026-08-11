@@ -132,6 +132,21 @@ export const cdlLoansController = {
         } catch (err) { next(err); }
     },
 
+    // Audit finding #15 — lump-sum part-payment applied across whichever
+    // EMIs are actually due, oldest first. No emiId in the body — unlike
+    // processManualPayment, the service picks the EMIs itself.
+    async partPayment(req: AuthRequest, res: Response, next: NextFunction) {
+        try {
+            const { id } = getValidatedParams<{ id: string }>(req);
+            const collectedBy = req.user!.id;
+            const callerId = req.user!.id;
+            const callerRole = req.user!.role;
+            const { amount, collectionId } = getValidatedBody<{ amount: number; collectionId?: string }>(req);
+            const result = await cdlLoansService.partPayment(id, amount, collectedBy, collectionId, req, callerId, callerRole);
+            res.status(HTTP.OK).json(successResponse(result, 'Part payment recorded'));
+        } catch (err) { next(err); }
+    },
+
     async handlePaymentFailure(req: AuthRequest, res: Response, next: NextFunction) {
         try {
             const { id } = getValidatedParams<{ id: string }>(req);

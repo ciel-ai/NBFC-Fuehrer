@@ -3,7 +3,7 @@ import { createModuleLogger } from '@/config/logger';
 import { prisma, withTransaction } from '@/config/database';
 import { ValidationError, NotFoundError, LoanStateError, ConflictError, CONFLICT_ERRORS } from '@/errors';
 import { computeMonthlyEmi, buildAmortizationSchedule } from '@/modules/emi/emi.calculator';
-import { emiService } from '@/modules/emi';
+import { emiService, emiRepository } from '@/modules/emi';
 import { loansRepository } from '@/modules/loans/loans.repository';
 import { paymentsService } from '@/modules/payments';
 import { kycRepository } from '@/modules/kyc';
@@ -25,6 +25,7 @@ import type {
     CdlNachResult, CdlDisbursalResult,
     CdlOverdueStatus, CdlClosureResult,
     CdlManualPaymentResult, CdlDocumentResult,
+    CdlPartPaymentResult, CdlPartPaymentEmiApplication,
 } from './cdlLoans.types';
 
 const log = createModuleLogger('cdlLoans.service');
@@ -921,6 +922,133 @@ export const cdlLoansService = {
             paidAt: (payment.settledAt ?? payment.initiatedAt).toISOString(),
             receiptUrl,
             note: `₹${amount.toLocaleString('en-IN')} recorded against EMI.`,
+        };
+    },
+
+    // ── Real: audit finding #15 — a generic lump-sum part-payment, applied
+    // across whichever EMIs are actually due, oldest first, rather than
+    // processManualPayment's single named EMI. Per the client spec
+    // (Section 8, "Foreclosure & Part Payment").
+    //
+    // CORRECTNESS — allocatePartialPayment (emi.calculator.ts) computes
+    // but never returns any surplus beyond a single EMI's own due; call
+    // it with more than that EMI owes and the excess is silently
+    // discarded. That's a real, separate, pre-existing bug in the
+    // shared payment path (see the commit for this fix) — NOT fixed
+    // here. To avoid tripping it, every call into
+    // paymentsService.recordCashPayment below is capped to exactly the
+    // current EMI's own true remaining due, read directly off
+    // emi_schedule's own emi_amount/penalty_amount columns
+    // (recordPartialPayment decrements these in place on every prior
+    // partial settlement, so they're always the real remaining due,
+    // never the original scheduled amount) — never the raw remaining
+    // lump sum.
+    //
+    // req is not in the task's illustrative signature but is required —
+    // recordCashPayment needs it (audit context, event requestId), and
+    // every other CDL method that calls into the payments module takes
+    // one (see processManualPayment above); added here in the same
+    // position for consistency.
+    async partPayment(
+        loanId: string,
+        amount: number,
+        collectedBy: string,
+        collectionId: string | undefined,
+        req: any,
+        callerId: string,
+        callerRole: Role,
+    ): Promise<CdlPartPaymentResult> {
+        if (!amount || amount <= 0) {
+            throw new ValidationError('amount', 'Payment amount must be greater than zero');
+        }
+
+        const account = await loansRepository.findAccountByIdOrThrow(loanId);
+        assertAccountOwnership(callerId, account, callerRole);
+
+        // Cap upfront against the account's real total outstanding (same
+        // emiService.getSummary closeLoan already uses). This codebase
+        // has no overpayment-credit-balance concept anywhere — rather
+        // than invent one here, an amount that exceeds what's actually
+        // owed is rejected outright, before a single EMI is touched.
+        const summary = await emiService.getSummary(loanId);
+        if (amount > summary.totalOutstanding) {
+            throw new ValidationError(
+                'amount',
+                `Amount exceeds total outstanding of ₹${summary.totalOutstanding.toLocaleString('en-IN')}`,
+            );
+        }
+
+        const emisApplied: CdlPartPaymentEmiApplication[] = [];
+        let remainingLumpSum = amount;
+
+        while (remainingLumpSum > 0) {
+            const emi = await emiRepository.findNextDueEmi(loanId);
+            if (!emi) break; // fully settled — shouldn't happen given the upfront cap above, but the loop must still terminate correctly if it does.
+
+            const thisEmiDue = emi.emiAmount + emi.penaltyAmount;
+            const cappedAmount = Math.min(remainingLumpSum, thisEmiDue);
+
+            if (cappedAmount <= 0) {
+                // Defensive: shouldn't be reachable given the upfront
+                // cap, but a due EMI with a zero remaining due would
+                // otherwise spin forever re-selecting itself.
+                log.warn('CDL part-payment: next due EMI has zero due but lump sum remains — stopping', {
+                    loanId, emiId: emi.id, remainingLumpSum,
+                });
+                break;
+            }
+
+            const payment = await paymentsService.recordCashPayment({
+                loanAccountId: loanId,
+                userId: account.userId,
+                emiId: emi.id,
+                amount: cappedAmount,
+                collectedBy,
+                collectionId: collectionId ?? '',
+            }, req);
+
+            // Audit finding #14's receipt pattern, reused per-EMI — each
+            // is a distinct payment record against a distinct EMI, same
+            // as if the customer had paid each one individually.
+            const receiptBuffer = await pdfService.generatePaymentReceipt(payment.id);
+            const docStorage = getDocStorageProvider();
+            const receiptKey = `receipts/cdl_${payment.id}.pdf`;
+            await docStorage.upload({
+                key: receiptKey,
+                fileBuffer: receiptBuffer,
+                contentType: 'application/pdf',
+            });
+            const { url: receiptUrl } = await docStorage.getSignedUrl(receiptKey);
+
+            emisApplied.push({
+                emiId: emi.id,
+                emiNumber: emi.emiNumber,
+                amountApplied: cappedAmount,
+                paymentId: payment.id,
+                receiptUrl,
+                // cappedAmount can never exceed thisEmiDue (Math.min
+                // above) — it only equals it when the full due was
+                // covered this call.
+                resultingStatus: cappedAmount >= thisEmiDue ? EMI_STATUS.PAID : EMI_STATUS.PARTIAL,
+            });
+
+            remainingLumpSum -= cappedAmount;
+        }
+
+        const totalAmountApplied = emisApplied.reduce((sum, e) => sum + e.amountApplied, 0);
+        const updatedSummary = await emiService.getSummary(loanId);
+
+        log.info('CDL part-payment recorded', {
+            loanId, totalAmountApplied, emisTouched: emisApplied.length,
+        });
+
+        return {
+            loanId,
+            totalAmountApplied,
+            emisApplied,
+            remainingOutstanding: updatedSummary.totalOutstanding,
+            fullyPaidOff: updatedSummary.totalOutstanding === 0,
+            note: `₹${totalAmountApplied.toLocaleString('en-IN')} applied across ${emisApplied.length} EMI(s).`,
         };
     },
 

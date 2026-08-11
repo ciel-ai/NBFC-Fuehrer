@@ -163,3 +163,33 @@ export interface CdlDocumentResult {
     documentRef: string;
     documentUrl: string;
 }
+
+// Audit finding #15 — a generic part-payment endpoint: a lump sum applied
+// across whichever EMIs are actually due, oldest first, rather than the
+// single named EMI processManualPayment requires. One entry per EMI the
+// lump sum actually touched (an EMI it fully settled, or the one it
+// partially settled before running out) — each is a distinct payment
+// record with its own receipt, same as if the customer had paid each one
+// individually via processManualPayment.
+export interface CdlPartPaymentEmiApplication {
+    emiId: string;
+    emiNumber: number;
+    amountApplied: number;
+    paymentId: string;
+    receiptUrl: string;
+    // 'PAID' if amountApplied covered this EMI's full remaining due,
+    // 'PARTIAL' otherwise (EMI_STATUS values, kept as string here so this
+    // type doesn't need to import the constants module just for a label).
+    resultingStatus: string;
+}
+
+export interface CdlPartPaymentResult {
+    loanId: string;
+    totalAmountApplied: number;
+    emisApplied: CdlPartPaymentEmiApplication[];
+    remainingOutstanding: number;
+    // Informational only — closing the loan stays a deliberate, separate
+    // customer action (POST /loans/:id/close), never auto-triggered here.
+    fullyPaidOff: boolean;
+    note: string;
+}

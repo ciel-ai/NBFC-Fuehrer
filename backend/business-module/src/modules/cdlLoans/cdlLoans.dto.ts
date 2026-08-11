@@ -161,6 +161,15 @@ export const cdlPaymentFailureSchema = Joi.object({
     emiId: Joi.string().uuid({ version: 'uuidv4' }).required(),
 });
 
+// ─── POST /loans/:id/part-payment (audit finding #15) ──────────────────────────
+// No emiId — unlike cdlManualPaymentSchema, this is a lump sum the service
+// itself allocates across whichever EMIs are actually due, oldest first.
+
+export const cdlPartPaymentSchema = Joi.object({
+    amount: commonSchemas.amount.required(),
+    collectionId: Joi.string().max(100).optional(),
+});
+
 // ─── :id param — used on every /applications/:id/* and /loans/:id/* route ─────
 // Same shape as commonSchemas.uuidParam; a named export here so
 // cdlLoans.routes.ts's intent is explicit at each call site.

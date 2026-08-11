@@ -71,6 +71,7 @@ describe('CDL routes carry idempotency() on state-changing endpoints (audit find
         '/applications/:id/credit-decision',
         '/applications/:id/esign',
         '/loans/:id/payments',
+        '/loans/:id/part-payment',
         '/loans/:id/payment-failure',
         '/loans/:id/close',
         '/loans/:id/noc',
