@@ -19,6 +19,7 @@
 
 import { prisma } from '@/config/database';
 import { createModuleLogger } from '@/config/logger';
+import { computeMonthlyEmi } from '@/modules/emi/emi.calculator';
 
 const log = createModuleLogger('cdlAutoApproval');
 
@@ -90,16 +91,6 @@ function getInterestRate(
         if (creditScore >= 750) return 14;
         return 15;
     }
-}
-
-// ─── EMI calculation (flat rate for CDL) ─────────────────────────────────────
-
-function calculateEmi(principal: number, annualRate: number, tenureMonths: number): number {
-    if (annualRate === 0) return Math.round(principal / tenureMonths);
-    const monthlyRate = annualRate / 12 / 100;
-    const emi = principal * monthlyRate * Math.pow(1 + monthlyRate, tenureMonths)
-        / (Math.pow(1 + monthlyRate, tenureMonths) - 1);
-    return Math.round(emi);
 }
 
 // ─── Auto Approval Engine ─────────────────────────────────────────────────────
@@ -225,8 +216,18 @@ export const cdlAutoApprovalService = {
         }
 
         // ── Step 3: FOIR calculation ───────────────────────────────────────────
+        // Audit finding #17 — this used to have its own duplicate,
+        // whole-rupee-rounded EMI formula (calculateEmi(), now removed),
+        // separate from computeMonthlyEmi (emi.calculator.ts) — the same
+        // authoritative calculator cdlLoans.service.ts's real amortization
+        // schedule uses, and the one an earlier commit already
+        // consolidated CDL/housing's own EMI estimates onto. Two
+        // implementations of "the EMI for this loan" can silently drift;
+        // this FOIR gate now evaluates against the exact figure the
+        // customer will actually be billed, not a separately-rounded
+        // estimate.
         const interestRate   = getInterestRate(input.employmentType, input.creditScore);
-        const proposedEmi    = calculateEmi(input.requestedAmount, interestRate, input.tenureMonths);
+        const proposedEmi    = computeMonthlyEmi(input.requestedAmount, interestRate, input.tenureMonths);
         const totalEmi       = input.existingEmis + proposedEmi;
         const foir           = Math.round((totalEmi / input.monthlyIncome) * 100);
 
