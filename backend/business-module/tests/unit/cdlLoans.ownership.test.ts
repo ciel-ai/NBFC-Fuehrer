@@ -81,10 +81,19 @@ jest.mock('@/modules/payments', () => ({
 
 const mockGeneratePdfAgreement = jest.fn();
 const mockGeneratePdfNoc = jest.fn();
+const mockGeneratePaymentReceipt = jest.fn();
+const mockGenerateClosureLetter = jest.fn();
 jest.mock('@/modules/documents/pdf.service', () => ({
     pdfService: {
         generateCdlLoanAgreement: (...args: unknown[]) => mockGeneratePdfAgreement(...args),
         generateNoc: (...args: unknown[]) => mockGeneratePdfNoc(...args),
+        // Audit finding #14 — processManualPayment/closeLoan now call
+        // these too; every test in this file exercises the ownership
+        // check, not document generation, so a resolved default in
+        // beforeEach (same treatment as mockUpload/mockGetSignedUrl
+        // below) keeps every existing test passing unmodified.
+        generatePaymentReceipt: (...args: unknown[]) => mockGeneratePaymentReceipt(...args),
+        generateClosureLetter: (...args: unknown[]) => mockGenerateClosureLetter(...args),
     },
 }));
 
@@ -136,6 +145,8 @@ beforeEach(() => {
     mockUpdateAccountStatus.mockResolvedValue({});
     mockUpload.mockResolvedValue({ key: 'k', eTag: 'e' });
     mockGetSignedUrl.mockResolvedValue({ url: 'https://stub/doc.pdf', expiresAt: new Date() });
+    mockGeneratePaymentReceipt.mockResolvedValue(Buffer.from('pdf-bytes'));
+    mockGenerateClosureLetter.mockResolvedValue(Buffer.from('pdf-bytes'));
 });
 
 describe('CDL ownership checks — application-scoped methods', () => {

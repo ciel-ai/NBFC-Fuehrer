@@ -129,5 +129,37 @@ export interface CdlClosureResult {
     closureId: string;
     totalAmountPaid: number;
     closedAt: string;
+    // Audit finding #14 — pdfService.generateClosureLetter already
+    // existed (housing loans could use it too) but CDL never called it.
+    closureLetterUrl: string;
     note: string;
+}
+
+// processManualPayment previously had no named return type in this file
+// at all (an inline object literal) — every other CDL service method has
+// one; adding it now rather than leaving this the one exception, since a
+// new field (receiptUrl) needs documenting somewhere real.
+export interface CdlManualPaymentResult {
+    loanId: string;
+    emiId: string;
+    paymentId: string;
+    amountPaid: number;
+    penaltyPaid: number;
+    totalCollected: number;
+    status: string;
+    paidAt: string;
+    // Audit finding #14 — pdfService.generatePaymentReceipt already
+    // existed but CDL never called it.
+    receiptUrl: string;
+    note: string;
+}
+
+// Shared shape for the three new on-demand document endpoints (loan
+// statement, repayment schedule, interest certificate) — same
+// reference/filename + signed-URL pattern generateNoc already returns
+// (there as an inline literal type; promoted to a real named type here
+// since three new endpoints share this exact shape).
+export interface CdlDocumentResult {
+    documentRef: string;
+    documentUrl: string;
 }
