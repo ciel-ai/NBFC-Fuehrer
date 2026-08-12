@@ -120,9 +120,12 @@ export const RULE_DEFINITIONS: RuleDefinition[] = [
         weight: 20,
         hardFail: false,
         evaluate(ctx) {
-            // Derived from bureau report stored in KYC — we don't have direct access
-            // here so we use the credit score as a proxy (low score = overdue accounts)
-            // In a full implementation, bureau data would be in the context
+            // PROXY: standing in for a real overdue-accounts lookup
+            // against bureau data (or, on this platform, a cross-product
+            // loan_accounts query) — not implemented yet. Derives a
+            // guess from credit score (low score = assumed overdue)
+            // rather than checking actual overdue status. See audit
+            // finding #22's plan, Phase 4.
             const score = ctx.kyc.creditScore ?? 750;
             const hasOverdues = score < 600; // Proxy threshold
 
@@ -145,8 +148,13 @@ export const RULE_DEFINITIONS: RuleDefinition[] = [
         weight: 10,
         hardFail: false,
         evaluate(ctx) {
-            // Would use ctx.bureauReport.enquiriesLast90Days in full impl
-            // Using a derived signal for now
+            // PROXY: standing in for real bureau enquiry-count data
+            // (ctx.bureauReport.enquiriesLast90Days in a full
+            // implementation) — not implemented yet. Derives a guess
+            // from credit score rather than an actual enquiry count.
+            // Worth checking whether the credit bureau provider already
+            // returns this field unread. See audit finding #22's plan,
+            // Phase 4.
             const max = ctx.config.maxEnquiries90Days;
             // Assume 1 enquiry (ours) — flag if score drop suggests more
             const estimated = ctx.kyc.creditScore && ctx.kyc.creditScore < 650 ? 4 : 1;
@@ -292,9 +300,29 @@ export const RULE_DEFINITIONS: RuleDefinition[] = [
         evaluate(ctx) {
             const clear = ctx.kyc.amlClear;
 
-            if (clear) {
+            if (clear === true) {
                 return pass(this, true, true,
                     'AML and sanctions screening returned clear',
+                );
+            }
+
+            // Audit finding #22, Phase 1 — amlClear used to default to
+            // `true` when no AML check had ever run, making "never
+            // checked" indistinguishable from "confirmed clear" to this
+            // hard-fail rule. null is now a distinct state.
+            //
+            // DELIBERATE COMPLIANCE-LEANING CHOICE, not a technical
+            // default: treating "not yet run" as a hard fail (rather
+            // than, say, a soft REFERRED signal) is the conservative
+            // option for an AML/sanctions gate — missing data is not the
+            // same claim as confirmed fraud, but a control like this
+            // should fail closed on missing data, not pass silently.
+            // This wasn't explicitly specified by AML policy and is
+            // worth a sign-off from whoever owns AML compliance at this
+            // company before this rule is relied on for a real decision.
+            if (clear === null) {
+                return fail(this, null, true,
+                    'AML/sanctions check has not been completed for this applicant',
                 );
             }
 
@@ -368,12 +396,13 @@ export const RULE_DEFINITIONS: RuleDefinition[] = [
         weight: 40,
         hardFail: true,   // Incomplete KYC blocks all processing
         evaluate(ctx) {
-            // If we reached underwriting, KYC must be complete.
-            // This rule is a safety check in case the workflow has a bug.
-            // In normal flow this always passes.
-            const kycComplete = ctx.kyc.creditScore !== undefined;
-
-            return kycComplete
+            // Audit finding #22, Phase 1 — this used to check
+            // `ctx.kyc.creditScore !== undefined`, which is true for any
+            // real caller (creditScore is typed `number | null`, never
+            // `undefined`), so this hard-fail safety check could never
+            // actually fail. ctx.kyc.kycComplete is the real signal,
+            // sourced from kyc_documents.overall_status.
+            return ctx.kyc.kycComplete
                 ? pass(this, true, true, 'KYC is fully verified')
                 : fail(this, false, true, 'KYC not complete — underwriting cannot proceed');
         },
@@ -432,7 +461,13 @@ export function runRuleEngine(ctx: RuleContext): RuleEngineResult {
     }
 
     // Weighted score: sum(weight × passed) / sum(weight) × 100
-    const totalWeight = RULE_DEFINITIONS.reduce((s, r) => s + r.weight, 0);
+    // Audit finding #22, Phase 1 — this used to sum only RULE_DEFINITIONS,
+    // but earnedWeight (below) is computed from `results`, which includes
+    // productRules whenever they ran. Whenever a product-specific rule
+    // (e.g. HOUSING_LOAN_RULES) actually applied, the denominator
+    // undercounted the real rule set being scored, inflating
+    // internalScore. Now sums whatever rule set was actually evaluated.
+    const totalWeight = [...RULE_DEFINITIONS, ...productRules].reduce((s, r) => s + r.weight, 0);
     const earnedWeight = results
         .filter((r) => r.passed)
         .reduce((s, r) => s + r.weight, 0);
