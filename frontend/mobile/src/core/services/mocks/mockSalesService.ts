@@ -10,6 +10,8 @@ import type {
   SalesProduct,
   SalesSubmitResult,
 } from '@/src/entities/salesAgent';
+import type { CdlQuoteInput, CdlQuoteResult } from '@/src/entities/consumerDurableLoan';
+import { mockConsumerDurableLoanService } from './mockConsumerDurableLoanService';
 
 // ---------------------------------------------------------------------------
 // Deterministic mock master-data + counts so every dashboard/screen renders
@@ -117,5 +119,15 @@ export const mockSalesService: ISalesService = {
       product,
       submittedAt: new Date().toISOString(),
     };
+  },
+
+  // Delegates to the CDL mock's own getQuote rather than a third copy of
+  // the same local calculation — one mock formula, reused by both the
+  // customer app's product-details screen and the sales wizard.
+  async getCdlQuote(product: SalesProduct, input: CdlQuoteInput): Promise<CdlQuoteResult> {
+    if (product !== 'cdl') {
+      throw { code: 'NOT_IMPLEMENTED', message: `Sales quote for ${product} loans is not implemented yet.` };
+    }
+    return mockConsumerDurableLoanService.getQuote(input);
   },
 };

@@ -208,6 +208,18 @@ enum enach_mandate_status {
     EXPIRED
 }
 
+// CDL-approved employment types only (loan_applications.employment_type —
+// see that field's own comment). STUDENT was accepted by the CDL request
+// validation/TS types this column replaces, but the client's Consumer Loan
+// Product Configuration spec's rate table only ever covered
+// Salaried/Self-Employed — STUDENT was never an officially confirmed value
+// (see the removed CDL_INTEREST_RATES.STUDENT entry, which had said as
+// much), so it is not carried into this enum.
+enum employment_type {
+    SALARIED
+    SELF_EMPLOYED
+}
+
 model loan_applications {
   id                   String                 @id @default(uuid()) @db.Uuid
   user_id              String                 @db.Uuid
@@ -252,6 +264,21 @@ model loan_applications {
   /// DB CHECK: down_payment IS NULL OR down_payment >= 0
   down_payment        Decimal?               @db.Decimal(15, 2)
   product_category    String?                @db.VarChar(50)
+  // CDL only — the employment type used to determine the permitted
+  // interest-rate set at submission (see cdlLoans.service.ts's
+  // CDL_INTEREST_RATES) and the authoritative value for all downstream CDL
+  // processing (credit assessment, auto-approval) from that point on.
+  // Nullable: (1) gold/housing applications never set it, same reasoning as
+  // product_name/product_value/product_category above; (2) existing CDL
+  // applications predate this column and have no reliable source to
+  // backfill it from — see migration 20260812_add_cdl_employment_type's own
+  // comment. Distinct from customers.employment_type — that is a general,
+  // mutable profile field that can predate or outlive any single
+  // application; this is a per-application snapshot of what was true and
+  // used for underwriting at the moment this specific application was
+  // filed, and must not silently change if the profile field is edited
+  // later.
+  employment_type     employment_type?
   is_priority_sector Boolean? @default(false)
   priority_category  String?  @db.VarChar(50)
   loan_purpose       String?  @db.VarChar(100)

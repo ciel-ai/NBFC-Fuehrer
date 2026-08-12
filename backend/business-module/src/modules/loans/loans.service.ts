@@ -126,6 +126,7 @@ function toApplicationResponse(
         productName: app.productName ?? null,
         productValue: app.productValue ?? null,
         downPayment: app.downPayment ?? null,
+        employmentType: app.employmentType ?? null,
         storeName: app.storeName,
         storeCity: app.storeCity,
         monthlyIncome: app.monthlyIncome ?? null,

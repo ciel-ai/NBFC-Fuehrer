@@ -43,7 +43,7 @@ export interface CdlApplicationInput {
     tenureMonths: number;
     storeName: string;
     storeCity: string;
-    employmentType: 'SALARIED' | 'SELF_EMPLOYED' | 'STUDENT';
+    employmentType: 'SALARIED' | 'SELF_EMPLOYED';
     monthlyIncome: number;
     /** Must be one of the allowed rates for the employmentType; defaults if omitted. */
     interestRate?: number;
@@ -57,7 +57,7 @@ export interface CdlQuoteInput {
     downPayment: number;
     loanAmount: number;
     tenureMonths: number;
-    employmentType: 'SALARIED' | 'SELF_EMPLOYED' | 'STUDENT';
+    employmentType: 'SALARIED' | 'SELF_EMPLOYED';
     interestRate?: number;
 }
 
@@ -68,8 +68,28 @@ export interface CdlQuoteResult {
     /** Authoritative — the same calculation used when the loan is booked. */
     emi: number;
     processingFee: number;
-    /** productValue - downPayment, capped at the product maximum. */
-    maxEligibleLoan: number;
+    processingFeeGst: number;
+    /**
+     * From the actual amortization schedule (sum of per-EMI interest
+     * components) — NOT emi * tenureMonths. See cdlLoansService.quote.
+     */
+    totalInterest: number;
+    /**
+     * From the actual amortization schedule (sum of per-EMI amounts).
+     * Named totalAmount, not totalPayable — moneyConverter.middleware.ts
+     * converts response fields to paise by detecting money words
+     * (amount/fee/emi/balance/income/interest/principal) in the key name;
+     * "payable" isn't one, so that name would silently leave this one
+     * field in rupees while every sibling field here converts to paise.
+     */
+    totalAmount: number;
+    /**
+     * productValue - downPayment, capped at the product maximum. Named
+     * maxEligibleAmount, not maxEligibleLoan — "loan" isn't a recognised
+     * money word either; same reasoning as totalAmount above. Matches
+     * underwriting.rules.ts's computeMaxEligibleAmount naming.
+     */
+    maxEligibleAmount: number;
 }
 
 export interface CdlApplicationResult {

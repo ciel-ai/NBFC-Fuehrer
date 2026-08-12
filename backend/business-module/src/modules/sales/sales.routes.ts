@@ -19,6 +19,7 @@ import { ROLE } from '@/config/constants';
 import {
     salesProductParamSchema,
     salesCdlSubmitSchema,
+    salesCdlQuoteSchema,
     salesListQuerySchema,
     salesCustomerSearchSchema,
 } from './sales.dto';
@@ -41,6 +42,17 @@ router.get(
     requireAuth(), allowRoles(SALES),
     validateParams(salesProductParamSchema),
     salesController.getDashboardCounts,
+);
+
+// Read-only — no application, account, schedule, payment or disbursement is
+// created (see salesService.getQuote). Declared before /:product/applications
+// only because it lives on a different path segment ('quote', not
+// 'applications'), no id-vs-literal ambiguity here.
+router.get(
+    '/:product/quote',
+    requireAuth(), allowRoles(SALES),
+    ...validateAll({ params: salesProductParamSchema, query: salesCdlQuoteSchema }),
+    salesController.quote,
 );
 
 router.get(

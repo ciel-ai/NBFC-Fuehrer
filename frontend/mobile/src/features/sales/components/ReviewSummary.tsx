@@ -3,7 +3,8 @@ import { View, Text, StyleSheet } from 'react-native';
 import { Colors } from '@/src/core/theme/colors';
 import { Typography } from '@/src/core/theme/typography';
 import { Spacing, BorderRadius } from '@/src/core/theme/spacing';
-import { formatDate } from '@/src/core/utils/formatters';
+import { formatCurrency, formatDate } from '@/src/core/utils/formatters';
+import type { CdlQuoteResult } from '@/src/entities/consumerDurableLoan';
 import {
   ornamentNetWeight,
   ornamentTotals,
@@ -28,6 +29,14 @@ function displayValue(
 ): string {
   // Derived rows (EMI, processing fee) hold no form value — recompute them.
   if (field.type === 'derived') return field.compute?.(values) ?? '—';
+
+  // The backend quote object (see CdlQuoteField) — format it rather than
+  // stringifying the raw object.
+  if (field.type === 'cdl-quote') {
+    const quote = values[field.name] as CdlQuoteResult | null | undefined;
+    if (!quote) return '—';
+    return `${formatCurrency(quote.emi)}/mo · fee ${formatCurrency(quote.processingFee)}`;
+  }
 
   const value = values[field.name];
   if (value == null || value === '') return '—';
@@ -83,7 +92,10 @@ export function ReviewSummary({ steps, values }: ReviewSummaryProps) {
           return <OrnamentGroup key={step.id} step={step} values={values} />;
         }
         const fields = (step.fields ?? []).filter(
-          (f) => f.type === 'derived' || (values[f.name] != null && values[f.name] !== ''),
+          (f) =>
+            f.type === 'derived' ||
+            f.type === 'cdl-quote' ||
+            (values[f.name] != null && values[f.name] !== ''),
         );
         if (fields.length === 0) return null;
         return (

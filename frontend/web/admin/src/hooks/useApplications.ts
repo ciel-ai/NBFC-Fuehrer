@@ -140,6 +140,9 @@ interface BackendAppDetail extends BackendAppRow {
   productName: string | null;
   productValue: number | null; // paise
   downPayment: number | null; // paise
+  // CDL only — null for gold/housing, and for CDL applications submitted
+  // before loan_applications.employment_type existed.
+  employmentType: 'SALARIED' | 'SELF_EMPLOYED' | null;
   rejectionReason: string | null;
   reviewedAt: string | null;
   customer: {
@@ -176,6 +179,7 @@ function mapAppDetail(r: BackendAppDetail): LoanApplication {
       ...(r.productName ? { productName: r.productName } : {}),
       ...(r.productValue != null ? { productValue: rupees(r.productValue) } : {}),
       ...(r.downPayment != null ? { downPayment: rupees(r.downPayment) } : {}),
+      ...(r.employmentType ? { employmentType: r.employmentType } : {}),
     },
     customer: {
       name: custName,
