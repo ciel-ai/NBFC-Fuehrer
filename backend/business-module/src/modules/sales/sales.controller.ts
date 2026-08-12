@@ -12,7 +12,7 @@ import { HTTP } from '@/config/constants';
 import { successResponse } from '@/types/common.types';
 import { salesService } from './sales.service';
 import type { SalesProduct, SalesApplicationStatus } from './sales.types';
-import type { CdlApplicationInput } from '@/modules/cdlLoans/cdlLoans.types';
+import type { CdlApplicationInput, CdlQuoteInput } from '@/modules/cdlLoans/cdlLoans.types';
 
 export const salesController = {
 
@@ -69,6 +69,18 @@ export const salesController = {
             const body = getValidatedBody<CdlApplicationInput & { customerId: string }>(req);
             const result = await salesService.submitApplication(product, body, req.user!.id);
             res.status(HTTP.CREATED).json(successResponse(result, 'Application submitted'));
+        } catch (err) { next(err); }
+    },
+
+    // Read-only — no application, account, schedule, payment or disbursement
+    // is created. Same figure the customer app's own /quote returns; see
+    // salesService.getQuote.
+    async quote(req: AuthRequest, res: Response, next: NextFunction) {
+        try {
+            const { product } = getValidatedParams<{ product: SalesProduct }>(req);
+            const query = getValidatedQuery<CdlQuoteInput>(req);
+            const result = await salesService.getQuote(product, query, req.user!.id);
+            res.status(HTTP.OK).json(successResponse(result));
         } catch (err) { next(err); }
     },
 };

@@ -873,6 +873,12 @@ export const LoanTab: React.FC<{ app: LoanApplication }> = ({ app }) => {
                 value={<span className="tnum">{inr(app.loan.downPayment)}</span>}
               />
             )}
+            {app.loan.employmentType && (
+              <InfoItem
+                label="Employment Type"
+                value={app.loan.employmentType === 'SELF_EMPLOYED' ? 'Self-employed' : 'Salaried'}
+              />
+            )}
           </InfoGrid>
         </Card>
         {app.creditDecision?.decision === 'APPROVED' && (

@@ -316,6 +316,8 @@ export interface LoanApplication {
     productName?: string;
     productValue?: number;
     downPayment?: number;
+    /** CDL only — the value used to determine the permitted interest-rate set. */
+    employmentType?: 'SALARIED' | 'SELF_EMPLOYED';
   };
   collateral?: {
     gold?: GoldCollateral;

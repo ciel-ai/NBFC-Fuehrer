@@ -23,12 +23,10 @@ import type {
   SalesProductConfig,
 } from '@/src/features/sales/config/types';
 import { STATE_OPTIONS, TILE_PRESETS } from '@/src/features/sales/config/shared';
-import { calculateEMI } from '@/src/core/utils/formatters';
 import {
   ageFromDob,
   cdlAutoDebitLabel,
   cdlInterestRatesFor,
-  cdlProcessingFee,
   cdlRateLabel,
   isCdlRateAllowed,
   CDL_AUTO_DEBIT_DATES,
@@ -59,14 +57,6 @@ const rateOptionsFor = (values: SalesFormValues): SalesFieldOption[] =>
     label: cdlRateLabel(r),
     value: String(r),
   }));
-
-const emiFor = (values: SalesFormValues): number => {
-  const amount = Number(values.loanAmount);
-  const tenure = Number(values.tenureMonths);
-  const rate = Number(values.interestRate);
-  if (!amount || !tenure || Number.isNaN(rate)) return 0;
-  return calculateEMI(amount, rate, tenure);
-};
 
 // Consumer Durable Loan — 15-step LOS journey.
 // Product rules come from src/entities/cdlPolicy.ts (client spec §1, §2, §4, §5).
@@ -307,46 +297,15 @@ export const cdlConfig: SalesProductConfig = {
               : 'Select an employment type first',
         },
         { name: 'downPayment', label: 'Down Payment (optional)', type: 'currency', prefix: '₹', placeholder: '10000', optional: true },
-        // 2(c) — slab-based, derived from the loan amount.
+        // Processing fee, EMI, total interest, total payable and the FOIR
+        // ratio all come from the backend's authoritative quote
+        // (GET /sales/cdl/quote — the same calculation the loan is actually
+        // booked at) rather than being computed locally here. See
+        // CdlQuoteField in SalesField.tsx.
         {
-          name: 'processingFeeDisplay',
-          label: 'Processing Fee',
-          type: 'derived',
-          compute: (v) => {
-            const fee = cdlProcessingFee(Number(v.loanAmount));
-            return fee > 0 ? inr(fee) : '—';
-          },
-          helper: `${inr(7000)}–${inr(25000)}: ${inr(1463)} · ${inr(25001)}–${inr(50000)}: ${inr(1817)} · ${inr(50001)}–${inr(100000)}: ${inr(2466)}`,
-        },
-        {
-          name: 'emiDisplay',
-          label: 'Monthly EMI',
-          type: 'derived',
-          compute: (v) => {
-            const emi = emiFor(v);
-            return emi > 0 ? inr(emi) : '—';
-          },
-          helperFrom: (v) => {
-            const emi = emiFor(v);
-            const tenure = Number(v.tenureMonths);
-            if (!emi || !tenure) return 'Set amount, tenure and rate to see the EMI';
-            return Number(v.interestRate) === 0
-              ? `No-cost EMI · ${inr(emi)} × ${tenure} months`
-              : `${inr(emi)} × ${tenure} months · reducing balance`;
-          },
-        },
-        {
-          name: 'foirDisplay',
-          label: 'FOIR (indicative)',
-          type: 'derived',
-          compute: (v) => {
-            const income = Number(v.monthlyIncome);
-            const emi = emiFor(v);
-            if (!income || !emi) return '—';
-            const foir = ((Number(v.existingEmis) || 0) + emi) / income * 100;
-            return `${Math.round(foir * 10) / 10}%`;
-          },
-          helper: '(Existing EMIs + Proposed EMI) ÷ Net Monthly Income × 100 · limit 60%',
+          name: 'cdlQuote',
+          label: 'Loan Quote',
+          type: 'cdl-quote',
         },
       ],
       schema: z

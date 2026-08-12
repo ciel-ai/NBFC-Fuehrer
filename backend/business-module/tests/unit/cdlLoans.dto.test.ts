@@ -103,6 +103,73 @@ describe('cdlSubmitApplicationSchema', () => {
     });
 });
 
+// Coverage for the employment-type persistence audit: loan_applications.
+// employment_type is a real Postgres enum with only SALARIED/SELF_EMPLOYED
+// (schema.prisma) — the request-level validation must reject everything
+// else before it ever reaches a Prisma insert, or an accepted-by-Joi value
+// would crash at the database instead of failing with a clean 400.
+describe('cdlSubmitApplicationSchema — employmentType', () => {
+    test('accepts SALARIED', () => {
+        const { error } = cdlSubmitApplicationSchema.validate(
+            { ...validApplication, employmentType: 'SALARIED' }, OPTS,
+        );
+        expect(error).toBeUndefined();
+    });
+
+    test('accepts SELF_EMPLOYED', () => {
+        const { error } = cdlSubmitApplicationSchema.validate(
+            { ...validApplication, employmentType: 'SELF_EMPLOYED' }, OPTS,
+        );
+        expect(error).toBeUndefined();
+    });
+
+    test('rejects missing employmentType', () => {
+        const { employmentType, ...withoutEmploymentType } = validApplication;
+        const { error } = cdlSubmitApplicationSchema.validate(withoutEmploymentType, OPTS);
+        expect(error).toBeDefined();
+    });
+
+    test('rejects null employmentType', () => {
+        const { error } = cdlSubmitApplicationSchema.validate(
+            { ...validApplication, employmentType: null }, OPTS,
+        );
+        expect(error).toBeDefined();
+    });
+
+    test('rejects lowercase "salaried"', () => {
+        const { error } = cdlSubmitApplicationSchema.validate(
+            { ...validApplication, employmentType: 'salaried' }, OPTS,
+        );
+        expect(error).toBeDefined();
+    });
+
+    test('rejects "Self Employed" (spaced, mixed case)', () => {
+        const { error } = cdlSubmitApplicationSchema.validate(
+            { ...validApplication, employmentType: 'Self Employed' }, OPTS,
+        );
+        expect(error).toBeDefined();
+    });
+
+    // STUDENT was previously accepted here — no longer, since it was never
+    // an officially confirmed CDL value and the DB enum it would now be
+    // written into doesn't include it (see cdlLoans.service.ts's removed
+    // CDL_INTEREST_RATES.STUDENT entry, and schema.prisma's employment_type
+    // enum comment).
+    test('rejects STUDENT (no longer a supported CDL value)', () => {
+        const { error } = cdlSubmitApplicationSchema.validate(
+            { ...validApplication, employmentType: 'STUDENT' }, OPTS,
+        );
+        expect(error).toBeDefined();
+    });
+
+    test('rejects an arbitrary string', () => {
+        const { error } = cdlSubmitApplicationSchema.validate(
+            { ...validApplication, employmentType: 'RANDOM' }, OPTS,
+        );
+        expect(error).toBeDefined();
+    });
+});
+
 describe('cdlCreditAssessmentSchema', () => {
     // cibilScore is deliberately NOT part of this schema any more — the
     // service reads it server-side from kyc_documents.credit_score, never

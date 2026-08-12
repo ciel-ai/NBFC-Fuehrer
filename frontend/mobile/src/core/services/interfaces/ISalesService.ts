@@ -8,6 +8,7 @@ import type {
   SalesProduct,
   SalesSubmitResult,
 } from '@/src/entities/salesAgent';
+import type { CdlQuoteInput, CdlQuoteResult } from '@/src/entities/consumerDurableLoan';
 
 /**
  * Sales-only concerns that have no customer-side equivalent. Product-specific
@@ -33,4 +34,11 @@ export interface ISalesService {
     product: SalesProduct,
     data: Record<string, unknown>,
   ): Promise<SalesSubmitResult>;
+  /**
+   * Live EMI/fee preview for the wizard's loan-details step, before the
+   * application is submitted. Same authoritative calculation the customer
+   * app's own quote uses (cdlLoansService.quote on the backend) — the
+   * wizard must not compute EMI/fee itself. Only CDL is implemented.
+   */
+  getCdlQuote(product: SalesProduct, input: CdlQuoteInput): Promise<CdlQuoteResult>;
 }

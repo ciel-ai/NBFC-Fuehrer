@@ -38,13 +38,14 @@ const log = createModuleLogger('cdlLoans.service');
 // duplicating literal numbers that could drift out of sync.
 
 // Discrete allowed rates per employment type — per client spec, not a range.
-export const CDL_INTEREST_RATES: Record<'SALARIED' | 'SELF_EMPLOYED' | 'STUDENT', number[]> = {
+// STUDENT previously had an entry here (defaulted to the SELF_EMPLOYED
+// table, "until confirmed with client") — removed along with every other
+// STUDENT reference in the CDL request validation/types it fed from. The
+// client spec never defined a STUDENT rate; carrying an unconfirmed value
+// through as if it were an approved product option was the actual gap.
+export const CDL_INTEREST_RATES: Record<'SALARIED' | 'SELF_EMPLOYED', number[]> = {
     SALARIED: [0, 13, 14],
     SELF_EMPLOYED: [0, 14, 15],
-    // Client's rate table only covers Salaried/Self-Employed — STUDENT has
-    // no defined rate. Defaulting to the SELF_EMPLOYED table conservatively
-    // until confirmed with client; flag this explicitly in the demo.
-    STUDENT: [0, 14, 15],
 };
 
 // Flat tiered processing fee by loan amount band — per client spec, not a %.
@@ -117,6 +118,16 @@ export const cdlLoansService = {
     // calcEmi / getCdlProcessingFee / getCdlInterestRate the booking path uses,
     // so the figure quoted is by construction the figure the loan is written
     // at — there is no second implementation to drift.
+    //
+    // totalInterest/totalPayable come from buildAmortizationSchedule (the same
+    // schedule builder disburseToMerchant uses for the real, booked loan) —
+    // NOT emi * tenureMonths. That shortcut silently disagrees with the real
+    // schedule once the final installment absorbs a rounding residual (see
+    // buildAmortizationSchedule's own invariants at the top of
+    // emi.calculator.ts), which is exactly the discrepancy a pre-application
+    // quote must not introduce. loanAccountId is a placeholder — this call
+    // creates no account and the schedule's aggregate totals don't depend on
+    // it; only buildAmortizationSchedule's per-entry rows (unused here) would.
     quote(input: CdlQuoteInput): CdlQuoteResult {
         const financeable = input.productValue - input.downPayment;
         if (input.downPayment > input.productValue) {
@@ -131,14 +142,28 @@ export const cdlLoansService = {
         validateCdlLoanParams(input.loanAmount, input.tenureMonths);
 
         const interestRate = getCdlInterestRate(input.employmentType, input.interestRate);
+        const schedule = buildAmortizationSchedule({
+            loanAccountId: '',
+            principal: input.loanAmount,
+            annualRatePct: interestRate,
+            tenureMonths: input.tenureMonths,
+            disbursementDate: new Date(),
+        });
+        const processingFee = getCdlProcessingFee(input.loanAmount);
+        const processingFeeGst = Math.round(processingFee * BUSINESS_RULES.GST_ON_PROCESSING_FEE);
 
         return {
             loanAmount: input.loanAmount,
             tenureMonths: input.tenureMonths,
             interestRate,
-            emi: calcEmi(input.loanAmount, interestRate, input.tenureMonths),
-            processingFee: getCdlProcessingFee(input.loanAmount),
-            maxEligibleLoan: Math.min(financeable, CDL_MAX_LOAN_AMOUNT),
+            emi: schedule.monthlyEmi,
+            processingFee,
+            processingFeeGst,
+            totalInterest: schedule.totalInterest,
+            // Named totalAmount (not totalPayable) — see the field's doc
+            // comment in cdlLoans.types.ts for why.
+            totalAmount: schedule.totalPayable,
+            maxEligibleAmount: Math.min(financeable, CDL_MAX_LOAN_AMOUNT),
         };
     },
 
@@ -208,6 +233,13 @@ export const cdlLoansService = {
             productValue: input.productValue,
             downPayment: input.downPayment,
             productCategory: input.productCategory,
+            // The employment type used to derive `interestRate` two lines
+            // above — persisted so it becomes the authoritative value for
+            // every later CDL step (credit assessment, auto-approval),
+            // rather than something each of those has to be separately
+            // trusted to receive correctly in its own request body. See
+            // loan_applications.employment_type's own comment.
+            employmentType: input.employmentType,
         });
 
         // Persist the computed terms onto the application row.
@@ -717,9 +749,27 @@ export const cdlLoansService = {
             throw new ValidationError('applicationId', 'Loan agreement must be eStamped before disbursement can proceed');
         }
 
-        const emi = calcEmi(application.approvedAmount, application.interestRate, application.tenureMonths);
-        const totalPayable = emi * application.tenureMonths;
-        const totalInterest = Math.max(0, totalPayable - application.approvedAmount);
+        // Audit finding — totalInterest/outstanding_balance were previously
+        // derived from `emi * tenureMonths`, a shortcut that silently
+        // disagrees with the real schedule once the final installment
+        // absorbs a rounding residual (see buildAmortizationSchedule's own
+        // invariants at the top of emi.calculator.ts). The schedule is the
+        // authoritative source of truth for both totals — built once here
+        // (its aggregate totals don't depend on loanAccountId, so a
+        // placeholder is fine; the real account id is substituted per-row
+        // below when the schedule is actually persisted inside the
+        // transaction) rather than recomputed a second time from scratch.
+        // `emi` is read off the same schedule instead of a separate calcEmi
+        // call so the two can never drift apart by construction.
+        const schedule = buildAmortizationSchedule({
+            loanAccountId: '',
+            principal: application.approvedAmount,
+            annualRatePct: application.interestRate,
+            tenureMonths: application.tenureMonths,
+            disbursementDate: new Date(),
+        });
+        const emi = schedule.monthlyEmi;
+        const totalInterest = schedule.totalInterest;
 
         const processingFee = application.processingFee ?? getCdlProcessingFee(application.approvedAmount);
         const processingFeeGst = Math.round(processingFee * BUSINESS_RULES.GST_ON_PROCESSING_FEE);
@@ -779,16 +829,14 @@ export const cdlLoansService = {
             // silently here would present a guess as a decided behavior.
             // preferredDebitDay IS now persisted (see submitApplication)
             // so it's available the moment this gets answered.
-            const schedule = buildAmortizationSchedule({
-                loanAccountId: accountRow.id,
-                principal: application.approvedAmount!,
-                annualRatePct: application.interestRate!,
-                tenureMonths: application.tenureMonths,
-                disbursementDate: new Date(),
-            });
+            // `schedule` was already built above (outside the transaction)
+            // to derive totalInterest/emi — reused here rather than
+            // rebuilding it a second time. Its entries carry the placeholder
+            // loanAccountId from that earlier call, so accountRow.id (the
+            // real id, only known now) is substituted explicitly below.
             await tx.emi_schedule.createMany({
                 data: schedule.entries.map((e) => ({
-                    loan_account_id: schedule.loanAccountId,
+                    loan_account_id: accountRow.id,
                     emi_number: e.emiNumber,
                     due_date: e.dueDate,
                     emi_amount: e.emiAmount,

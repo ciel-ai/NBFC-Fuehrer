@@ -10,6 +10,7 @@ import type {
   SalesProduct,
   SalesSubmitResult,
 } from '@/src/entities/salesAgent';
+import type { CdlQuoteInput, CdlQuoteResult } from '@/src/entities/consumerDurableLoan';
 
 // Real implementation — endpoints stubbed against the planned sales API.
 // Never exercised while USE_MOCK=true; present so the USE_MOCK switch compiles
@@ -52,6 +53,11 @@ export const realSalesService: ISalesService = {
     data: Record<string, unknown>,
   ): Promise<SalesSubmitResult> {
     const response = await api.post<SalesSubmitResult>(`/sales/${product}/applications`, data);
+    return response.data;
+  },
+
+  async getCdlQuote(product: SalesProduct, input: CdlQuoteInput): Promise<CdlQuoteResult> {
+    const response = await api.get<CdlQuoteResult>(`/sales/${product}/quote`, { params: input });
     return response.data;
   },
 };

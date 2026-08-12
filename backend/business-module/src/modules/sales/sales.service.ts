@@ -22,7 +22,7 @@ import { createModuleLogger } from '@/config/logger';
 import { NotFoundError, ValidationError } from '@/errors';
 import { PRODUCT_TYPE, LOAN_STATUS } from '@/config/constants';
 import { cdlLoansService } from '@/modules/cdlLoans/cdlLoans.service';
-import type { CdlApplicationInput } from '@/modules/cdlLoans/cdlLoans.types';
+import type { CdlApplicationInput, CdlQuoteInput, CdlQuoteResult } from '@/modules/cdlLoans/cdlLoans.types';
 import type {
     SalesProduct, SalesApplicationStatus,
     FdoDetails, RetailShop,
@@ -153,7 +153,11 @@ export const salesService = {
                 id: true,
                 full_name: true,
                 phone: true,
-                kyc_documents: { select: { pan_number: true, overall_status: true } },
+                // kyc_documents.pan_masked, not pan_number — that column
+                // doesn't exist (kyc_documents stores the masked display
+                // value; the real PAN lives encrypted in pan_encrypted,
+                // which search results must never expose).
+                kyc_documents: { select: { pan_masked: true, overall_status: true } },
                 _count: { select: { loan_applications: true } },
             },
             take: 20,
@@ -164,7 +168,7 @@ export const salesService = {
             id: u.id,
             name: u.full_name,
             phone: u.phone,
-            pan: u.kyc_documents?.pan_number ?? null,
+            pan: u.kyc_documents?.pan_masked ?? null,
             kycStatus: u.kyc_documents?.overall_status ?? 'NOT_STARTED',
             existingLoans: u._count.loan_applications,
         }));
@@ -312,5 +316,30 @@ export const salesService = {
             message: 'Application submitted successfully.',
             createdAt: result.createdAt,
         };
+    },
+
+    // ── Quote ────────────────────────────────────────────────────────────────
+    /**
+     * Same authoritative calculation the customer app's own /quote endpoint
+     * uses (cdlLoansService.quote) — the sales wizard's live EMI/fee preview
+     * must not run a second, local formula that can disagree with the figure
+     * the application is actually booked at. requireAgent() is the only
+     * sales-specific check here; no customer is identified yet at quote time.
+     *
+     * Only CDL is implemented, same restriction as submitApplication above.
+     */
+    async getQuote(
+        product: SalesProduct,
+        input: CdlQuoteInput,
+        userId: string,
+    ): Promise<CdlQuoteResult> {
+        if (product !== 'cdl') {
+            throw new ValidationError(
+                'product',
+                `Sales quote for ${product} loans is not implemented yet.`,
+            );
+        }
+        await requireAgent(userId);
+        return cdlLoansService.quote(input);
     },
 };

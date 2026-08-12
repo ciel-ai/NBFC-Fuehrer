@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -17,8 +17,11 @@ import { Colors } from '@/src/core/theme/colors';
 import { Typography, FontFamily, FontSize } from '@/src/core/theme/typography';
 import { Spacing, BorderRadius } from '@/src/core/theme/spacing';
 import { scale } from '@/src/core/utils/responsive';
-import { formatDate } from '@/src/core/utils/formatters';
+import { formatCurrency, formatDate } from '@/src/core/utils/formatters';
 import { useAssetPicker } from '@/src/features/sales/hooks/useAssetPicker';
+import { useServices } from '@/src/core/services/ServiceProvider';
+import { toCdlEmploymentType } from '@/src/entities/consumerDurableLoan';
+import type { CdlQuoteResult } from '@/src/entities/consumerDurableLoan';
 import type {
   SalesFieldConfig,
   SalesFieldOption,
@@ -57,6 +60,25 @@ export function SalesField({ field, control, values = {} }: SalesFieldProps) {
   // `derived` rows are read-only output, not inputs — they hold no form value.
   if (field.type === 'derived') {
     return <DerivedRow field={field} values={values} />;
+  }
+
+  // `cdl-quote` DOES hold a form value (the resolved backend quote), unlike
+  // `derived` — so it goes through Controller like a normal field, just with
+  // its own fetch-driven body instead of a text/select input.
+  if (field.type === 'cdl-quote') {
+    return (
+      <Controller
+        control={control}
+        name={field.name}
+        render={({ field: { onChange, value } }) => (
+          <CdlQuoteField
+            values={values}
+            value={value as CdlQuoteResult | null}
+            onChange={onChange}
+          />
+        )}
+      />
+    );
   }
 
   const options = resolveOptions(field, values);
@@ -151,6 +173,135 @@ function DerivedRow({
         <Text style={styles.derivedText}>{text}</Text>
       </View>
       {helper ? <Text style={styles.hintText}>{helper}</Text> : null}
+    </View>
+  );
+}
+
+// ── CDL quote (backend-calculated EMI / fee / FOIR) ────────────────────────
+//
+// Replaces what used to be three separate `derived` rows, each computing its
+// own figure locally via calculateEMI() — the mobile app's own copy of the
+// EMI formula, which could silently disagree with the authoritative figure
+// the backend actually books the loan at. This fetches the real quote
+// (GET /sales/cdl/quote — same calculation the customer app's own quote and
+// the disbursed loan use) instead, debounced as the agent edits amount/
+// tenure/rate, and writes the resolved figures into form state via
+// onChange so the review step and submit payload see real numbers.
+// FOIR is computed from the returned emi (not a second local EMI) — a plain
+// ratio, not a duplicate financial calculation.
+function CdlQuoteField({
+  values,
+  value,
+  onChange,
+}: {
+  values: SalesFormValues;
+  value: CdlQuoteResult | null;
+  onChange: (v: CdlQuoteResult | null) => void;
+}) {
+  const { salesService } = useServices();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
+  const requestSeq = useRef(0);
+  const [retryTick, setRetryTick] = useState(0);
+
+  const loanAmount = Number(values.loanAmount);
+  const tenureMonths = Number(values.tenureMonths);
+  const interestRate = Number(values.interestRate);
+  const employmentType = String(values.employmentType ?? '');
+  const productValue = Number(values.productValue) || loanAmount;
+  const downPayment = Number(values.downPayment) || 0;
+
+  const priceable =
+    loanAmount > 0 &&
+    tenureMonths > 0 &&
+    !Number.isNaN(interestRate) &&
+    employmentType.length > 0;
+
+  useEffect(() => {
+    if (!priceable) {
+      requestSeq.current++; // cancel any in-flight result
+      onChange(null);
+      setLoading(false);
+      setError(false);
+      return;
+    }
+
+    const seq = ++requestSeq.current;
+    const t = setTimeout(() => {
+      setLoading(true);
+      setError(false);
+      salesService
+        .getCdlQuote('cdl', {
+          productValue,
+          downPayment,
+          loanAmount,
+          tenureMonths,
+          employmentType: toCdlEmploymentType(employmentType),
+          interestRate,
+        })
+        .then((result) => {
+          if (seq !== requestSeq.current) return; // superseded
+          onChange(result);
+          setLoading(false);
+        })
+        .catch(() => {
+          if (seq !== requestSeq.current) return;
+          onChange(null);
+          setLoading(false);
+          setError(true);
+        });
+    }, 400);
+
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [priceable, loanAmount, tenureMonths, interestRate, employmentType, productValue, downPayment, retryTick]);
+
+  const income = Number(values.monthlyIncome);
+  const existingEmis = Number(values.existingEmis) || 0;
+  const foirText =
+    value && income > 0
+      ? `${Math.round(((existingEmis + value.emi) / income) * 1000) / 10}%`
+      : '—';
+
+  return (
+    <View style={styles.section}>
+      <Text style={styles.label}>LOAN QUOTE</Text>
+
+      <View style={styles.quoteBody}>
+        <QuoteRow label="Processing Fee" text={value ? formatCurrency(value.processingFee) : loading ? '…' : '—'} />
+        <QuoteRow label="Monthly EMI" text={value ? formatCurrency(value.emi) : loading ? '…' : '—'} emphasize />
+        <QuoteRow label="Total Interest" text={value ? formatCurrency(value.totalInterest) : loading ? '…' : '—'} />
+        <QuoteRow label="Total Payable" text={value ? formatCurrency(value.totalAmount) : loading ? '…' : '—'} />
+        <QuoteRow label="FOIR (indicative)" text={foirText} />
+      </View>
+
+      {!priceable ? (
+        <Text style={styles.hintText}>Set amount, tenure, rate and employment type to see the quote</Text>
+      ) : error ? (
+        <View style={styles.quoteErrorRow}>
+          <Text style={styles.errorText}>Could not fetch the quote. Please retry.</Text>
+          <Pressable
+            onPress={() => setRetryTick((n) => n + 1)}
+            accessibilityRole="button"
+            accessibilityLabel="Retry fetching the quote"
+          >
+            <Text style={styles.quoteRetry}>Retry</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <Text style={styles.hintText}>
+          Reducing balance · same calculation the loan is booked at
+        </Text>
+      )}
+    </View>
+  );
+}
+
+function QuoteRow({ label, text, emphasize }: { label: string; text: string; emphasize?: boolean }) {
+  return (
+    <View style={styles.quoteInnerRow} accessibilityLabel={`${label}: ${text}`}>
+      <Text style={styles.quoteInnerLabel}>{label}</Text>
+      <Text style={emphasize ? styles.quoteInnerValueEmphasis : styles.quoteInnerValue}>{text}</Text>
     </View>
   );
 }
@@ -463,6 +614,47 @@ const styles = StyleSheet.create({
     ...Typography.caption,
     color: Colors.textSecondary,
     marginTop: Spacing.xs,
+  },
+  // CDL quote
+  quoteBody: {
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.backgroundLight,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+  },
+  quoteInnerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: Spacing.xs,
+  },
+  quoteInnerLabel: {
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.sm,
+    color: Colors.textSecondary,
+  },
+  quoteInnerValue: {
+    fontFamily: FontFamily.semiBold,
+    fontSize: FontSize.sm,
+    color: Colors.textPrimary,
+  },
+  quoteInnerValueEmphasis: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.md,
+    color: Colors.primary,
+  },
+  quoteErrorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: Spacing.xs,
+  },
+  quoteRetry: {
+    fontFamily: FontFamily.semiBold,
+    fontSize: FontSize.xs,
+    color: Colors.primary,
   },
   // Select modal
   modalBackdrop: {

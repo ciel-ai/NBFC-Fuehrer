@@ -69,14 +69,24 @@ export const mockConsumerDurableLoanService: IConsumerDurableLoanService = {
   // module, never from a formula local to a screen.
   async getQuote(input): Promise<CdlQuoteResult> {
     const interestRate = input.interestRate ?? CDL_DEFAULT_INTEREST_RATE;
+    const emi = calculateEMI(input.loanAmount, interestRate, input.tenureMonths);
+    const processingFee = cdlProcessingFee(input.loanAmount);
+    // Mock-only approximation (emi * tenureMonths) — fine here since the
+    // mock is never the source of truth for a real loan. The real service
+    // must never do this; see cdlLoansService.quote on the backend, which
+    // sums the actual amortization schedule instead.
+    const totalPayable = Math.round(emi * input.tenureMonths * 100) / 100;
     return mockDelay(
       {
         loanAmount: input.loanAmount,
         tenureMonths: input.tenureMonths,
         interestRate,
-        emi: calculateEMI(input.loanAmount, interestRate, input.tenureMonths),
-        processingFee: cdlProcessingFee(input.loanAmount),
-        maxEligibleLoan: Math.min(
+        emi,
+        processingFee,
+        processingFeeGst: Math.round(processingFee * 0.18),
+        totalInterest: Math.max(0, Math.round((totalPayable - input.loanAmount) * 100) / 100),
+        totalAmount: totalPayable,
+        maxEligibleAmount: Math.min(
           input.productValue - input.downPayment,
           CDL_MAX_LOAN_AMOUNT,
         ),

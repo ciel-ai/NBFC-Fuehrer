@@ -13,13 +13,19 @@
 // cdlLoansService.submitApplication, the same code path the customer app uses.
 
 import Joi from 'joi';
-import { cdlSubmitApplicationSchema } from '@/modules/cdlLoans/cdlLoans.dto';
+import { cdlSubmitApplicationSchema, cdlQuoteSchema } from '@/modules/cdlLoans/cdlLoans.dto';
 
 // ─── POST /sales/:product/applications ─────────────────────────────────────────
 
 export const salesProductParamSchema = Joi.object({
     product: Joi.string().valid('gold', 'housing', 'cdl').required(),
 });
+
+// ─── GET /sales/:product/quote ──────────────────────────────────────────────────
+// No sales-specific fields — a quote isn't tied to a customer yet, unlike
+// submit. Reused as-is from the CDL module rather than restated here, same
+// reasoning as salesCdlSubmitSchema above.
+export const salesCdlQuoteSchema = cdlQuoteSchema;
 
 /**
  * The CDL application body, plus the customer it belongs to.

@@ -123,6 +123,7 @@ function mapApplication(row: Record<string, unknown>): LoanApplication {
         downPayment: row.down_payment != null
             ? toNumber(row.down_payment as number) : null,
         productCategory: (row.product_category as string | null) ?? null,
+        employmentType: (row.employment_type as 'SALARIED' | 'SELF_EMPLOYED' | null) ?? null,
     };
 }
 
@@ -248,6 +249,12 @@ export const loansRepository = {
                     : {}),
                 ...(data.productCategory !== undefined
                     ? { product_category: data.productCategory }
+                    : {}),
+                // CDL-only, same conditional-write reasoning as the product
+                // fields above — gold/housing never pass this, and the
+                // column stays NULL rather than being explicitly overwritten.
+                ...(data.employmentType !== undefined
+                    ? { employment_type: data.employmentType }
                     : {}),
             },
         });

@@ -11,7 +11,7 @@ import PDFDocument from 'pdfkit';
 import { prisma } from '@/config/database';
 import { createModuleLogger } from '@/config/logger';
 import { NotFoundError } from '@/errors';
-import { computeMonthlyEmi, computeApr } from '@/modules/emi/emi.calculator';
+import { computeMonthlyEmi, computeApr, buildAmortizationSchedule } from '@/modules/emi/emi.calculator';
 import { NBFC_IDENTITY, INTEREST_METHOD_LABEL, COOLING_OFF_PERIOD_DAYS } from '@/config/nbfc.constants';
 
 const log = createModuleLogger('pdf.service');
@@ -608,12 +608,30 @@ export const pdfService = {
             documentationFee + appraiserFee + incidentalCharges,
         );
 
+        // totalRepayable/totalInterest previously came from
+        // `monthlyEmi * tenureMonths` — a shortcut that silently disagrees
+        // with the real repayment schedule once the final installment
+        // absorbs a rounding residual (see buildAmortizationSchedule's own
+        // invariants at the top of emi.calculator.ts). The KFS is a
+        // pre-disbursement disclosure, so no real emi_schedule rows exist
+        // yet to sum — this builds the same hypothetical schedule the real
+        // one will match once disbursed (same principal/rate/tenure), same
+        // approach cdlLoansService.quote/disburseToMerchant use.
+        // loanAccountId is a placeholder; only the aggregate totals below
+        // are read, never the per-entry rows.
+        const schedule = buildAmortizationSchedule({
+            loanAccountId: '',
+            principal,
+            annualRatePct,
+            tenureMonths,
+            disbursementDate: new Date(),
+        });
         const monthlyEmi = application.monthly_emi
             ? Number(application.monthly_emi)
-            : computeMonthlyEmi(principal, annualRatePct, tenureMonths);
+            : schedule.monthlyEmi;
 
-        const totalRepayable = roundToPaisa(monthlyEmi * tenureMonths);
-        const totalInterest = roundToPaisa(totalRepayable - principal);
+        const totalRepayable = roundToPaisa(schedule.totalPayable);
+        const totalInterest = roundToPaisa(schedule.totalInterest);
 
         let apr = annualRatePct;
         try {

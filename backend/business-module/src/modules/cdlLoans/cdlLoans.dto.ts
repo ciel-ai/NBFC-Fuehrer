@@ -110,9 +110,14 @@ export const cdlSubmitApplicationSchema = Joi.object({
     storeName: Joi.string().trim().min(2).max(100).required(),
     storeCity: Joi.string().trim().min(2).max(100).required(),
 
-    // Must match CdlApplicationInput['employmentType']
+    // Must match CdlApplicationInput['employmentType'] and the
+    // loan_applications.employment_type enum (schema.prisma) — STUDENT was
+    // previously accepted here but was never an officially confirmed CDL
+    // value (see CDL_INTEREST_RATES' removed STUDENT entry in
+    // cdlLoans.service.ts, whose own comment said as much), and the DB enum
+    // this now persists into does not include it.
     employmentType: Joi.string()
-        .valid('SALARIED', 'SELF_EMPLOYED', 'STUDENT')
+        .valid('SALARIED', 'SELF_EMPLOYED')
         .required(),
 
     monthlyIncome: Joi.number().positive().precision(2).required(),
@@ -170,7 +175,7 @@ export const cdlQuoteSchema = Joi.object({
         .max(CDL_MAX_TENURE_MONTHS)
         .required(),
     employmentType: Joi.string()
-        .valid('SALARIED', 'SELF_EMPLOYED', 'STUDENT')
+        .valid('SALARIED', 'SELF_EMPLOYED')
         .required(),
     interestRate: Joi.number()
         .valid(...ANY_VALID_INTEREST_RATE)

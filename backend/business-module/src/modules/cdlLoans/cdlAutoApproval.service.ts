@@ -20,6 +20,7 @@
 import { prisma } from '@/config/database';
 import { createModuleLogger } from '@/config/logger';
 import { computeMonthlyEmi } from '@/modules/emi/emi.calculator';
+import { ValidationError, NotFoundError } from '@/errors';
 
 const log = createModuleLogger('cdlAutoApproval');
 
@@ -369,4 +370,47 @@ export const cdlAutoApprovalService = {
 
     // ── Get interest rate ─────────────────────────────────────────────────────
     getInterestRate,
+
+    // ── Evaluate + save, sourcing employmentType from the application itself ──
+    // Audit finding: the route this backs previously took employmentType
+    // straight from the caller's request body — defaulting to 'SALARIED'
+    // when omitted entirely — with no cross-check against what the
+    // application actually is. loan_applications.employment_type
+    // (persisted at cdlLoansService.submitApplication, from the same value
+    // used to lock in the application's own interest_rate) is the one
+    // authoritative source once an application exists; this reads it
+    // instead of accepting a second, independently-supplied copy that
+    // could silently disagree. Applications submitted before that column
+    // existed have no persisted value and cannot be auto-approved through
+    // this path until corrected — see the column's own comment.
+    async evaluateForApplication(
+        loanApplicationId: string,
+        rest: Omit<CdlAutoApprovalInput, 'loanApplicationId' | 'employmentType'>,
+    ): Promise<AutoApprovalResult> {
+        if (!loanApplicationId) {
+            throw new ValidationError('loanApplicationId', 'loanApplicationId is required');
+        }
+        const application = await prisma.loan_applications.findUnique({
+            where: { id: loanApplicationId },
+            select: { employment_type: true },
+        });
+        if (!application) {
+            throw new NotFoundError('Loan application', loanApplicationId);
+        }
+        if (!application.employment_type) {
+            throw new ValidationError(
+                'employmentType',
+                'This application has no persisted employment type (submitted before the employment_type column existed). ' +
+                    'It requires manual/back-office correction before auto-approval can run.',
+            );
+        }
+
+        const result = this.evaluate({
+            loanApplicationId,
+            employmentType: application.employment_type,
+            ...rest,
+        });
+        await this.saveResult(loanApplicationId, result);
+        return result;
+    },
 };
