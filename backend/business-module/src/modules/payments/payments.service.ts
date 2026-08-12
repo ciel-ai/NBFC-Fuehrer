@@ -243,22 +243,46 @@ export const paymentsService = {
             throw new EmiAlreadyPaidError(emi.id, emi.emiNumber);
         }
 
+        const debitAttemptNo = emi.bounceCount + 1;
+
+        // Idempotency guard: if this attempt was already initiated, return the existing record.
+        // Protects against cron misfires, network retries, and duplicate job executions.
+        const existingDebit = await paymentsRepository.findExistingEnachDebit(emiId, debitAttemptNo);
+        if (existingDebit) {
+            log.info('NACH debit already initiated for this EMI and attempt — returning existing record', {
+                paymentId: existingDebit.id,
+                emiId,
+                debitAttemptNo,
+            });
+            return toPaymentResponse(existingDebit);
+        }
+
         const totalDebit = roundRupees(amount + penaltyAmount);
 
         // Write PENDING payment record before calling gateway
-        const payment = await paymentsRepository.createPayment({
-            loanAccountId,
-                userId: loanAccount.userId, // Resolved via account
-            emiId,
-            paymentType: 'EMI',
-            amount,
-            penaltyAmount,
-            channel: PAYMENT_CHANNEL.ENACH,
-            gateway: 'razorpay',
-            mandateId,
-            debitAttemptNo: emi.bounceCount + 1,
-            status: PAYMENT_STATUS.PENDING,
-        });
+        let payment: PaymentRecord;
+        try {
+            payment = await paymentsRepository.createPayment({
+                loanAccountId,
+                userId: loanAccount.userId,
+                emiId,
+                paymentType: 'EMI',
+                amount,
+                penaltyAmount,
+                channel: PAYMENT_CHANNEL.ENACH,
+                gateway: 'razorpay',
+                mandateId,
+                debitAttemptNo,
+                status: PAYMENT_STATUS.PENDING,
+            });
+        } catch (err) {
+            if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+                log.info('NACH debit race condition — concurrent call already created the record', { emiId, debitAttemptNo });
+                const raceDebit = await paymentsRepository.findExistingEnachDebit(emiId, debitAttemptNo);
+                if (raceDebit) return toPaymentResponse(raceDebit);
+            }
+            throw err;
+        }
 
         const provider = getPaymentProvider();
 

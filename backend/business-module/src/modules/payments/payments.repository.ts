@@ -5,6 +5,7 @@ import { createModuleLogger } from '@/config/logger';
 import {
     PAYMENT_STATUS,
     PAGINATION,
+    PAYMENT_CHANNEL,
 } from '@/config/constants';
 import type { PaymentStatus, PaymentChannel } from '@/config/constants';
 import {
@@ -132,6 +133,20 @@ export const paymentsRepository = {
     ): Promise<PaymentRecord | null> {
         const row = await prisma.payments.findFirst({
             where: { gateway_txn_id: gatewayTxnId },
+        });
+        return row ? mapPayment(row as unknown as Record<string, unknown>) : null;
+    },
+
+        async findExistingEnachDebit(
+        emiId: string,
+        debitAttemptNo: number,
+    ): Promise<PaymentRecord | null> {
+        const row = await prisma.payments.findFirst({
+            where: {
+                emi_id: emiId,
+                debit_attempt_no: debitAttemptNo,
+                channel: PAYMENT_CHANNEL.ENACH,
+            },
         });
         return row ? mapPayment(row as unknown as Record<string, unknown>) : null;
     },

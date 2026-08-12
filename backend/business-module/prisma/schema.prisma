@@ -464,6 +464,10 @@ model payments {
   @@index([initiated_at])
   @@index([loan_account_id, status])
   @@index([legacy_id])
+    // A partial unique index (one ENACH debit attempt per emi_id+debit_attempt_no)
+  // cannot be expressed in Prisma's schema DSL — applied via raw SQL migration
+  // 20260811000000_enach_debit_idempotency. Prevents double-charging on cron
+  // retries or network replays.
 }
 
 // A partial unique index (one non-cancelled mandate per loan_account_id)

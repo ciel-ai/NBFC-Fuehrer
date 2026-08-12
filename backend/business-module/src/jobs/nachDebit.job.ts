@@ -43,101 +43,121 @@ export async function runNachDebitJob(): Promise<void> {
     let failed = 0;
 
     try {
-        const today = new Date();
+                const today = new Date();
         today.setHours(0, 0, 0, 0);
         const tomorrow = new Date(today);
         tomorrow.setDate(tomorrow.getDate() + 1);
 
-        // EMIs due today, not yet fully settled — includes PARTIAL so a
-        // remaining balance after a partial cash payment still gets
-        // auto-debited rather than silently dropping out of collection.
-        const dueEmis = await prisma.emi_schedule.findMany({
-            where: {
-                status: { in: [EMI_STATUS.PENDING, EMI_STATUS.PARTIAL] },
-                due_date: { gte: today, lt: tomorrow },
-            },
-            include: {
-                loan_account: {
-                    select: {
-                        id: true,
-                        user_id: true,
-                        razorpay_mandate_id: true,
-                        status: true,
-                        // Cross-checked against the denormalized
-                        // razorpay_mandate_id below — the two are supposed
-                        // to stay in sync, but nothing enforced that until
-                        // now, so this is the belt-and-suspenders check.
-                        enach_mandates: {
-                            where: { status: 'ACTIVE' },
-                            select: { id: true, razorpay_mandate_id: true },
+        const BATCH_SIZE = 100;
+        let cursor: string | undefined;
+        let totalFound = 0;
+
+        while (true) {
+            const batch = await prisma.emi_schedule.findMany({
+                where: {
+                    status: { in: [EMI_STATUS.PENDING, EMI_STATUS.PARTIAL] },
+                    due_date: { gte: today, lt: tomorrow },
+                },
+                include: {
+                    loan_account: {
+                        select: {
+                            id: true,
+                            user_id: true,
+                            razorpay_mandate_id: true,
+                            status: true,
+                            // Cross-checked against the denormalized
+                            // razorpay_mandate_id below — the two are supposed
+                            // to stay in sync, but nothing enforced that until
+                            // now, so this is the belt-and-suspenders check.
+                            enach_mandates: {
+                                where: { status: 'ACTIVE' },
+                                select: { id: true, razorpay_mandate_id: true },
+                            },
                         },
                     },
                 },
-            },
-            take: 500,
-        });
+                orderBy: { id: 'asc' },
+                take: BATCH_SIZE,
+                ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+            });
 
-        log.info(`NACH debit: ${dueEmis.length} EMIs due today`);
+            if (batch.length === 0) break;
 
-        for (const emi of dueEmis) {
-            const account = emi.loan_account;
+            totalFound += batch.length;
+            cursor = batch[batch.length - 1]!.id;
 
-            if (!account || !['ACTIVE', 'DISBURSED'].includes(account.status as string)) {
-                continue;
-            }
+            log.info(`NACH debit: processing batch of ${batch.length} EMIs`);
 
-            if (!account.razorpay_mandate_id) {
-                log.warn('Debit skipped — no active mandate', { emiId: emi.id, loanAccountId: account?.id });
-                continue;
-            }
+            for (const emi of batch) {
+                const account = emi.loan_account;
 
-            const hasMatchingActiveMandate = account.enach_mandates?.some(
-                (m) => m.razorpay_mandate_id === account.razorpay_mandate_id,
-            );
-            if (!hasMatchingActiveMandate) {
-                log.warn('Debit skipped — mandate id on loan account has no matching ACTIVE mandate record', {
-                    emiId: emi.id,
-                    loanAccountId: account?.id,
-                    razorpayMandateId: account.razorpay_mandate_id,
-                });
-                continue;
-            }
+                if (!account || !['ACTIVE', 'DISBURSED'].includes(account.status as string)) {
+                    continue;
+                }
 
-            attempted++;
+                if (!account.razorpay_mandate_id) {
+                    log.warn('Debit skipped — no active mandate', { emiId: emi.id, loanAccountId: account?.id });
+                    continue;
+                }
 
-            try {
-                const fakeReq = {
-                    requestId: `job:nach:${emi.id}`,
-                    requestLogger: log,
-                    user: null,
-                    auditContext: {},
-                } as unknown as import('express').Request;
-
-                await paymentsService.processNachDebit(
-                    {
-                        emiId: emi.id,
-                        loanAccountId: account.id as string,
-                        mandateId: account.razorpay_mandate_id as string,
-                        amount: toNumber(emi.emi_amount as unknown as number),
-                        penaltyAmount: toNumber(emi.penalty_amount as unknown as number),
-                        description: `Auto-debit EMI #${emi.emi_number}`,
-                    },
-                    fakeReq,
+                const hasMatchingActiveMandate = account.enach_mandates?.some(
+                    (m) => m.razorpay_mandate_id === account.razorpay_mandate_id,
                 );
+                if (!hasMatchingActiveMandate) {
+                    log.warn('Debit skipped — mandate id on loan account has no matching ACTIVE mandate record', {
+                        emiId: emi.id,
+                        loanAccountId: account?.id,
+                        razorpayMandateId: account.razorpay_mandate_id,
+                    });
+                    continue;
+                }
 
-                succeeded++;
-                log.info('NACH debit initiated', { emiId: emi.id, emiNumber: emi.emi_number, loanAccount: account.id });
+                attempted++;
 
-            } catch (err) {
-                failed++;
-                log.error('NACH debit failed', { emiId: emi.id, error: (err as Error).message });
+                try {
+                    const fakeReq = {
+                        requestId: `job:nach:${emi.id}`,
+                        requestLogger: log,
+                        user: null,
+                        auditContext: {},
+                    } as unknown as import('express').Request;
+
+                    await paymentsService.processNachDebit(
+                        {
+                            emiId: emi.id,
+                            loanAccountId: account.id as string,
+                            mandateId: account.razorpay_mandate_id as string,
+                            amount: toNumber(emi.emi_amount as unknown as number),
+                            penaltyAmount: toNumber(emi.penalty_amount as unknown as number),
+                            description: `Auto-debit EMI #${emi.emi_number}`,
+                        },
+                        fakeReq,
+                    );
+
+                    succeeded++;
+                    log.info('NACH debit initiated', { emiId: emi.id, emiNumber: emi.emi_number, loanAccount: account.id });
+
+                } catch (err) {
+                    failed++;
+                    log.error('NACH debit failed', { emiId: emi.id, error: (err as Error).message });
+                }
+
+                await sleep(150);
             }
+        }
 
-            await sleep(150);
+        const FAILURE_ALERT_THRESHOLD = 0.1;
+        if (attempted > 0 && failed / attempted > FAILURE_ALERT_THRESHOLD) {
+            log.error('NACH debit high failure rate alert', {
+                attempted,
+                succeeded,
+                failed,
+                failureRate: `${((failed / attempted) * 100).toFixed(1)}%`,
+            });
         }
 
         log.info('NACH debit job completed', {
-            attempted, succeeded, failed,
+            attempted, succeeded, failed, totalFound,
             durationMs: Date.now() - jobStart,
         });
 
