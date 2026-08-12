@@ -30,12 +30,14 @@ jest.mock('@/modules/loans', () => ({
 const mockCreatePayment = jest.fn();
 const mockMarkPaymentSuccess = jest.fn();
 const mockFindPaymentByIdOrThrow = jest.fn();
+const mockFindExistingEnachDebit = jest.fn();
 
 jest.mock('@/modules/payments/payments.repository', () => ({
     paymentsRepository: {
         createPayment: (...args: unknown[]) => mockCreatePayment(...args),
         markPaymentSuccess: (...args: unknown[]) => mockMarkPaymentSuccess(...args),
         findPaymentByIdOrThrow: (...args: unknown[]) => mockFindPaymentByIdOrThrow(...args),
+        findExistingEnachDebit: (...args: unknown[]) => mockFindExistingEnachDebit(...args),
     },
 }));
 
