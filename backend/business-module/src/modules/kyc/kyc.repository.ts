@@ -345,8 +345,18 @@ export const kycRepository = {
             existingEmiPerMonth: bankStatement?.emiObligations ?? null,
             bankBounces: bankStatement?.bounces ?? 0,
             fraudScore: doc.fraudScore,
-            amlClear: amlCheck?.clear ?? true,
+            // Audit finding #22, Phase 1 — was `?? true`, silently
+            // treating "AML check never run" the same as "confirmed
+            // clear" for a hard-fail fraud rule. null now means
+            // genuinely unknown; the rule decides how to treat that.
+            amlClear: amlCheck?.clear ?? null,
             monthsAnalysed: bankStatement?.monthsAnalysed ?? 0,
+            // doc (from findByUserIdOrThrow, above) already carries
+            // overallStatus — reusing it directly here instead of a
+            // second query via this.isComplete(userId), since the data's
+            // already in hand and the comparison is identical (same
+            // status field, same KYC_STATUS.COMPLETE constant).
+            kycComplete: doc.overallStatus === KYC_STATUS.COMPLETE,
         };
     },
 

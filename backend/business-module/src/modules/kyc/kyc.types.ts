@@ -200,6 +200,17 @@ export interface KycUnderwritingData {
     existingEmiPerMonth: number | null;
     bankBounces: number;
     fraudScore: number | null;
-    amlClear: boolean;
+    // Audit finding #22, Phase 1 — null means "AML check has not been run
+    // yet", distinct from a confirmed clear (true) or a confirmed hit
+    // (false). Previously typed as a plain boolean and defaulted to true
+    // when missing, which made "never checked" indistinguishable from
+    // "confirmed clear" to the AML_CLEAR hard-fail rule.
+    amlClear: boolean | null;
     monthsAnalysed: number;
+    // Audit finding #22, Phase 1 — the real KYC-completeness signal
+    // (sourced from kyc_documents.overall_status), replacing the
+    // underwriting engine's old KYC_COMPLETE check, which tested
+    // `creditScore !== undefined` — always true for any real caller,
+    // since creditScore is typed `number | null`, never `undefined`.
+    kycComplete: boolean;
 }
