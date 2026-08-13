@@ -1,58 +1,73 @@
 // src/modules/sales/sales.controller.ts
+//
+// Every handler here was synchronous, took req.body/req.query unvalidated, and
+// called a service that returned fixtures. They are async now because the
+// service reads and writes the database, and they read validated input rather
+// than raw request fields.
+
 import type { Response, NextFunction } from 'express';
 import type { AuthRequest } from '@/types/express';
+import { getValidatedBody, getValidatedParams, getValidatedQuery } from '@/types/express';
 import { HTTP } from '@/config/constants';
 import { successResponse } from '@/types/common.types';
 import { salesService } from './sales.service';
 import type { SalesProduct, SalesApplicationStatus } from './sales.types';
+import type { CdlApplicationInput } from '@/modules/cdlLoans/cdlLoans.types';
 
 export const salesController = {
 
-    lookupFdo(req: AuthRequest, res: Response, next: NextFunction) {
+    async lookupFdo(req: AuthRequest, res: Response, next: NextFunction) {
         try {
             const fdoCode = req.params['fdoCode'] as string;
-            const result = salesService.lookupFdo(fdoCode);
+            const result = await salesService.lookupFdo(fdoCode);
             res.status(HTTP.OK).json(successResponse(result));
         } catch (err) { next(err); }
     },
 
-    lookupRetailShop(req: AuthRequest, res: Response, next: NextFunction) {
+    async lookupRetailShop(req: AuthRequest, res: Response, next: NextFunction) {
         try {
             const shopCode = req.params['shopCode'] as string;
-            const result = salesService.lookupRetailShop(shopCode);
+            const result = await salesService.lookupRetailShop(shopCode);
             res.status(HTTP.OK).json(successResponse(result));
         } catch (err) { next(err); }
     },
 
-    searchCustomer(req: AuthRequest, res: Response, next: NextFunction) {
+    async searchCustomer(req: AuthRequest, res: Response, next: NextFunction) {
         try {
-            const query = (req.query['q'] as string) ?? '';
-            const result = salesService.searchCustomer(query);
+            const { q } = getValidatedQuery<{ q: string }>(req);
+            const result = await salesService.searchCustomer(q);
             res.status(HTTP.OK).json(successResponse(result));
         } catch (err) { next(err); }
     },
 
-    getDashboardCounts(req: AuthRequest, res: Response, next: NextFunction) {
+    async getDashboardCounts(req: AuthRequest, res: Response, next: NextFunction) {
         try {
-            const product = req.params['product'] as SalesProduct;
-            const result = salesService.getDashboardCounts(product);
+            const { product } = getValidatedParams<{ product: SalesProduct }>(req);
+            const result = await salesService.getDashboardCounts(product, req.user!.id);
             res.status(HTTP.OK).json(successResponse(result));
         } catch (err) { next(err); }
     },
 
-    listApplications(req: AuthRequest, res: Response, next: NextFunction) {
+    async listApplications(req: AuthRequest, res: Response, next: NextFunction) {
         try {
-            const product = req.params['product'] as SalesProduct;
-            const status = (req.query['status'] as SalesApplicationStatus) ?? 'SUBMITTED';
-            const result = salesService.listApplications(product, status);
+            const { product } = getValidatedParams<{ product: SalesProduct }>(req);
+            const { status, page, limit } = getValidatedQuery<{
+                status?: SalesApplicationStatus; page: number; limit: number;
+            }>(req);
+            const result = await salesService.listApplications(
+                product, status, req.user!.id, page, limit,
+            );
             res.status(HTTP.OK).json(successResponse(result));
         } catch (err) { next(err); }
     },
 
-    submitApplication(req: AuthRequest, res: Response, next: NextFunction) {
+    // The agent is taken from the JWT, never from the body — a sales user
+    // cannot file an application as somebody else.
+    async submitApplication(req: AuthRequest, res: Response, next: NextFunction) {
         try {
-            const product = req.params['product'] as SalesProduct;
-            const result = salesService.submitApplication(product, req.body);
+            const { product } = getValidatedParams<{ product: SalesProduct }>(req);
+            const body = getValidatedBody<CdlApplicationInput & { customerId: string }>(req);
+            const result = await salesService.submitApplication(product, body, req.user!.id);
             res.status(HTTP.CREATED).json(successResponse(result, 'Application submitted'));
         } catch (err) { next(err); }
     },

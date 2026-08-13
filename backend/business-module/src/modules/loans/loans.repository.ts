@@ -117,6 +117,12 @@ function mapApplication(row: Record<string, unknown>): LoanApplication {
             ? toNumber(row.monthly_income as number) : null,
         repaymentType: (row.repayment_type as string) ?? 'MONTHLY_EMI',
         preferredDebitDay: (row.preferred_debit_day as number | null) ?? null,
+        productName: (row.product_name as string | null) ?? null,
+        productValue: row.product_value != null
+            ? toNumber(row.product_value as number) : null,
+        downPayment: row.down_payment != null
+            ? toNumber(row.down_payment as number) : null,
+        productCategory: (row.product_category as string | null) ?? null,
     };
 }
 
@@ -228,6 +234,20 @@ export const loansRepository = {
                 // rather than overriding it with an explicit null.
                 ...(data.preferredDebitDay !== undefined
                     ? { preferred_debit_day: data.preferredDebitDay }
+                    : {}),
+                // CDL-only; gold/housing pass nothing and the columns stay
+                // NULL, which is what "this loan finances no product" means.
+                ...(data.productName !== undefined
+                    ? { product_name: data.productName }
+                    : {}),
+                ...(data.productValue !== undefined
+                    ? { product_value: data.productValue }
+                    : {}),
+                ...(data.downPayment !== undefined
+                    ? { down_payment: data.downPayment }
+                    : {}),
+                ...(data.productCategory !== undefined
+                    ? { product_category: data.productCategory }
                     : {}),
             },
         });

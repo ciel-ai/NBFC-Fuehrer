@@ -1,13 +1,23 @@
 // src/modules/cdlLoans/cdlLoans.controller.ts
 import type { Response, NextFunction } from 'express';
 import type { AuthRequest } from '@/types/express';
-import { getValidatedBody, getValidatedParams } from '@/types/express';
+import { getValidatedBody, getValidatedParams, getValidatedQuery } from '@/types/express';
 import { HTTP } from '@/config/constants';
 import { successResponse } from '@/types/common.types';
 import { cdlLoansService } from './cdlLoans.service';
-import type { CdlApplicationInput, CdlCreditAssessmentInput } from './cdlLoans.types';
+import type { CdlApplicationInput, CdlCreditAssessmentInput, CdlQuoteInput } from './cdlLoans.types';
 
 export const cdlLoansController = {
+
+    // GET /consumer-durable-loans/quote — read-only pricing for the product
+    // screen. Nothing is created or persisted.
+    async quote(req: AuthRequest, res: Response, next: NextFunction) {
+        try {
+            const query = getValidatedQuery<CdlQuoteInput>(req);
+            const result = cdlLoansService.quote(query);
+            res.status(HTTP.OK).json(successResponse(result));
+        } catch (err) { next(err); }
+    },
 
     async submitApplication(req: AuthRequest, res: Response, next: NextFunction) {
         try {
@@ -126,7 +136,9 @@ export const cdlLoansController = {
             const collectedBy = req.user!.id;
             const callerId = req.user!.id;
             const callerRole = req.user!.role;
-            const { emiId, amount, collectionId } = getValidatedBody<{ emiId: string; amount: number; collectionId?: string }>(req);
+            // amount is optional — omitted by the customer app, which pays the
+            // whole EMI; the service resolves it from the EMI row either way.
+            const { emiId, amount, collectionId } = getValidatedBody<{ emiId: string; amount?: number; collectionId?: string }>(req);
             const result = await cdlLoansService.processManualPayment(id, emiId, amount, collectedBy, collectionId, req, callerId, callerRole);
             res.status(HTTP.OK).json(successResponse(result, 'Payment recorded'));
         } catch (err) { next(err); }

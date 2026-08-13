@@ -11,12 +11,7 @@ import { Button } from '@/src/shared/components/common/Button';
 import { LoadingSpinner } from '@/src/shared/components/common/LoadingSpinner';
 import { formatCurrency } from '@/src/core/utils/formatters';
 import { useServices } from '@/src/core/services/ServiceProvider';
-import {
-  ageFromDob,
-  CDL_FOIR_MAX,
-  type CdlCreditAssessment,
-  type CdlCreditDecision,
-} from '@/src/entities/consumerDurableLoan';
+import type { CdlCreditDecision } from '@/src/entities/consumerDurableLoan';
 
 import { usePersistApplyStep } from '@/src/features/apply/useApplyDraft';
 
@@ -29,32 +24,28 @@ export default function CdlCreditDecisionScreen() {
   const [agentApproved, setAgentApproved] = useState(false);
   const [agentLoading, setAgentLoading] = useState(false);
 
-  const amount = Number(params.loanAmount ?? 0);
 
   useEffect(() => {
     let mounted = true;
     const run = async () => {
       try {
-        const assessment: CdlCreditAssessment = {
-          applicationId: params.applicationId ?? 'cdl_mock_application',
-          employmentVerified: true,
-          employmentType: params.employmentType ?? 'salaried',
-          annualIncome: Number(params.monthlyIncome ?? 0) * 12,
-          monthlyIncome: Number(params.monthlyIncome ?? 0),
-          cibilScore: Number(params.cibilScore ?? 0),
-          existingObligations: Number(params.existingObligations ?? 0),
-          proposedEmi: Number(params.emi ?? 0),
-          foir: Number(params.foir ?? 0),
-          foirLimit: CDL_FOIR_MAX,
-          foirStatus: (params.foirStatus as CdlCreditAssessment['foirStatus']) ?? 'passed',
-          age: params.dob ? ageFromDob(params.dob) : undefined,
-          loanAmount: amount,
-        };
+        // Canonical: income inputs only. The decision itself is the server's
+        // to make — this screen used to post a whole assessment object
+        // including a client-supplied cibilScore and foir, none of which the
+        // API accepts (and rightly so: it computes the decision from the
+        // bureau-verified score, not from anything the app asserts).
         const data = await consumerDurableLoanService.getCreditDecision(
-          assessment.applicationId,
-          assessment,
+          params.applicationId ?? 'cdl_mock_application',
+          {
+            monthlyIncome: Number(params.monthlyIncome ?? 0),
+            existingEmis: Number(params.existingObligations ?? params.existingEmi ?? 0),
+            proposedEmi: Number(params.emi ?? 0),
+          },
         );
-        if (mounted) setDecision({ ...data, approvedAmount: amount });
+        // The approved amount is the server's answer, not the amount asked
+        // for — overwriting it with the requested figure hid rejections and
+        // part-approvals behind the number the customer had typed in.
+        if (mounted) setDecision(data);
       } catch {
         if (mounted) Alert.alert('Decision unavailable', 'Please try again.');
       } finally {

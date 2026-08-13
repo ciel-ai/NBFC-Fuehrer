@@ -927,7 +927,11 @@ export const pdfService = {
 
             doc.fontSize(11).fillColor('#0F2C4F').text('C. Financed Purchase');
             doc.moveDown(0.3);
-            addField(doc, 'Item Financed:', application.purpose ?? 'N/A');
+            // product_name is the item; `purpose` is the fallback for CDL rows
+            // written before 20260813010000_add_cdl_product_name, when the
+            // product name was stored there. New rows put the loan's actual
+            // purpose in that column, so it must not be preferred.
+            addField(doc, 'Item Financed:', application.product_name ?? application.purpose ?? 'N/A');
             addField(doc, 'Store Name:', application.store_name ?? 'N/A');
             addField(doc, 'Store City:', application.store_city ?? 'N/A');
             doc.moveDown(0.7);

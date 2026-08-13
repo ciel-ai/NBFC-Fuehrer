@@ -1,9 +1,43 @@
 // src/modules/cdlLoans/cdlLoans.types.ts
+//
+// ─── CANONICAL CDL CONTRACT ───────────────────────────────────────────────────
+//
+// This file is the single source of truth for CDL field names. The mobile app's
+// mirror of these types lives at
+// frontend/mobile/src/entities/consumerDurableLoan.ts and must match it field
+// for field; tests/unit/cdlLoans.contract.test.ts pins the request shapes so
+// the two cannot drift apart silently again.
+//
+// Naming rules, and why each canonical name won:
+//
+//   loanAmount        the principal. Not `amount` (the mobile app's old name,
+//                     too generic to distinguish from productValue/downPayment/
+//                     approvedAmount) and not `amountRequested` (the shared
+//                     repository/DB name, which gold and housing also use —
+//                     see the mapping note below).
+//   tenureMonths      not `tenure`; the unit belongs in the name.
+//   productValue      the item's invoice value. Was `productPrice` here and
+//                     `productValue` in the mobile app and the sales wizard;
+//                     the majority name also reads as the business fact.
+//                     productValue - downPayment = loanAmount.
+//   interestRate      not `interestRatePct`. Matches the DB column
+//                     (interest_rate) and every other module's field name.
+//   preferredDebitDay not `autoDebitDate`. It is a day-of-month (4|7|12), not
+//                     a date, and preferred_debit_day is what the column is
+//                     already called.
+//   existingEmis      the applicant's existing monthly EMI obligations. Not
+//                     `existingObligations` (the mobile app's old name).
+//
+// Application-level names are camelCase and map to snake_case columns in the
+// repository layer only (loanAmount → amount_requested, productValue →
+// product_value). That mapping is deliberate: the columns are shared with gold
+// and housing applications and renaming them would break both products.
 
 export interface CdlApplicationInput {
     productCategory: 'TV_APPLIANCES' | 'MOBILES_TABLETS' | 'LAPTOPS' | 'FURNITURE' | 'AC' | 'OTHERS';
     productName: string;
-    productPrice: number;
+    /** Invoice value of the item financed. Not the principal — see header. */
+    productValue: number;
     downPayment: number;
     loanAmount: number;
     tenureMonths: number;
@@ -11,13 +45,39 @@ export interface CdlApplicationInput {
     storeCity: string;
     employmentType: 'SALARIED' | 'SELF_EMPLOYED' | 'STUDENT';
     monthlyIncome: number;
-    interestRatePct?: number;   // must be one of the allowed rates for the employmentType; defaults if omitted
-    autoDebitDate?: 4 | 7 | 12;
+    /** Must be one of the allowed rates for the employmentType; defaults if omitted. */
+    interestRate?: number;
+    /** Day of month for the NACH auto-debit. */
+    preferredDebitDay?: 4 | 7 | 12;
+}
+
+/** GET /consumer-durable-loans/quote — read-only pricing, creates nothing. */
+export interface CdlQuoteInput {
+    productValue: number;
+    downPayment: number;
+    loanAmount: number;
+    tenureMonths: number;
+    employmentType: 'SALARIED' | 'SELF_EMPLOYED' | 'STUDENT';
+    interestRate?: number;
+}
+
+export interface CdlQuoteResult {
+    loanAmount: number;
+    tenureMonths: number;
+    interestRate: number;
+    /** Authoritative — the same calculation used when the loan is booked. */
+    emi: number;
+    processingFee: number;
+    /** productValue - downPayment, capped at the product maximum. */
+    maxEligibleLoan: number;
 }
 
 export interface CdlApplicationResult {
     applicationId: string;
     status: string;
+    productName: string;
+    productValue: number;
+    downPayment: number;
     loanAmount: number;
     tenureMonths: number;
     interestRate: number;
@@ -57,8 +117,22 @@ export interface CdlCreditAssessmentInput {
     // a client could submit any value 300-900 directly and the assessment
     // would trust it outright.
     monthlyIncome: number;
+    /** Canonical name — the mobile app previously sent `existingObligations`. */
     existingEmis: number;
     proposedEmi: number;
+}
+
+export interface CdlNachInput {
+    /** The real account number. Never a masked display string. */
+    bankAccount: string;
+    ifsc: string;
+    /**
+     * Carried from the application so the mandate is registered against the
+     * day the customer actually chose. Previously the mobile app sent this
+     * (as `autoDebitDate`) and Joi's stripUnknown dropped it before the
+     * service ever saw it.
+     */
+    preferredDebitDay?: 4 | 7 | 12;
 }
 
 export interface CdlCreditAssessment {

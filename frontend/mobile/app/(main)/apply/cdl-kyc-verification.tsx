@@ -11,6 +11,7 @@ import { Button } from '@/src/shared/components/common/Button';
 import { LoadingSpinner } from '@/src/shared/components/common/LoadingSpinner';
 import { useServices } from '@/src/core/services/ServiceProvider';
 import type { CdlKycResult, CdlVerificationCheck } from '@/src/entities/consumerDurableLoan';
+import { toCdlEmploymentType } from '@/src/entities/consumerDurableLoan';
 
 const STATUS_META: Record<CdlVerificationCheck['status'], { label: string; color: string; icon: keyof typeof Ionicons.glyphMap }> = {
   passed: { label: 'Verified', color: Colors.success, icon: 'checkmark-circle' },
@@ -33,13 +34,28 @@ export default function CdlKycVerificationScreen() {
     let mounted = true;
     const run = async () => {
       try {
+        // Canonical CDL application contract — see
+        // src/entities/consumerDurableLoan.ts. Every field the API requires is
+        // sent under the name it validates.
+        //
+        // productName and productValue are the customer's own typed values,
+        // carried here from the product-details screen. `emi` and
+        // `processingFee` are deliberately NOT sent: the backend calculates
+        // both when it books the loan and would strip them anyway.
         const app = await consumerDurableLoanService.submitApplication({
-          productName: params.productName ?? 'Consumer Durable',
-          amount: Number(params.loanAmount ?? 0),
-          tenure: Number(params.tenure ?? 12),
-          emi: Number(params.emi ?? 0),
+          productName: params.productName ?? '',
+          productValue: Number(params.productValue ?? 0),
+          downPayment: Number(params.downPayment ?? 0),
+          loanAmount: Number(params.loanAmount ?? 0),
+          tenureMonths: Number(params.tenure ?? 12),
+          storeName: params.storeName ?? '',
+          storeCity: params.storeCity ?? '',
+          employmentType: toCdlEmploymentType(params.employmentType),
           monthlyIncome: Number(params.monthlyIncome ?? 0),
-          employmentType: params.employmentType,
+          interestRate: params.interestRate ? Number(params.interestRate) : undefined,
+          preferredDebitDay: params.preferredDebitDay
+            ? (Number(params.preferredDebitDay) as 4 | 7 | 12)
+            : undefined,
         });
         if (!mounted) return;
         setApplicationId(app.applicationId);

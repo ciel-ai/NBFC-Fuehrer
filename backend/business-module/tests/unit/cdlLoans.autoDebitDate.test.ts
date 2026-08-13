@@ -43,7 +43,7 @@ const USER_ID = 'user-1';
 const baseInput = {
     productCategory: 'MOBILES_TABLETS' as const,
     productName: 'Smartphone XYZ',
-    productPrice: 30000,
+    productValue: 30000,
     downPayment: 5000,
     loanAmount: 25000,
     tenureMonths: 12,
@@ -67,8 +67,8 @@ beforeEach(() => {
 });
 
 describe('submitApplication persists the customer\'s chosen auto-debit date', () => {
-    test('a valid autoDebitDate (7th) is passed through to createApplication as preferredDebitDay', async () => {
-        await cdlLoansService.submitApplication(USER_ID, { ...baseInput, autoDebitDate: 7 });
+    test('a valid preferredDebitDay (7th) is passed through to createApplication as preferredDebitDay', async () => {
+        await cdlLoansService.submitApplication(USER_ID, { ...baseInput, preferredDebitDay: 7 });
 
         expect(mockCreateApplication).toHaveBeenCalledWith(
             expect.objectContaining({ preferredDebitDay: 7 }),
@@ -82,7 +82,7 @@ describe('submitApplication persists the customer\'s chosen auto-debit date', ()
             mockCreateApplication.mockResolvedValue({ id: 'app-1', referenceNumber: 'FHR-2026-000001', appliedAt: new Date() });
             mockUpdateApplicationStatus.mockResolvedValue({ id: 'app-1', status: 'KYC_PENDING', referenceNumber: 'FHR-2026-000001', appliedAt: new Date() });
 
-            await cdlLoansService.submitApplication(USER_ID, { ...baseInput, autoDebitDate: date });
+            await cdlLoansService.submitApplication(USER_ID, { ...baseInput, preferredDebitDay: date });
 
             expect(mockCreateApplication).toHaveBeenCalledWith(
                 expect.objectContaining({ preferredDebitDay: date }),
@@ -90,7 +90,7 @@ describe('submitApplication persists the customer\'s chosen auto-debit date', ()
         }
     });
 
-    test('an application submitted without autoDebitDate passes undefined, not a fabricated default', async () => {
+    test('an application submitted without preferredDebitDay passes undefined, not a fabricated default', async () => {
         await cdlLoansService.submitApplication(USER_ID, baseInput);
 
         expect(mockCreateApplication).toHaveBeenCalledWith(
@@ -98,9 +98,9 @@ describe('submitApplication persists the customer\'s chosen auto-debit date', ()
         );
     });
 
-    test('an out-of-range autoDebitDate is still rejected before reaching createApplication (validateCdlLoanParams unchanged)', async () => {
+    test('an out-of-range preferredDebitDay is still rejected before reaching createApplication (validateCdlLoanParams unchanged)', async () => {
         await expect(
-            cdlLoansService.submitApplication(USER_ID, { ...baseInput, autoDebitDate: 15 as any }),
+            cdlLoansService.submitApplication(USER_ID, { ...baseInput, preferredDebitDay: 15 as any }),
         ).rejects.toThrow();
         expect(mockCreateApplication).not.toHaveBeenCalled();
     });

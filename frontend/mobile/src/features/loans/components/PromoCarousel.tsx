@@ -36,10 +36,14 @@ interface PromoItem {
 const PROMO_ITEMS: PromoItem[] = [
   {
     id: '1',
-    title: '0% Interest on iPhone 15',
-    subtitle: 'Own it today. No processing fee.',
+    // Product-agnostic: CDL finances whatever the customer is buying, and
+    // there is no catalogue to advertise a specific item from. The previous
+    // copy also promised "no processing fee", which is never true — every CDL
+    // carries a slab fee of ₹1,463–₹2,466.
+    title: '0% Interest EMI available',
+    subtitle: 'Finance any consumer durable on easy EMIs.',
     badge: 'LIMITED TIME',
-    icon: 'phone-portrait',
+    icon: 'bag-handle',
     cta: 'Check Eligibility',
     bgColor: Colors.primary,
     accentColor: '#FFFFFF',

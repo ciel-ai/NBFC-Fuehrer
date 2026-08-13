@@ -9,6 +9,7 @@ import {
   type SalesSubmitOp,
 } from '@/src/features/sales/api/offlineQueue';
 import { salesKeys } from '@/src/features/sales/queries/useSalesQueries';
+import type { CdlNachInput } from '@/src/entities/consumerDurableLoan';
 
 let isFlushingQueue = false;
 
@@ -23,7 +24,7 @@ async function runMoneyOp(services: Services, op: MoneyOp): Promise<void> {
     case 'cdl-nach':
       await services.consumerDurableLoanService.registerNachMandate(
         applicationId,
-        p as { emi: number; bankAccount: string; autoDebitDate?: number },
+        p as CdlNachInput,
         idempotencyKey,
       );
       return;

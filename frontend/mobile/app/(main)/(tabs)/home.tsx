@@ -423,7 +423,10 @@ export default function HomeScreen() {
 
         {/* Quick Actions */}
         <View style={styles.section}>
-          <SectionHeader title="Quick Actions" action="View all" onAction={() => go('/(main)/apply/product-listing')} />
+          {/* Was the CDL product catalogue, which no longer exists — the
+              customer enters their own product now. Points at the loan
+              products list, which is what "view all" meant to offer. */}
+          <SectionHeader title="Quick Actions" action="View all" onAction={() => go('/(main)/apply/loan-products')} />
           <View style={styles.qaRow}>
             {QUICK_ACTIONS.map((item) => (
               <QuickActionTile key={item.id} item={item} />

@@ -55,8 +55,10 @@ export interface SalesApplicationSummary {
 }
 
 export interface SalesSubmitResult {
+    /** The real loan_applications.id (UUID) — no longer a fabricated string. */
     applicationId: string;
     status: string;
+    /** loan_applications.reference_number, generated when the row is created. */
     referenceId: string;
     message: string;
     createdAt: string;

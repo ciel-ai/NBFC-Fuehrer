@@ -50,8 +50,9 @@ export type LiveLoanAccount = LoanAccount & { id: string };
 
 // The backend's moneyConverter middleware serialises money fields in PAISE
 // (mobile-app convention). The web UI works in rupees — convert on ingest.
-// NOTE: outstandingAfter is NOT in the middleware's field list, so it
-// arrives in rupees already.
+// NOTE: outstandingAfter carries none of the money words the middleware
+// detects ('amount', 'fee', 'emi', 'balance', 'income', 'interest',
+// 'principal'), so it is not converted and arrives in rupees already.
 const rupees = (paise: number): number => Math.round(paise) / 100;
 
 // ─── Mappers ──────────────────────────────────────────────────────────────────

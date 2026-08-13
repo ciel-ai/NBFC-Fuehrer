@@ -856,6 +856,23 @@ export const LoanTab: React.FC<{ app: LoanApplication }> = ({ app }) => {
             <InfoItem label="EMI" value={<span className="tnum">{inr(app.loan.emi)}</span>} />
             <InfoItem label="Purpose" value={app.loan.purpose} />
             <InfoItem label="Scheme" value={app.loan.scheme} />
+            {/* CDL only — the item financed, as the customer entered it, from
+                its own columns rather than the overloaded `purpose` field. */}
+            {app.loan.productName && (
+              <InfoItem label="Product" value={app.loan.productName} />
+            )}
+            {app.loan.productValue != null && (
+              <InfoItem
+                label="Product Value"
+                value={<span className="tnum">{inr(app.loan.productValue)}</span>}
+              />
+            )}
+            {app.loan.downPayment != null && (
+              <InfoItem
+                label="Down Payment"
+                value={<span className="tnum">{inr(app.loan.downPayment)}</span>}
+              />
+            )}
           </InfoGrid>
         </Card>
         {app.creditDecision?.decision === 'APPROVED' && (

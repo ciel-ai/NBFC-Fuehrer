@@ -45,16 +45,48 @@ const ANY_VALID_INTEREST_RATE = [
 // ─── POST /consumer-durable-loans/applications ─────────────────────────────────
 
 export const cdlSubmitApplicationSchema = Joi.object({
-    // Must match CdlApplicationInput['productCategory'] (cdlLoans.types.ts)
+    // Must match CdlApplicationInput['productCategory'] (cdlLoans.types.ts).
+    //
+    // DELIBERATE DEFAULT, not an oversight. An audit of every consumer found
+    // that product_category is written and never read: no reporting, credit
+    // decision, underwriting rule, admin filter, CAM document, loan agreement,
+    // analytics or product-config path depends on it. Asking the customer to
+    // classify their own purchase, to populate a column nothing consumes,
+    // would be a question with no purpose — so the customer product-details
+    // screen does not ask, and unclassified applications record OTHERS
+    // honestly. The in-store sales wizard may still send a real category.
+    //
+    // If a reader ever appears (category-wise portfolio reporting is the
+    // likely one), add the picker then — the column and the enum already
+    // exist, so only the UI would be new.
     productCategory: Joi.string()
         .valid('TV_APPLIANCES', 'MOBILES_TABLETS', 'LAPTOPS', 'FURNITURE', 'AC', 'OTHERS')
-        .required(),
+        .default('OTHERS'),
 
-    productName: Joi.string().trim().min(2).max(200).required(),
+    // trim() runs before the length checks, so "   " collapses to "" and is
+    // rejected by min(2) — a whitespace-only product name cannot get through.
+    productName: Joi.string().trim().min(2).max(200).required().messages({
+        'string.empty': 'Product name is required',
+        'any.required': 'Product name is required',
+        'string.min': 'Product name must be at least 2 characters',
+        'string.max': 'Product name cannot exceed 200 characters',
+    }),
 
-    productPrice: commonSchemas.amount.required(),
+    // Canonical name (was productPrice here, productValue everywhere else —
+    // see the naming table in cdlLoans.types.ts). The invoice value of the
+    // item, not the principal. commonSchemas.amount is positive(), so ₹0 is
+    // rejected: an item with no value cannot be financed.
+    productValue: commonSchemas.amount.required().messages({
+        'number.base': 'Product value must be a number',
+        'number.positive': 'Product value must be greater than ₹0',
+        'any.required': 'Product value is required',
+    }),
 
-    downPayment: Joi.number().min(0).precision(2).required(),
+    // Optional: paying nothing upfront is a valid CDL application.
+    downPayment: Joi.number().min(0).precision(2).default(0).messages({
+        'number.base': 'Down payment must be a number',
+        'number.min': 'Down payment cannot be negative',
+    }),
 
     loanAmount: commonSchemas.amount
         .min(CDL_MIN_LOAN_AMOUNT)
@@ -89,12 +121,59 @@ export const cdlSubmitApplicationSchema = Joi.object({
     // getCdlInterestRate() in the service — this just rejects obviously
     // wrong values (a string, a negative number, a rate no employment
     // type ever allows) before they get that far.
-    interestRatePct: Joi.number()
+    interestRate: Joi.number()
         .valid(...ANY_VALID_INTEREST_RATE)
         .optional(),
 
-    autoDebitDate: Joi.number()
+    preferredDebitDay: Joi.number()
         .valid(...CDL_AUTO_DEBIT_DATES)
+        .optional(),
+})
+    // The principal cannot exceed the invoice value — the same rule the sales
+    // wizard already enforces client-side (cdlConfig.ts superRefine). Stated
+    // here too because backend validation is the one that counts, and because
+    // productValue only became persistable in this change.
+    .custom((value, helpers) => {
+        const { loanAmount, productValue, downPayment = 0 } = value as {
+            loanAmount: number; productValue: number; downPayment?: number;
+        };
+        // Order matters: report the impossible input before the derived one,
+        // so a customer who over-paid the down payment is told that rather
+        // than being told their loan amount is too high.
+        if (downPayment > productValue) {
+            return helpers.message({
+                custom: 'Down payment cannot exceed the product value',
+            });
+        }
+        const financeable = productValue - downPayment;
+        if (loanAmount > financeable) {
+            return helpers.message({
+                custom: `Loan amount cannot exceed the product value after down payment (₹${financeable.toLocaleString('en-IN')})`,
+            });
+        }
+        return value;
+    });
+
+// ─── GET /consumer-durable-loans/quote ─────────────────────────────────────────
+// Read-only pricing for the product-details screen. The app must not compute
+// EMI or the processing fee itself — a second implementation of either can
+// disagree with the one that actually books the loan, and the customer would
+// be shown a number the loan is not written at.
+
+export const cdlQuoteSchema = Joi.object({
+    productValue: commonSchemas.amount.required(),
+    downPayment: Joi.number().min(0).precision(2).default(0),
+    loanAmount: commonSchemas.amount.required(),
+    tenureMonths: Joi.number()
+        .integer()
+        .min(CDL_MIN_TENURE_MONTHS)
+        .max(CDL_MAX_TENURE_MONTHS)
+        .required(),
+    employmentType: Joi.string()
+        .valid('SALARIED', 'SELF_EMPLOYED', 'STUDENT')
+        .required(),
+    interestRate: Joi.number()
+        .valid(...ANY_VALID_INTEREST_RATE)
         .optional(),
 });
 
@@ -134,8 +213,19 @@ export const cdlCreditDecisionSchema = Joi.object({
 // Field names/format match createMandateSchema in payments.dto.ts.
 
 export const cdlNachSchema = Joi.object({
-    bankAccount: Joi.string().min(9).max(18).required(),
-    ifsc: Joi.string().length(11).uppercase().required(),
+    // The real account number. The mobile app previously sent a masked
+    // display string ("****1234"), which is both 8 characters (so it failed
+    // this min(9) anyway) and useless to the mandate registration — masking
+    // belongs in the UI, never on the wire.
+    bankAccount: Joi.string().pattern(/^\d{9,18}$/).required().messages({
+        'string.pattern.base': 'Bank account number must be 9-18 digits',
+    }),
+    ifsc: commonSchemas.ifsc.required(),
+    // Previously sent by the app as `autoDebitDate` and silently dropped by
+    // stripUnknown, so the mandate ignored the day the customer chose.
+    preferredDebitDay: Joi.number()
+        .valid(...CDL_AUTO_DEBIT_DATES)
+        .optional(),
 });
 
 // ─── POST /applications/:id/disburse ───────────────────────────────────────────
@@ -149,9 +239,16 @@ export const cdlDisburseSchema = Joi.object({
 
 // ─── POST /loans/:id/payments ──────────────────────────────────────────────────
 
+// `amount` is OPTIONAL and server-verified. The customer app pays a specific
+// EMI in full and has no business asserting what that EMI costs — it now sends
+// emiId alone and the service reads the amount from the EMI row. A staff/agent
+// cash collection may still send an explicit amount (a part collection against
+// an EMI), and the service checks it against the EMI's actual due before
+// accepting it. Previously `amount` was required, so the customer app's
+// `{ emiId }` body was rejected outright and EMI payment was unusable.
 export const cdlManualPaymentSchema = Joi.object({
     emiId: Joi.string().uuid({ version: 'uuidv4' }).required(),
-    amount: commonSchemas.amount.required(),
+    amount: commonSchemas.amount.optional(),
     collectionId: Joi.string().max(100).optional(),
 });
 

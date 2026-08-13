@@ -236,6 +236,22 @@ model loan_applications {
   nominee_address      String?
   nominee_age          Int?
   preferred_debit_day Int?    @default(4)
+  // CDL product details. Nullable because gold/housing applications have no
+  // financed product — only consumer-durable applications populate them.
+  // product_value is the invoice value of the item being financed; it is NOT
+  // the loan principal (amount_requested), which is product_value minus
+  // down_payment. All three were previously validated by the CDL DTO and then
+  // silently discarded — there was nowhere to put them.
+  // The financed item's name as the customer typed it. Distinct from
+  // `purpose`, which is the generic loan-purpose field gold and housing also
+  // use — CDL had been overloading it, so "what was bought" and "why the loan
+  // was taken" were the same column and neither could be queried reliably.
+  product_name        String?                @db.VarChar(200)
+  /// DB CHECK: product_value IS NULL OR product_value >= 0
+  product_value       Decimal?               @db.Decimal(15, 2)
+  /// DB CHECK: down_payment IS NULL OR down_payment >= 0
+  down_payment        Decimal?               @db.Decimal(15, 2)
+  product_category    String?                @db.VarChar(50)
   is_priority_sector Boolean? @default(false)
   priority_category  String?  @db.VarChar(50)
   loan_purpose       String?  @db.VarChar(100)

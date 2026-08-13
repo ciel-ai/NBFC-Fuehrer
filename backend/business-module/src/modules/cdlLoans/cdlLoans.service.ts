@@ -19,10 +19,11 @@ import { LOAN_STATUS, EMI_STATUS, PRODUCT_TYPE, BUSINESS_RULES } from '@/config/
 import type { Role } from '@/config/constants';
 import type {
     CdlApplicationInput, CdlApplicationResult,
+    CdlQuoteInput, CdlQuoteResult,
     CdlKycResult, CdlComplianceResult,
     CdlCreditAssessmentInput, CdlCreditAssessment,
     CdlCreditDecision, CdlAgreementResult,
-    CdlNachResult, CdlDisbursalResult,
+    CdlNachInput, CdlNachResult, CdlDisbursalResult,
     CdlOverdueStatus, CdlClosureResult,
     CdlManualPaymentResult, CdlDocumentResult,
     CdlPartPaymentResult, CdlPartPaymentEmiApplication,
@@ -53,6 +54,13 @@ const CDL_PROCESSING_FEE_TIERS: { max: number; fee: number }[] = [
     { max: 100000, fee: 2466 },
 ];
 
+// loan_applications.purpose for every CDL application. The column is the
+// generic loan-purpose field (housing writes its property type there, gold its
+// own value) and is NOT NULL, so CDL has to write something — this is the
+// honest answer. It used to hold a duplicate of the product name, which left
+// "what was financed" and "why the loan was taken" indistinguishable.
+export const CDL_LOAN_PURPOSE = 'Consumer durable purchase';
+
 export const CDL_MIN_LOAN_AMOUNT = 7000;
 export const CDL_MAX_LOAN_AMOUNT = 100000;
 export const CDL_MIN_TENURE_MONTHS = 6;
@@ -64,7 +72,7 @@ function getCdlInterestRate(employmentType: keyof typeof CDL_INTEREST_RATES, req
     const allowed = CDL_INTEREST_RATES[employmentType];
     if (requested !== undefined) {
         if (!allowed.includes(requested)) {
-            throw new ValidationError('interestRatePct', `${requested}% is not a valid rate for ${employmentType}. Allowed: ${allowed.join(', ')}%`);
+            throw new ValidationError('interestRate', `${requested}% is not a valid rate for ${employmentType}. Allowed: ${allowed.join(', ')}%`);
         }
         return requested;
     }
@@ -79,15 +87,15 @@ function getCdlProcessingFee(loanAmount: number): number {
     return tier.fee;
 }
 
-function validateCdlLoanParams(loanAmount: number, tenureMonths: number, autoDebitDate?: number): void {
+function validateCdlLoanParams(loanAmount: number, tenureMonths: number, preferredDebitDay?: number): void {
     if (loanAmount < CDL_MIN_LOAN_AMOUNT || loanAmount > CDL_MAX_LOAN_AMOUNT) {
         throw new ValidationError('loanAmount', `Loan amount must be between ₹${CDL_MIN_LOAN_AMOUNT.toLocaleString('en-IN')} and ₹${CDL_MAX_LOAN_AMOUNT.toLocaleString('en-IN')}`);
     }
     if (tenureMonths < CDL_MIN_TENURE_MONTHS || tenureMonths > CDL_MAX_TENURE_MONTHS) {
         throw new ValidationError('tenureMonths', `Tenure must be between ${CDL_MIN_TENURE_MONTHS} and ${CDL_MAX_TENURE_MONTHS} months`);
     }
-    if (autoDebitDate !== undefined && !CDL_AUTO_DEBIT_DATES.includes(autoDebitDate)) {
-        throw new ValidationError('autoDebitDate', `Auto-debit date must be one of: ${CDL_AUTO_DEBIT_DATES.join(', ')}`);
+    if (preferredDebitDay !== undefined && !CDL_AUTO_DEBIT_DATES.includes(preferredDebitDay)) {
+        throw new ValidationError('preferredDebitDay', `Auto-debit day must be one of: ${CDL_AUTO_DEBIT_DATES.join(', ')}`);
     }
 }
 
@@ -104,8 +112,50 @@ export const cdlLoansService = {
 
     // ── Real: creates an actual loan_applications row, product_type =
     // CONSUMER_DURABLE, same table gold/housing loans use. ───────────────────
-    async submitApplication(userId: string, input: CdlApplicationInput): Promise<CdlApplicationResult> {
-        validateCdlLoanParams(input.loanAmount, input.tenureMonths, input.autoDebitDate);
+    // ── Quote: authoritative EMI + processing fee, no side effects ───────────
+    // The product-details screen renders what this returns. It runs the same
+    // calcEmi / getCdlProcessingFee / getCdlInterestRate the booking path uses,
+    // so the figure quoted is by construction the figure the loan is written
+    // at — there is no second implementation to drift.
+    quote(input: CdlQuoteInput): CdlQuoteResult {
+        const financeable = input.productValue - input.downPayment;
+        if (input.downPayment > input.productValue) {
+            throw new ValidationError('downPayment', 'Down payment cannot exceed the product value');
+        }
+        if (input.loanAmount > financeable) {
+            throw new ValidationError(
+                'loanAmount',
+                `Loan amount cannot exceed the product value after down payment (₹${financeable.toLocaleString('en-IN')})`,
+            );
+        }
+        validateCdlLoanParams(input.loanAmount, input.tenureMonths);
+
+        const interestRate = getCdlInterestRate(input.employmentType, input.interestRate);
+
+        return {
+            loanAmount: input.loanAmount,
+            tenureMonths: input.tenureMonths,
+            interestRate,
+            emi: calcEmi(input.loanAmount, interestRate, input.tenureMonths),
+            processingFee: getCdlProcessingFee(input.loanAmount),
+            maxEligibleLoan: Math.min(financeable, CDL_MAX_LOAN_AMOUNT),
+        };
+    },
+
+    /**
+     * @param userId  the CUSTOMER the application belongs to — not the caller.
+     * @param options.agentId  set when a sales agent files on the customer's
+     *   behalf, so the application records who originated it. The customer app
+     *   omits it. Everything else (bounds, rate table, EMI, fee, duplicate
+     *   check, initial status) is identical for both flows by construction —
+     *   the sales wizard calls this method rather than reimplementing it.
+     */
+    async submitApplication(
+        userId: string,
+        input: CdlApplicationInput,
+        options?: { agentId?: string },
+    ): Promise<CdlApplicationResult> {
+        validateCdlLoanParams(input.loanAmount, input.tenureMonths, input.preferredDebitDay);
 
         // Previously missing entirely — a customer could submit unlimited
         // simultaneous CDL applications. loansRepository.hasActiveApplication
@@ -116,7 +166,7 @@ export const cdlLoansService = {
         const hasActive = await loansRepository.hasActiveApplication(userId);
         if (hasActive) throw CONFLICT_ERRORS.duplicateApplication(userId);
 
-        const interestRate = getCdlInterestRate(input.employmentType, input.interestRatePct);
+        const interestRate = getCdlInterestRate(input.employmentType, input.interestRate);
         const emi = calcEmi(input.loanAmount, interestRate, input.tenureMonths);
         const processingFee = getCdlProcessingFee(input.loanAmount);
 
@@ -124,12 +174,19 @@ export const cdlLoansService = {
 
         const created = await loansRepository.createApplication({
             userId,
-            agentId: null,
+            agentId: options?.agentId ?? null,
             customerId: customer?.id ?? null,
             amountRequested: input.loanAmount,
             tenureMonths: input.tenureMonths,
             productType: PRODUCT_TYPE.CONSUMER_DURABLE,
-            purpose: input.productName,
+            productName: input.productName,
+            // `purpose` is the generic loan-purpose column gold and housing
+            // also use, and it is NOT NULL — so CDL must write something. It
+            // now writes the actual purpose of the loan instead of a second
+            // copy of the product name. Readers that want the item read
+            // productName (with a `?? purpose` fallback for rows written
+            // before 20260813010000_add_cdl_product_name).
+            purpose: CDL_LOAN_PURPOSE,
             storeName: input.storeName,
             storeCity: input.storeCity,
             monthlyIncome: input.monthlyIncome,
@@ -142,7 +199,15 @@ export const cdlLoansService = {
             // away. It is NOT yet used to align EMI schedule due dates —
             // see disburseToMerchant below for why that half is
             // deliberately still open.
-            preferredDebitDay: input.autoDebitDate,
+            preferredDebitDay: input.preferredDebitDay,
+            // The three CDL product facts. Validated since the DTO was
+            // written, ignored here until loan_applications gained columns
+            // for them (migration 20260813000000_add_cdl_product_fields) —
+            // every CDL application before that lost the invoice value, the
+            // down payment and the category the moment Joi handed them over.
+            productValue: input.productValue,
+            downPayment: input.downPayment,
+            productCategory: input.productCategory,
         });
 
         // Persist the computed terms onto the application row.
@@ -163,6 +228,9 @@ export const cdlLoansService = {
         return {
             applicationId: updated.id,
             status: updated.status,
+            productName: input.productName,
+            productValue: input.productValue,
+            downPayment: input.downPayment,
             loanAmount: input.loanAmount,
             tenureMonths: input.tenureMonths,
             interestRate,
@@ -551,7 +619,7 @@ export const cdlLoansService = {
     // pattern gold loans already use. ─────────────────────────────────────────
     async registerNachMandate(
         applicationId: string,
-        input: { bankAccount: string; ifsc: string },
+        input: CdlNachInput,
         callerId: string,
         callerRole: Role,
     ): Promise<CdlNachResult> {
@@ -572,6 +640,23 @@ export const cdlLoansService = {
         // current/expected status).
         if (application.status !== LOAN_STATUS.APPROVED) {
             throw new LoanStateError(applicationId, application.status, LOAN_STATUS.APPROVED);
+        }
+
+        // The customer can still change their auto-debit day at NACH setup —
+        // this is the screen that actually asks for it. Previously the app
+        // sent it as `autoDebitDate` and stripUnknown discarded it, so the
+        // choice made here was lost and the application's original day stood.
+        if (
+            input.preferredDebitDay !== undefined &&
+            input.preferredDebitDay !== application.preferred_debit_day
+        ) {
+            await prisma.loan_applications.update({
+                where: { id: applicationId },
+                data: {
+                    preferred_debit_day: input.preferredDebitDay,
+                    updated_at: new Date(),
+                },
+            });
         }
 
         const principal = Number(application.approved_amount ?? application.amount_requested);
@@ -871,19 +956,39 @@ export const cdlLoansService = {
     async processManualPayment(
         loanId: string,
         emiId: string,
-        amount: number,
+        requestedAmount: number | undefined,
         collectedBy: string,
         collectionId: string | undefined,
         req: any,
         callerId: string,
         callerRole: Role,
     ): Promise<CdlManualPaymentResult> {
-        if (!amount || amount <= 0) {
-            throw new ValidationError('amount', 'Payment amount must be greater than zero');
-        }
-
         const account = await loansRepository.findAccountByIdOrThrow(loanId);
         assertAccountOwnership(callerId, account, callerRole);
+
+        // The payable amount is the EMI's, not the caller's. The customer app
+        // pays a whole EMI and sends no amount at all; a staff cash collection
+        // may send one, and it is checked against the real due before we take
+        // it. Trusting a client-supplied figure outright would let a customer
+        // settle a ₹4,212 EMI by asserting ₹1.
+        const emi = await prisma.emi_schedule.findUnique({ where: { id: emiId } });
+        if (!emi) throw new NotFoundError('EMI', emiId);
+        if (emi.loan_account_id !== loanId) {
+            throw new ValidationError('emiId', 'This EMI does not belong to the specified loan');
+        }
+
+        const dueAmount = Number(emi.emi_amount) + Number(emi.penalty_amount ?? 0);
+        const amount = requestedAmount ?? dueAmount;
+
+        if (amount <= 0) {
+            throw new ValidationError('amount', 'Payment amount must be greater than zero');
+        }
+        if (amount > dueAmount) {
+            throw new ValidationError(
+                'amount',
+                `Payment amount ₹${amount.toLocaleString('en-IN')} exceeds the amount due on this EMI (₹${dueAmount.toLocaleString('en-IN')})`,
+            );
+        }
 
         const payment = await paymentsService.recordCashPayment({
             loanAccountId: loanId,

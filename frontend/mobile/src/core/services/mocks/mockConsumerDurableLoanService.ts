@@ -3,14 +3,15 @@ import type { DocumentUploadResult } from '@/src/entities/document';
 import { calculateEMI } from '@/src/core/utils/formatters';
 import type { EMISchedule, Loan } from '@/src/entities/loan';
 import {
-  ageFromDob,
   cdlAutoDebitLabel,
   cdlCalculateFoir,
+  cdlProcessingFee,
   evaluateCdlApplication,
   CDL_DEFAULT_AUTO_DEBIT_DATE,
   CDL_DEFAULT_INTEREST_RATE,
   CDL_FOIR_MAX,
   CDL_FOIR_REJECT,
+  CDL_MAX_LOAN_AMOUNT,
 } from '@/src/entities/consumerDurableLoan';
 import type {
   CdlAgentReviewDecision,
@@ -28,6 +29,7 @@ import type {
   CdlNachResult,
   CdlOverdueStatus,
   CdlPaymentFailure,
+  CdlQuoteResult,
 } from '@/src/entities/consumerDurableLoan';
 import type { IConsumerDurableLoanService } from '../interfaces/IConsumerDurableLoanService';
 import {
@@ -51,17 +53,60 @@ function mockCibilFor(monthlyIncome: number): number {
   return 668;                             // reject
 }
 
+/**
+ * Application facts the server holds and the client no longer sends. Set on
+ * submitApplication, read by the credit assessment/decision mocks — the mock
+ * equivalent of the API reading its own loan_applications row.
+ */
+let lastSubmitted: {
+  loanAmount: number;
+  employmentType: string;
+  tenureMonths: number;
+} | null = null;
+
 export const mockConsumerDurableLoanService: IConsumerDurableLoanService = {
+  // Mirrors the API's /quote: EMI and fee come from the shared CDL policy
+  // module, never from a formula local to a screen.
+  async getQuote(input): Promise<CdlQuoteResult> {
+    const interestRate = input.interestRate ?? CDL_DEFAULT_INTEREST_RATE;
+    return mockDelay(
+      {
+        loanAmount: input.loanAmount,
+        tenureMonths: input.tenureMonths,
+        interestRate,
+        emi: calculateEMI(input.loanAmount, interestRate, input.tenureMonths),
+        processingFee: cdlProcessingFee(input.loanAmount),
+        maxEligibleLoan: Math.min(
+          input.productValue - input.downPayment,
+          CDL_MAX_LOAN_AMOUNT,
+        ),
+      },
+      250,
+    );
+  },
+
   async submitApplication(input: CdlApplicationInput): Promise<CdlApplicationResult> {
+    const interestRate = input.interestRate ?? CDL_DEFAULT_INTEREST_RATE;
+    // The canonical credit-assessment/decision requests carry only income
+    // fields — the server reads the loan amount and employment type back from
+    // the application row. The mock remembers them here for the same reason,
+    // so both paths decide on server-held facts rather than client assertions.
+    lastSubmitted = {
+      loanAmount: input.loanAmount,
+      employmentType: input.employmentType,
+      tenureMonths: input.tenureMonths,
+    };
     return mockDelay(
       {
         applicationId: ref('CDL-APP'),
         status: 'submitted',
         productName: input.productName,
-        amount: input.amount,
-        tenure: input.tenure,
-        emi: input.emi,
-        interestRate: input.interestRate ?? CDL_DEFAULT_INTEREST_RATE,
+        amount: input.loanAmount,
+        tenure: input.tenureMonths,
+        // The API computes the EMI; the mock does the same rather than
+        // echoing one back, since the canonical request no longer carries it.
+        emi: calculateEMI(input.loanAmount, interestRate, input.tenureMonths),
+        interestRate,
       },
       1200,
     );
@@ -121,11 +166,13 @@ export const mockConsumerDurableLoanService: IConsumerDurableLoanService = {
     return cdlCalculateFoir(input);
   },
 
+  // Canonical input: the three income fields the API actually accepts. The
+  // score, age band and loan ceiling are server-derived — the mock derives
+  // them here for the same reason, so the mock and live paths agree on what a
+  // client is allowed to assert.
   async runCreditAssessment(applicationId, input): Promise<CdlCreditAssessment> {
     const monthlyIncome = input.monthlyIncome || 0;
-    // Prefer the obligations the agent captured; fall back to a 15% estimate.
-    const existingObligations =
-      input.existingObligations ?? Math.round(monthlyIncome * 0.15);
+    const existingObligations = input.existingEmis;
     const foir = cdlCalculateFoir({
       monthlyIncome,
       existingObligations,
@@ -138,7 +185,7 @@ export const mockConsumerDurableLoanService: IConsumerDurableLoanService = {
       {
         applicationId,
         employmentVerified: true,
-        employmentType: input.employmentType || 'salaried',
+        employmentType: '',
         annualIncome: monthlyIncome * 12,
         monthlyIncome,
         cibilScore: mockCibilFor(monthlyIncome),
@@ -147,23 +194,26 @@ export const mockConsumerDurableLoanService: IConsumerDurableLoanService = {
         foir,
         foirLimit: CDL_FOIR_MAX,
         foirStatus,
-        age: input.dob ? ageFromDob(input.dob) : undefined,
-        loanAmount: input.loanAmount,
       },
       1700,
     );
   },
 
-  async getCreditDecision(applicationId, assessment): Promise<CdlCreditDecision> {
+  // Canonical input — the same three income fields as the assessment. The
+  // decision inputs the API does not accept from a client (CIBIL score, age,
+  // customer type, loan ceiling) are derived here, matching the live path
+  // where the server reads them from the application and the bureau record.
+  async getCreditDecision(applicationId, input): Promise<CdlCreditDecision> {
     // The full 4.1–4.4 matrix lives in the policy module.
+    const loanAmount = lastSubmitted?.loanAmount ?? 0;
     const result = evaluateCdlApplication({
-      customerType: assessment.employmentType,
-      age: assessment.age,
-      monthlyIncome: assessment.monthlyIncome,
-      existingObligations: assessment.existingObligations,
-      proposedEmi: assessment.proposedEmi,
-      loanAmount: assessment.loanAmount ?? 0,
-      cibilScore: assessment.cibilScore,
+      customerType: (lastSubmitted?.employmentType ?? 'SALARIED').toLowerCase(),
+      age: undefined,
+      monthlyIncome: input.monthlyIncome,
+      existingObligations: input.existingEmis,
+      proposedEmi: input.proposedEmi,
+      loanAmount,
+      cibilScore: mockCibilFor(input.monthlyIncome),
     });
 
     return mockDelay(
@@ -172,7 +222,7 @@ export const mockConsumerDurableLoanService: IConsumerDurableLoanService = {
         decision: result.outcome,
         cibilScore: result.cibilScore,
         foir: result.foir,
-        approvedAmount: assessment.loanAmount ?? 0,
+        approvedAmount: result.outcome === 'rejected' ? 0 : loanAmount,
         reason: result.summary,
         reasons: result.reasons,
         requiresAgentReview: result.outcome === 'flagged',
@@ -185,7 +235,10 @@ export const mockConsumerDurableLoanService: IConsumerDurableLoanService = {
     await mockDelay(null, 900);
   },
 
-  async generateAgreement(applicationId, input): Promise<CdlAgreementResult> {
+  // No body — the API reads the approved terms from the application row.
+  async generateAgreement(applicationId): Promise<CdlAgreementResult> {
+    const loanAmount = lastSubmitted?.loanAmount ?? 0;
+    const tenure = lastSubmitted?.tenureMonths ?? 0;
     return mockDelay(
       {
         agreementId: ref('CDL-AGR'),
@@ -193,71 +246,80 @@ export const mockConsumerDurableLoanService: IConsumerDurableLoanService = {
         stampRef: ref('NESL'),
         esignRef: ref('EMD'),
         s3Url: `s3://fuehrer-agreements/${applicationId}.pdf`,
-        amount: input.amount,
-        tenure: input.tenure,
-        emi: input.emi,
-        interestRate: input.interestRate ?? CDL_DEFAULT_INTEREST_RATE,
+        amount: loanAmount,
+        tenure,
+        emi: tenure ? calculateEMI(loanAmount, CDL_DEFAULT_INTEREST_RATE, tenure) : 0,
+        interestRate: CDL_DEFAULT_INTEREST_RATE,
       },
       1300,
     );
   },
 
   async registerNachMandate(_applicationId, input): Promise<CdlNachResult> {
+    const tenure = lastSubmitted?.tenureMonths ?? 0;
     return mockDelay(
       {
         mandateId: ref('RP-NACH'),
         status: 'completed',
-        debitDate: cdlAutoDebitLabel(input.autoDebitDate ?? CDL_DEFAULT_AUTO_DEBIT_DATE),
-        emi: input.emi,
+        debitDate: cdlAutoDebitLabel(input.preferredDebitDay ?? CDL_DEFAULT_AUTO_DEBIT_DATE),
+        emi: tenure
+          ? calculateEMI(lastSubmitted?.loanAmount ?? 0, CDL_DEFAULT_INTEREST_RATE, tenure)
+          : 0,
+        // Masking is a display concern — the mock echoes what was actually sent.
         bankAccount: input.bankAccount,
       },
       1400,
     );
   },
 
+  // Activation is part of disbursal now — POST /loans (activateLoan) was
+  // removed from the API, which transitions DISBURSED → ACTIVE itself on
+  // payout confirmation. The schedule/runtime-loan setup that used to live in
+  // activateLoan happens here so the mock flow matches that behaviour.
   async disburseToMerchant(_applicationId, input): Promise<CdlDisbursalResult> {
     const seq = Date.now().toString().slice(-5);
+    const loanAccountId = `CDL-2026-${seq}`;
+    const disbursedAt = new Date();
+    const rate = CDL_DEFAULT_INTEREST_RATE;
+    const tenure = lastSubmitted?.tenureMonths ?? 0;
+    const principal = lastSubmitted?.loanAmount ?? input.amount;
+
+    if (tenure > 0) {
+      const schedule = generateCdlSchedule(
+        loanAccountId,
+        principal,
+        tenure,
+        disbursedAt,
+        rate,
+        CDL_DEFAULT_AUTO_DEBIT_DATE,
+      );
+      const loan: Loan = {
+        id: loanAccountId,
+        type: 'consumer_durable',
+        amount: principal,
+        emi: calculateEMI(principal, rate, tenure),
+        tenure,
+        status: 'active',
+        disbursedAt: disbursedAt.toISOString().slice(0, 10),
+        nextDueDate: schedule[0]?.dueDate ?? disbursedAt.toISOString().slice(0, 10),
+        outstandingAmount: principal,
+        applicationStatus: 'repayment',
+        bankAccount: input.merchantName,
+      };
+      addRuntimeLoan(loan, schedule);
+    }
+
     return mockDelay(
       {
         payoutId: ref('RP-PAYOUT'),
         status: 'completed',
         amount: input.amount,
         merchantName: input.merchantName,
-        loanAccountId: `CDL-2026-${seq}`,
-        disbursedAt: new Date().toISOString(),
+        loanAccountId,
+        disbursedAt: disbursedAt.toISOString(),
       },
       1500,
     );
-  },
-
-  async activateLoan(input): Promise<Loan> {
-    const disbursedAt = new Date();
-    const rate = input.interestRate ?? CDL_DEFAULT_INTEREST_RATE;
-    const debitDate = input.autoDebitDate ?? CDL_DEFAULT_AUTO_DEBIT_DATE;
-    const schedule = generateCdlSchedule(
-      input.loanAccountId,
-      input.amount,
-      input.tenure,
-      disbursedAt,
-      rate,
-      debitDate,
-    );
-    const emi = calculateEMI(input.amount, rate, input.tenure);
-    const loan: Loan = {
-      id: input.loanAccountId,
-      type: 'consumer_durable',
-      amount: input.amount,
-      emi,
-      tenure: input.tenure,
-      status: 'active',
-      disbursedAt: disbursedAt.toISOString().slice(0, 10),
-      nextDueDate: schedule[0]?.dueDate ?? disbursedAt.toISOString().slice(0, 10),
-      outstandingAmount: input.amount,
-      applicationStatus: 'repayment',
-      bankAccount: input.merchantName ?? 'Merchant payout',
-    };
-    addRuntimeLoan(loan, schedule);
-    return mockDelay(loan, 600);
   },
 
   async getEmiSchedule(loanId: string): Promise<EMISchedule[]> {
