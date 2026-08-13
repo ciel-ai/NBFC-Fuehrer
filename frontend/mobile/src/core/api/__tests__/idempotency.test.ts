@@ -57,7 +57,11 @@ describe('money-movement real services attach the Idempotency-Key', () => {
   });
 
   it('cdl: registerNachMandate + disburseToMerchant + processManualPayment', async () => {
-    await realConsumerDurableLoanService.registerNachMandate('a', { emi: 1, bankAccount: 'x' }, 'k-nach');
+    await realConsumerDurableLoanService.registerNachMandate(
+      'a',
+      { bankAccount: '123456789012', ifsc: 'HDFC0001234' },
+      'k-nach',
+    );
     await realConsumerDurableLoanService.disburseToMerchant('a', { amount: 1, merchantName: 'm' }, 'k-disb');
     await realConsumerDurableLoanService.processManualPayment('L1', 'e1', 'k-pay');
     expect(configOf(0)).toEqual({ headers: { [HEADER]: 'k-nach' } });

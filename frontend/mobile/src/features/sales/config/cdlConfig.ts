@@ -62,7 +62,7 @@ const rateOptionsFor = (values: SalesFormValues): SalesFieldOption[] =>
 
 const emiFor = (values: SalesFormValues): number => {
   const amount = Number(values.loanAmount);
-  const tenure = Number(values.tenure);
+  const tenure = Number(values.tenureMonths);
   const rate = Number(values.interestRate);
   if (!amount || !tenure || Number.isNaN(rate)) return 0;
   return calculateEMI(amount, rate, tenure);
@@ -217,7 +217,7 @@ export const cdlConfig: SalesProductConfig = {
               : `Net salary after deductions · minimum ${inr(CDL_MIN_MONTHLY_INCOME)}`,
         },
         // 5. Existing EMIs feed the FOIR calculation.
-        { name: 'existingEmi', label: 'Existing EMIs (monthly)', type: 'currency', prefix: '₹', placeholder: '5000', helper: 'Total EMI on all current obligations. Enter 0 if none.' },
+        { name: 'existingEmis', label: 'Existing EMIs (monthly)', type: 'currency', prefix: '₹', placeholder: '5000', helper: 'Total EMI on all current obligations. Enter 0 if none.' },
         { name: 'workExperienceYears', label: 'Work Experience (years)', type: 'number', placeholder: '3' },
       ],
       schema: z.object({
@@ -227,7 +227,7 @@ export const cdlConfig: SalesProductConfig = {
           CDL_MIN_MONTHLY_INCOME,
           `Minimum monthly income is ${inr(CDL_MIN_MONTHLY_INCOME)}`,
         ),
-        existingEmi: amountSchema(0, 'Enter existing EMIs (0 if none)'),
+        existingEmis: amountSchema(0, 'Enter existing EMIs (0 if none)'),
         workExperienceYears: positiveNumberSchema('Enter work experience'),
       }),
     },
@@ -284,7 +284,7 @@ export const cdlConfig: SalesProductConfig = {
           helper: `${inr(CDL_MIN_LOAN_AMOUNT)} – ${inr(CDL_MAX_LOAN_AMOUNT)}`,
         },
         {
-          name: 'tenure',
+          name: 'tenureMonths',
           label: 'Tenure',
           type: 'select',
           placeholder: 'Select tenure',
@@ -328,7 +328,7 @@ export const cdlConfig: SalesProductConfig = {
           },
           helperFrom: (v) => {
             const emi = emiFor(v);
-            const tenure = Number(v.tenure);
+            const tenure = Number(v.tenureMonths);
             if (!emi || !tenure) return 'Set amount, tenure and rate to see the EMI';
             return Number(v.interestRate) === 0
               ? `No-cost EMI · ${inr(emi)} × ${tenure} months`
@@ -343,7 +343,7 @@ export const cdlConfig: SalesProductConfig = {
             const income = Number(v.monthlyIncome);
             const emi = emiFor(v);
             if (!income || !emi) return '—';
-            const foir = ((Number(v.existingEmi) || 0) + emi) / income * 100;
+            const foir = ((Number(v.existingEmis) || 0) + emi) / income * 100;
             return `${Math.round(foir * 10) / 10}%`;
           },
           helper: '(Existing EMIs + Proposed EMI) ÷ Net Monthly Income × 100 · limit 60%',
@@ -358,7 +358,7 @@ export const cdlConfig: SalesProductConfig = {
             CDL_MAX_LOAN_AMOUNT,
             `Loan amount cannot exceed ${inr(CDL_MAX_LOAN_AMOUNT)}`,
           ),
-          tenure: requiredSelect('a tenure'),
+          tenureMonths: requiredSelect('a tenure'),
           interestRate: requiredSelect('an interest rate'),
           downPayment: z.union([amountSchema(0), z.literal('')]).optional(),
           // Carried in from earlier steps so we can cross-validate.

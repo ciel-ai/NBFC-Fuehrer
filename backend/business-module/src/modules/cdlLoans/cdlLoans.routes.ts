@@ -1,10 +1,11 @@
 // src/modules/cdlLoans/cdlLoans.routes.ts
 import { Router } from 'express';
 import { cdlLoansController } from './cdlLoans.controller';
-import { requireAuth, allowRoles, validateBody, validateParams, validateAll } from '@/middlewares';
+import { requireAuth, allowRoles, validateBody, validateParams, validateQuery, validateAll } from '@/middlewares';
 import { idempotency } from '@/middlewares/idempotency.middleware';
 import { ROLE } from '@/config/constants';
 import {
+    cdlQuoteSchema,
     cdlSubmitApplicationSchema,
     cdlCreditAssessmentSchema,
     cdlCreditDecisionSchema,
@@ -42,6 +43,15 @@ const A = ROLE.SUPER_ADMIN;
 // POST /loans (activateLoan) removed — activation is automatic now, see
 // disburseToMerchant (sync) and disbursement.service.ts's
 // _completeDisbursement (async webhook confirmation).
+// GET /quote — authoritative EMI + processing fee for the product-details
+// screen. A read: no idempotency(), nothing created. Declared before
+// /applications/:id routes so 'quote' is never read as an application id.
+router.get(
+    '/quote',
+    requireAuth(), allowRoles(C),
+    validateQuery(cdlQuoteSchema),
+    cdlLoansController.quote,
+);
 router.post(
     '/applications',
     requireAuth(), allowRoles(C),

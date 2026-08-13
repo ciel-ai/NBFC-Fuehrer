@@ -22,11 +22,14 @@ interface BackendAppRow {
   referenceNumber: string | null;
   status: string;
   amountRequested: number; // paise (moneyConverter middleware)
-  approvedAmount: number | null;
+  approvedAmount: number | null; // paise
   tenureMonths: number;
   interestRate: number | null;
   productType: string;
   purpose: string;
+  // CDL only. Null on gold/housing rows, and on CDL rows created before the
+  // product_name column existed — hence the `?? purpose` fallback below.
+  productName?: string | null;
   storeName: string;
   storeCity: string;
   appliedAt: string;
@@ -70,7 +73,10 @@ function mapApp(r: BackendAppRow): LoanApplication {
       amount: rupees(r.approvedAmount ?? r.amountRequested),
       tenureMonths: r.tenureMonths,
       interestRate: r.interestRate ?? 0,
+      // Legacy CDL rows kept the product name in `purpose`; new ones keep the
+      // loan's real purpose there and the item in productName.
       purpose: r.purpose,
+      ...(r.productName ? { productName: r.productName } : {}),
       emi: 0,
       scheme: 'Standard',
     },
@@ -127,9 +133,13 @@ export function useApplications(): {
 // so the existing tabs render "—"/empty instead of crashing.
 
 interface BackendAppDetail extends BackendAppRow {
-  monthlyEmi: number | null;
-  processingFee: number | null;
-  monthlyIncome: number | null;
+  monthlyEmi: number | null; // paise
+  processingFee: number | null; // paise
+  monthlyIncome: number | null; // paise
+  // CDL product details — null for gold/housing, which finance no product.
+  productName: string | null;
+  productValue: number | null; // paise
+  downPayment: number | null; // paise
   rejectionReason: string | null;
   reviewedAt: string | null;
   customer: {
@@ -161,6 +171,11 @@ function mapAppDetail(r: BackendAppDetail): LoanApplication {
     loan: {
       ...((base as unknown as { loan: object }).loan as object),
       emi: rupees(r.monthlyEmi),
+      // The financed item, from its own columns rather than the generic
+      // `purpose` field CDL used to overload.
+      ...(r.productName ? { productName: r.productName } : {}),
+      ...(r.productValue != null ? { productValue: rupees(r.productValue) } : {}),
+      ...(r.downPayment != null ? { downPayment: rupees(r.downPayment) } : {}),
     },
     customer: {
       name: custName,

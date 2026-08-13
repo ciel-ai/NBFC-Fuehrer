@@ -64,6 +64,22 @@ export interface LoanApplication {
     // "clarification required", not yet a settled policy to implement).
     preferredDebitDay?: number | null;
 
+    // ── Consumer-durable product details ──────────────────────────────────
+    // Only CDL applications populate these; gold and housing finance no
+    // product and leave them null. productValue is the item's invoice value,
+    // NOT the principal — amountRequested = productValue - downPayment.
+    // See migration 20260813000000_add_cdl_product_fields.
+    /**
+     * The financed item, as typed by the customer. Distinct from `purpose`:
+     * that is the generic loan-purpose field shared with gold and housing.
+     * CDL writes both (purpose for backward compatibility with the admin list
+     * and CAM document, productName as the real field).
+     */
+    productName?: string | null;
+    productValue?: Rupees | null;
+    downPayment?: Rupees | null;
+    productCategory?: string | null;
+
     // Approval details — populated by credit manager
     approvedAmount: Rupees | null;
     interestRate: number | null;
@@ -173,6 +189,10 @@ export interface LoanApplicationResponse {
     processingFee: Rupees | null;
     productType: ProductType;
     purpose: string;
+    // CDL product details — null for gold/housing.
+    productName: string | null;
+    productValue: Rupees | null;
+    downPayment: Rupees | null;
     storeName: string;
     storeCity: string;
     monthlyIncome: number | null;

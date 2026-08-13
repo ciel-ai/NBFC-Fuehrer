@@ -1,5 +1,5 @@
 import type { DocumentUploadResult } from '@/src/entities/document';
-import type { EMISchedule, Loan } from '@/src/entities/loan';
+import type { EMISchedule } from '@/src/entities/loan';
 import type {
   CdlAgentReviewDecision,
   CdlAgreementResult,
@@ -8,53 +8,64 @@ import type {
   CdlClosureResult,
   CdlComplianceResult,
   CdlCreditAssessment,
+  CdlCreditAssessmentInput,
   CdlCreditDecision,
   CdlDisbursalResult,
   CdlFoirInput,
   CdlKycResult,
   CdlManualPaymentResult,
+  CdlNachInput,
   CdlNachResult,
   CdlOverdueStatus,
   CdlPaymentFailure,
+  CdlQuoteInput,
+  CdlQuoteResult,
 } from '@/src/entities/consumerDurableLoan';
 
 export interface IConsumerDurableLoanService {
+  /**
+   * Authoritative EMI + processing fee for the product-details screen.
+   * The app must not compute either itself: a second implementation can
+   * disagree with the one that books the loan, and the customer would be
+   * shown a figure the loan is not written at.
+   */
+  getQuote(input: CdlQuoteInput): Promise<CdlQuoteResult>;
+
   // LOS
   submitApplication(input: CdlApplicationInput): Promise<CdlApplicationResult>;
   /** Uploads a captured KYC/collateral document against the application. */
   uploadDocument(applicationId: string, uri: string, type: string): Promise<DocumentUploadResult>;
   runKycChecks(applicationId: string): Promise<CdlKycResult>;
   runComplianceChecks(applicationId: string): Promise<CdlComplianceResult>;
+  // The API takes exactly three income fields and derives everything else
+  // server-side — the CIBIL score from the bureau-verified kyc_documents row,
+  // the FOIR limit and the auto-approval ceiling from its own policy. The app
+  // used to post its whole CdlCreditAssessment view model here (cibilScore,
+  // foirLimit, age, employmentType, loanAmount…); stripUnknown deleted all of
+  // it, and `existingObligations` was dropped while the required
+  // `existingEmis` arrived missing.
   runCreditAssessment(
     applicationId: string,
-    input: {
-      monthlyIncome: number;
-      employmentType: string;
-      proposedEmi: number;
-      /** Existing EMIs captured on the occupation step — drives FOIR. */
-      existingObligations?: number;
-      /** Needed to apply the ₹40k auto-approval ceiling (4.1). */
-      loanAmount?: number;
-      /** Needed to apply the 21–55 age band (4.1). */
-      dob?: string;
-    },
+    input: CdlCreditAssessmentInput,
   ): Promise<CdlCreditAssessment>;
   /** Pure FOIR calculation — kept synchronous so screens can recompute live. */
   calculateFOIR(input: CdlFoirInput): number;
   getCreditDecision(
     applicationId: string,
-    assessment: CdlCreditAssessment,
+    input: CdlCreditAssessmentInput,
   ): Promise<CdlCreditDecision>;
   submitAgentReviewDecision(decision: CdlAgentReviewDecision): Promise<void>;
 
   // Agreement → NACH → Disbursal
-  generateAgreement(
-    applicationId: string,
-    input: { amount: number; tenure: number; emi: number; interestRate?: number },
-  ): Promise<CdlAgreementResult>;
+  /**
+   * Takes no body — the route validates :id only and the service reads the
+   * approved terms from the application row. The app used to post amount,
+   * tenure, emi and interestRate, all of which were ignored.
+   */
+  generateAgreement(applicationId: string): Promise<CdlAgreementResult>;
   registerNachMandate(
     applicationId: string,
-    input: { emi: number; bankAccount: string; autoDebitDate?: number },
+    input: CdlNachInput,
     idempotencyKey?: string,
   ): Promise<CdlNachResult>;
   disburseToMerchant(
@@ -64,8 +75,11 @@ export interface IConsumerDurableLoanService {
   ): Promise<CdlDisbursalResult>;
 
   // LMS
-  activateLoan(input: CdlApplicationInput & { loanAccountId: string }): Promise<Loan>;
   getEmiSchedule(loanId: string): Promise<EMISchedule[]>;
+  /**
+   * Pays one EMI. No amount is sent: the API resolves the payable figure from
+   * the EMI row itself, so a client cannot understate what it owes.
+   */
   processManualPayment(
     loanId: string,
     emiId: string,

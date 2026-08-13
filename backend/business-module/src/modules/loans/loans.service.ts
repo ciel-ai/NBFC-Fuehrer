@@ -120,6 +120,12 @@ function toApplicationResponse(
         processingFee: app.processingFee ?? null,
         productType: app.productType,
         purpose: app.purpose,
+        // CDL product details — null for gold/housing, which finance no
+        // product. productName is the real field; `purpose` above still
+        // carries a copy for the screens that already read it.
+        productName: app.productName ?? null,
+        productValue: app.productValue ?? null,
+        downPayment: app.downPayment ?? null,
         storeName: app.storeName,
         storeCity: app.storeCity,
         monthlyIncome: app.monthlyIncome ?? null,

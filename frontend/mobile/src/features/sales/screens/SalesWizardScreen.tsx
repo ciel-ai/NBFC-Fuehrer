@@ -220,8 +220,14 @@ export function SalesWizardScreen({ product }: { product: SalesProduct }) {
           {isLast && submit.isError ? (
             <View style={styles.errorBanner} accessibilityLiveRegion="polite">
               <Ionicons name="alert-circle" size={scale(18)} color={Colors.error} />
+              {/* The API's own message — validation failures, an unknown
+                  customer, a duplicate application and business-rule
+                  rejections each say what actually went wrong. A blanket
+                  "check your connection" hid all of them. */}
               <Text style={styles.errorBannerText}>
-                Submission failed. Please check your connection and try again.
+                {submit.error?.message?.trim()
+                  ? submit.error.message
+                  : 'Submission failed. Please check your connection and try again.'}
               </Text>
             </View>
           ) : null}

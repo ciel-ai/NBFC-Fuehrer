@@ -71,8 +71,15 @@ router.get('/summary', requireAuth(), allowRoles(...CREDIT_ROLES), async (_req: 
     } catch (err) { next(err); }
 });
 
-// POST /applications/:id/credit-decision
-// { decision: APPROVED|REJECTED, riskGrade, remarks, approvedAmount?, approvedTenure?, approvedRate?, reason? }
+// POST /credit/decision/:id
+// { decision: APPROVED|REJECTED, approvedAmount?, approvedRate?, processingFee?, reason? }
+//
+// This comment previously advertised riskGrade, remarks and approvedTenure as
+// part of the contract. The handler reads none of them and there is nowhere to
+// store them, so an admin sending them would have seen them vanish — the
+// dashboard does not send them, and the documented contract now matches what
+// the handler actually accepts. `approvedRate` is the wire name for what the
+// service calls interestRate; the mapping is done explicitly below.
 router.post('/decision/:id', requireAuth(), allowRoles(...CREDIT_ROLES), async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
         const { id } = req.params;

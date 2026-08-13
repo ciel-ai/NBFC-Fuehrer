@@ -13,7 +13,6 @@ import { formatCurrency, formatTenure } from '@/src/core/utils/formatters';
 import { useServices } from '@/src/core/services/ServiceProvider';
 import {
   cdlAutoDebitLabel,
-  cdlProcessingFee,
   CDL_DEFAULT_AUTO_DEBIT_DATE,
   CDL_DEFAULT_INTEREST_RATE,
   type CdlAgreementResult,
@@ -38,8 +37,11 @@ export default function CdlAgreementScreen() {
   const tenure = Number(params.tenure ?? 12);
   const emi = Number(params.emi ?? 0);
   const interestRate = params.interestRate ? Number(params.interestRate) : CDL_DEFAULT_INTEREST_RATE;
-  const autoDebitDate = params.debitDate ? Number(params.debitDate) : CDL_DEFAULT_AUTO_DEBIT_DATE;
-  const processingFee = params.processingFee ? Number(params.processingFee) : cdlProcessingFee(amount);
+  const preferredDebitDay = params.debitDate ? Number(params.debitDate) : CDL_DEFAULT_AUTO_DEBIT_DATE;
+  // Carried from the product screen, which got it from the API's /quote. No
+  // local fallback: recomputing the fee here would be a second implementation
+  // that can disagree with the one the loan is actually booked at.
+  const processingFee = params.processingFee ? Number(params.processingFee) : 0;
 
   const sign = async () => {
     if (otp !== '123456') {
@@ -49,9 +51,10 @@ export default function CdlAgreementScreen() {
     }
     setLoading(true);
     try {
+      // No body — the API reads the approved terms from the application row.
+      // The amount/tenure/emi/interestRate this used to post were ignored.
       const data = await consumerDurableLoanService.generateAgreement(
         params.applicationId ?? 'cdl_mock_application',
-        { amount, tenure, emi, interestRate },
       );
       setAgreement(data);
       setStep('signed');
@@ -91,7 +94,7 @@ export default function CdlAgreementScreen() {
                 ['Processing fee', processingFee > 0 ? formatCurrency(processingFee) : '—'],
                 ['Tenure', formatTenure(tenure)],
                 ['Monthly EMI', formatCurrency(emi)],
-                ['Auto-debit', cdlAutoDebitLabel(autoDebitDate)],
+                ['Auto-debit', cdlAutoDebitLabel(preferredDebitDay)],
               ].map(([label, value], index, arr) => (
                 <View key={label}>
                   <View style={styles.row}>

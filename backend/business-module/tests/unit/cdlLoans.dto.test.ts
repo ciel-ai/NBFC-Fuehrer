@@ -30,7 +30,7 @@ const OPTS = { abortEarly: false, stripUnknown: true, convert: true };
 const validApplication = {
     productCategory: 'MOBILES_TABLETS',
     productName: 'Smartphone XYZ',
-    productPrice: 30000,
+    productValue: 30000,
     downPayment: 5000,
     loanAmount: 25000,
     tenureMonths: 12,
@@ -74,16 +74,16 @@ describe('cdlSubmitApplicationSchema', () => {
         expect(error).toBeDefined();
     });
 
-    test('rejects an autoDebitDate that is not one of the three allowed dates', () => {
+    test('rejects a preferredDebitDay that is not one of the three allowed dates', () => {
         const { error } = cdlSubmitApplicationSchema.validate(
-            { ...validApplication, autoDebitDate: 15 }, OPTS,
+            { ...validApplication, preferredDebitDay: 15 }, OPTS,
         );
         expect(error).toBeDefined();
     });
 
-    test('accepts a valid autoDebitDate', () => {
+    test('accepts a valid preferredDebitDay', () => {
         const { error } = cdlSubmitApplicationSchema.validate(
-            { ...validApplication, autoDebitDate: 7 }, OPTS,
+            { ...validApplication, preferredDebitDay: 7 }, OPTS,
         );
         expect(error).toBeUndefined();
     });

@@ -43,9 +43,16 @@ export default function CdlNachScreen() {
   const setupNach = async () => {
     setLoading(true);
     try {
+      // The real account number and the IFSC the screen already validates.
+      // This previously sent a masked display string ("****1234") and no IFSC
+      // at all — the mandate cannot be registered against either.
       const data = await consumerDurableLoanService.registerNachMandate(
         params.applicationId ?? 'cdl_mock_application',
-        { emi, bankAccount: `****${accountNumber.slice(-4)}`, autoDebitDate: debitDate },
+        {
+          bankAccount: accountNumber,
+          ifsc,
+          preferredDebitDay: debitDate as 4 | 7 | 12,
+        },
         getKey(),
       );
       setResult(data);

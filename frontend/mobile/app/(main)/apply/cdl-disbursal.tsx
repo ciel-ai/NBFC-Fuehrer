@@ -29,7 +29,6 @@ export default function CdlDisbursalScreen() {
 
   const amount = Number(params.loanAmount ?? 0);
   const tenure = Number(params.tenure ?? 12);
-  const emi = Number(params.emi ?? 0);
   const merchantName = params.merchantName ?? `${params.productName ?? 'Authorized'} Merchant`;
 
   useEffect(() => {
@@ -38,20 +37,15 @@ export default function CdlDisbursalScreen() {
     let mounted = true;
     const run = async () => {
       try {
+        // Disbursal activates the loan and creates the EMI schedule server-
+        // side. The separate activateLoan call this used to make hit POST
+        // /consumer-durable-loans/loans, an endpoint the API removed when
+        // activation became automatic — it had been a guaranteed 404.
         const disbursal = await consumerDurableLoanService.disburseToMerchant(
           params.applicationId ?? 'cdl_mock_application',
           { amount, merchantName },
           getKey(),
         );
-        // Activate the loan: creates the account + 12-month EMI schedule.
-        await consumerDurableLoanService.activateLoan({
-          productName: params.productName ?? 'Consumer Durable',
-          amount,
-          tenure,
-          emi,
-          merchantName,
-          loanAccountId: disbursal.loanAccountId,
-        });
         await queryClient.invalidateQueries({ queryKey: ['activeLoans'] });
         if (mounted) setStatus(disbursal);
       } catch {

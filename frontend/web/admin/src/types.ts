@@ -312,6 +312,10 @@ export interface LoanApplication {
     purpose: string;
     emi: number;
     scheme: string;
+    /** CDL only — the financed item and its invoice value. Absent otherwise. */
+    productName?: string;
+    productValue?: number;
+    downPayment?: number;
   };
   collateral?: {
     gold?: GoldCollateral;

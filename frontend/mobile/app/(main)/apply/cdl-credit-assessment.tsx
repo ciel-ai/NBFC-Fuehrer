@@ -36,15 +36,17 @@ export default function CdlCreditAssessmentScreen() {
     let mounted = true;
     const run = async () => {
       try {
+        // Canonical: the three income fields the API accepts. Employment
+        // type, loan amount, date of birth and the CIBIL score are read
+        // server-side from the application and the bureau record — sending
+        // them here achieved nothing, and `existingObligations` was dropped
+        // while the required `existingEmis` arrived missing.
         const data = await consumerDurableLoanService.runCreditAssessment(
           params.applicationId ?? 'cdl_mock_application',
           {
             monthlyIncome: Number(params.monthlyIncome ?? 0),
-            employmentType: params.employmentType ?? 'salaried',
+            existingEmis: Number(params.existingEmi ?? 0),
             proposedEmi: Number(params.emi ?? 0),
-            existingObligations: params.existingEmi ? Number(params.existingEmi) : undefined,
-            loanAmount: Number(params.loanAmount ?? 0),
-            dob: params.dob,
           },
         );
         if (mounted) setAssessment(data);
