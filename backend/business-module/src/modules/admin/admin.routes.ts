@@ -2,6 +2,7 @@
 import { Router } from 'express';
 import Joi from 'joi';
 import { adminController } from './admin.controller';
+import { migrationRouter } from '@/modules/migration';
 import {
     requireAuth,
     allowRoles,
@@ -172,5 +173,8 @@ router.patch(
     validateBody(Joi.object({ isActive: Joi.boolean().required() })),
     adminController.setCustomerActiveStatus,
 );
+
+// ─── Data migration monitoring ────────────────────────────────────────────────
+router.use('/migration', requireAuth(), allowRoles(...SUPER_ADMIN_ONLY), migrationRouter);
 
 export { router as adminRouter };
