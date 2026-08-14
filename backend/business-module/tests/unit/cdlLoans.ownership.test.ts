@@ -32,6 +32,7 @@ const mockLoanApplicationsUpdate = jest.fn();
 const mockKycDocumentsFindUnique = jest.fn();
 const mockCustomersFindUnique = jest.fn();
 const mockEmiScheduleAggregate = jest.fn();
+const mockEmiScheduleFindUnique = jest.fn();
 
 jest.mock('@/config/database', () => ({
     prisma: {
@@ -47,8 +48,9 @@ jest.mock('@/config/database', () => ({
             findUnique: (...args: unknown[]) => mockCustomersFindUnique(...args),
         },
         emi_schedule: {
-            aggregate: (...args: unknown[]) => mockEmiScheduleAggregate(...args),
-        },
+    aggregate: (...args: unknown[]) => mockEmiScheduleAggregate(...args),
+    findUnique: (...args: unknown[]) => mockEmiScheduleFindUnique(...args),
+},
     },
 }));
 
@@ -147,6 +149,12 @@ beforeEach(() => {
     mockGetSignedUrl.mockResolvedValue({ url: 'https://stub/doc.pdf', expiresAt: new Date() });
     mockGeneratePaymentReceipt.mockResolvedValue(Buffer.from('pdf-bytes'));
     mockGenerateClosureLetter.mockResolvedValue(Buffer.from('pdf-bytes'));
+    mockEmiScheduleFindUnique.mockResolvedValue({
+    id: 'emi-1',
+    loan_account_id: LOAN_ID,
+    emi_amount: 2233,
+    penalty_amount: 0,
+});
 });
 
 describe('CDL ownership checks — application-scoped methods', () => {

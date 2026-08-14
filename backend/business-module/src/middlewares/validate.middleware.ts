@@ -128,8 +128,9 @@ export const commonSchemas = {
 
     // IFSC code
     ifsc: Joi.string()
-        .pattern(/^[A-Z]{4}0[A-Z0-9]{6}$/)
-        .message('IFSC code is invalid'),
+    .uppercase()                                  
+    .pattern(/^[A-Z]{4}0[A-Z0-9]{6}$/)
+    .message('IFSC code is invalid'),
 
     // Loan amount in rupees (positive, max 2 decimal places)
     amount: Joi.number()

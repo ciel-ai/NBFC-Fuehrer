@@ -46,6 +46,15 @@ jest.mock('@/providers/docStorage', () => ({
     }),
 }));
 
+const mockEmiScheduleFindUnique = jest.fn();
+jest.mock('@/config/database', () => ({
+    prisma: {
+        emi_schedule: {
+            findUnique: (...args: unknown[]) => mockEmiScheduleFindUnique(...args),
+        },
+    },
+}));
+
 import { cdlLoansService } from '@/modules/cdlLoans/cdlLoans.service';
 import { ForbiddenError } from '@/errors';
 import { ROLE } from '@/config/constants';
@@ -59,6 +68,14 @@ const ownedAccount = { id: LOAN_ID, userId: OWNER_ID, status: 'ACTIVE', interest
 beforeEach(() => {
     jest.clearAllMocks();
     mockUpload.mockResolvedValue({ key: 'k', eTag: 'e' });
+
+    mockEmiScheduleFindUnique.mockResolvedValue({
+    id: 'emi-1',
+    loan_account_id: LOAN_ID,
+    emi_amount: 1000,
+    penalty_amount: 0,
+});
+
 });
 
 describe('processManualPayment — receipt generation (audit finding #14)', () => {
