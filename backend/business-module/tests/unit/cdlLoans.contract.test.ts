@@ -164,6 +164,29 @@ describe('CDL product and loan amount rules', () => {
         expect(withValues(80000, 20000, 60000).error).toBeUndefined();
     });
 
+    // Financing the whole remainder exactly — the boundary, not one rupee under.
+    test('₹80,000 product, ₹10,000 down, ₹70,000 loan is accepted and keeps every value', () => {
+        const { error, value } = cdlSubmitApplicationSchema.validate(
+            {
+                ...application,
+                productName: 'Samsung Galaxy S26',
+                productValue: 80000,
+                downPayment: 10000,
+                loanAmount: 70000,
+            },
+            OPTS,
+        );
+        expect(error).toBeUndefined();
+        expect(value.productName).toBe('Samsung Galaxy S26');
+        expect(value.productValue).toBe(80000);
+        expect(value.downPayment).toBe(10000);
+        expect(value.loanAmount).toBe(70000);
+    });
+
+    test('₹80,000 product, ₹10,000 down, ₹70,001 loan is rejected', () => {
+        expect(withValues(80000, 10000, 70001).error).toBeDefined();
+    });
+
     test('the same product with a ₹70,000 loan is rejected', () => {
         const { error } = withValues(80000, 20000, 70000);
         expect(error).toBeDefined();

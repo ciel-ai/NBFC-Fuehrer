@@ -18,6 +18,7 @@ import { Spacing, BorderRadius, Shadow } from '@/src/core/theme/spacing';
 import { Header } from '@/src/shared/components/common/Header';
 import { Button } from '@/src/shared/components/common/Button';
 import { scale } from '@/src/core/utils/responsive';
+import { usePersistApplyStepFromParams } from '@/src/features/apply/useApplyDraft';
 
 type LivenessState = 'idle' | 'capturing' | 'checking' | 'passed' | 'failed';
 
@@ -28,6 +29,9 @@ const LIVENESS_STEPS = [
 ];
 
 export default function KYCStep2Screen() {
+  // Saves a resumable draft for whichever flow threaded `applyFlow`.
+  // No-ops for flows that do not set it, so the gold path is unchanged.
+  usePersistApplyStepFromParams();
   const params = useLocalSearchParams<{
     productName?: string;
     loanAmount?: string;

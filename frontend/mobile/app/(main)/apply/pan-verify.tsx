@@ -20,6 +20,7 @@ import { Button } from '@/src/shared/components/common/Button';
 import { scale } from '@/src/core/utils/responsive';
 import { isValidPAN } from '@/src/core/utils/validators';
 import { maskPAN, sanitizeInput } from '@/src/core/utils/formatters';
+import { usePersistApplyStepFromParams } from '@/src/features/apply/useApplyDraft';
 
 type VerifyState = 'idle' | 'verifying' | 'success' | 'error';
 
@@ -30,6 +31,9 @@ const MOCK_PAN_RESULT = {
 };
 
 export default function PANVerifyScreen() {
+  // Saves a resumable draft for whichever flow threaded `applyFlow`.
+  // No-ops for flows that do not set it, so the gold path is unchanged.
+  usePersistApplyStepFromParams();
   const params = useLocalSearchParams<{ productName?: string; loanAmount?: string }>();
   const [pan, setPan] = useState('');
   const [verifyState, setVerifyState] = useState<VerifyState>('idle');

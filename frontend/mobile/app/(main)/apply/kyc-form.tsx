@@ -18,6 +18,7 @@ import { Spacing, BorderRadius } from '@/src/core/theme/spacing';
 import { Header } from '@/src/shared/components/common/Header';
 import { Button } from '@/src/shared/components/common/Button';
 import { NAME_REGEX } from '@/src/core/utils/validators';
+import { usePersistApplyStepFromParams } from '@/src/features/apply/useApplyDraft';
 
 type Gender = 'male' | 'female' | 'other';
 
@@ -150,6 +151,9 @@ const fi = StyleSheet.create({
 });
 
 export default function KYCFormScreen() {
+  // Saves a resumable draft for whichever flow threaded `applyFlow`.
+  // No-ops for flows that do not set it, so the gold path is unchanged.
+  usePersistApplyStepFromParams();
   const params = useLocalSearchParams<Record<string, string>>();
   const { productName, loanAmount, tenure, emi } = params;
 

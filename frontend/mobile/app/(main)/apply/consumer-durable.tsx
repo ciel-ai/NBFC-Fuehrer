@@ -200,6 +200,9 @@ export default function ConsumerDurableLoanScreen() {
         // kyc-form → address-employment → kyc-step-2 → cdl-kyc-verification
         // by `...params` spread, and submitted verbatim.
         params: {
+          // Lets the shared KYC screens save a resumable draft under the right
+          // flow — without it they cannot tell a CDL journey from a gold one.
+          applyFlow: 'cdl',
           productName: trimmedName,
           productValue: String(productValue),
           downPayment: String(downPayment),

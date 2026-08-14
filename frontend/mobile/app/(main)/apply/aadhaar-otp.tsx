@@ -19,6 +19,7 @@ import { Header } from '@/src/shared/components/common/Header';
 import { Button } from '@/src/shared/components/common/Button';
 import { scale } from '@/src/core/utils/responsive';
 import { formatCountdown } from '@/src/core/utils/formatters';
+import { usePersistApplyStepFromParams } from '@/src/features/apply/useApplyDraft';
 
 type Step = 'enter_aadhaar' | 'enter_otp' | 'verified';
 
@@ -31,6 +32,9 @@ function maskAadhaar(raw: string): string {
 }
 
 export default function AadhaarOTPScreen() {
+  // Saves a resumable draft for whichever flow threaded `applyFlow`.
+  // No-ops for flows that do not set it, so the gold path is unchanged.
+  usePersistApplyStepFromParams();
   const params = useLocalSearchParams<{
     productName?: string;
     loanAmount?: string;

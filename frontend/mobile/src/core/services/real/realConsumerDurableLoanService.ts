@@ -55,6 +55,9 @@ import type { IConsumerDurableLoanService } from '../interfaces/IConsumerDurable
 
 const base = '/consumer-durable-loans';
 
+/** Money fields the API serialises in paise. The app works in rupees. */
+const paiseToRupees = (paise: number): number => Math.round(paise) / 100;
+
 // ─── Wire response shapes ─────────────────────────────────────────────────────
 // Mirrors of the backend's result types. Declared here rather than imported
 // because the two codebases do not share a build; the contract test
@@ -264,9 +267,29 @@ function toCreditDecision(w: WireCreditDecision): CdlCreditDecision {
 }
 
 export const realConsumerDurableLoanService: IConsumerDurableLoanService = {
+  // ── Money units ──────────────────────────────────────────────────────────
+  // The API's moneyConverter middleware serialises money fields in PAISE, but
+  // it detects them by the words in the key: 'amount', 'fee', 'emi',
+  // 'balance', 'income', 'interest', 'principal'. So on this response `emi`,
+  // `processingFee` and `loanAmount` arrive in paise while `maxEligibleLoan`,
+  // `productValue` and `downPayment` — none of which contain a detected word —
+  // arrive in rupees.
+  //
+  // Normalising here rather than teaching the middleware new words on purpose:
+  // adding 'value' would also flip appraisedGoldValue / marketValue /
+  // estimatedValue on the gold-loan responses, which are not part of this
+  // change. The screen and the mock therefore both deal in rupees only.
   async getQuote(input: CdlQuoteInput): Promise<CdlQuoteResult> {
     const res = await api.get<CdlQuoteResult>(`${base}/quote`, { params: input });
-    return res.data;
+    const w = res.data;
+    return {
+      ...w,
+      loanAmount: paiseToRupees(w.loanAmount),
+      emi: paiseToRupees(w.emi),
+      processingFee: paiseToRupees(w.processingFee),
+      // Already rupees — not touched by the middleware.
+      maxEligibleLoan: w.maxEligibleLoan,
+    };
   },
 
   async submitApplication(input: CdlApplicationInput): Promise<CdlApplicationResult> {
@@ -276,9 +299,11 @@ export const realConsumerDurableLoanService: IConsumerDurableLoanService = {
       applicationId: w.applicationId,
       status: 'submitted',
       productName: w.productName,
-      amount: w.loanAmount,
+      // loanAmount and monthlyEmi are paise on the wire; interestRate is a
+      // rate, never converted. See the money-units note on getQuote.
+      amount: paiseToRupees(w.loanAmount),
       tenure: w.tenureMonths,
-      emi: w.monthlyEmi,
+      emi: paiseToRupees(w.monthlyEmi),
       interestRate: w.interestRate,
     };
   },

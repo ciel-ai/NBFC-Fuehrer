@@ -137,9 +137,15 @@ interface BackendAppDetail extends BackendAppRow {
   processingFee: number | null; // paise
   monthlyIncome: number | null; // paise
   // CDL product details — null for gold/housing, which finance no product.
+  //
+  // These two arrive in RUPEES, not paise. The moneyConverter middleware
+  // detects money by the words in the key ('amount', 'fee', 'emi', 'balance',
+  // 'income', 'interest', 'principal'); neither "productValue" nor
+  // "downPayment" contains one, so neither is converted. Dividing them by 100
+  // would show an ₹80,000 product as ₹800.
   productName: string | null;
-  productValue: number | null; // paise
-  downPayment: number | null; // paise
+  productValue: number | null; // rupees
+  downPayment: number | null; // rupees
   rejectionReason: string | null;
   reviewedAt: string | null;
   customer: {
@@ -174,8 +180,9 @@ function mapAppDetail(r: BackendAppDetail): LoanApplication {
       // The financed item, from its own columns rather than the generic
       // `purpose` field CDL used to overload.
       ...(r.productName ? { productName: r.productName } : {}),
-      ...(r.productValue != null ? { productValue: rupees(r.productValue) } : {}),
-      ...(r.downPayment != null ? { downPayment: rupees(r.downPayment) } : {}),
+      // Already rupees — see the note on BackendAppDetail.
+      ...(r.productValue != null ? { productValue: r.productValue } : {}),
+      ...(r.downPayment != null ? { downPayment: r.downPayment } : {}),
     },
     customer: {
       name: custName,

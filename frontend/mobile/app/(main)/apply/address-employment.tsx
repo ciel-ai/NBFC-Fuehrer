@@ -18,6 +18,7 @@ import { FontFamily, FontSize } from '@/src/core/theme/typography';
 import { Spacing, BorderRadius } from '@/src/core/theme/spacing';
 import { Header } from '@/src/shared/components/common/Header';
 import { Button } from '@/src/shared/components/common/Button';
+import { usePersistApplyStepFromParams } from '@/src/features/apply/useApplyDraft';
 
 // ---------------------------------------------------------------------------
 // Shared CAM capture step — the customer-facing Credit Approval Memo fields:
@@ -113,6 +114,9 @@ function ChipSelect<T extends string>({
 }
 
 export default function AddressEmploymentScreen() {
+  // Saves a resumable draft for whichever flow threaded `applyFlow`.
+  // No-ops for flows that do not set it, so the gold path is unchanged.
+  usePersistApplyStepFromParams();
   const params = useLocalSearchParams<Record<string, string>>();
   const nextPath = typeof params.camNextPath === 'string' && params.camNextPath ? params.camNextPath : 'pan-verify';
 

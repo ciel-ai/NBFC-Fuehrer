@@ -59,7 +59,10 @@ export function pickLatestDraft(map: ApplyDraftMap): CustomerApplyDraft | null {
 /** Human summary for the resume card, e.g. "Gold Loan · ₹1,50,000". */
 export function draftLabel(flow: ApplyFlow, params: Record<string, string>): string {
   const base = FLOW_LABELS[flow];
-  const amount = params.approvedAmount ?? params.maxLoan ?? params.amount;
+  // `loanAmount` is the canonical CDL field; the older names stay for the gold
+  // flow and for drafts saved before the CDL rename.
+  const amount =
+    params.approvedAmount ?? params.maxLoan ?? params.loanAmount ?? params.amount;
   const n = amount ? Number(amount) : NaN;
   if (!isNaN(n) && n > 0) {
     return `${base} · ₹${Math.round(n).toLocaleString('en-IN')}`;
