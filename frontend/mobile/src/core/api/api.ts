@@ -10,6 +10,7 @@ import { Platform } from 'react-native';
 import { secureStorage } from '../storage/storage';
 import { useAuthStore } from '@/src/store/authStore';
 import { API_BASE_URL, API_TIMEOUT, SECURE_STORE_KEYS, USE_MOCK } from '@/src/core/utils/constants';
+import { convertMoneyFieldsFromPaise } from './moneyConverter';
 
 // ─── Mock helper ────────────────────────────────────────────────────────────
 export function mockDelay<T>(data: T, ms = 1500): Promise<T> {
@@ -274,7 +275,7 @@ api.interceptors.request.use(
   (error: unknown) => Promise.reject(error)
 );
 
-// ─── Response interceptor: unwrap envelope, then 401 → refresh → retry ───────
+// ─── Response interceptor: unwrap envelope, convert money, then 401 → refresh → retry ───
 api.interceptors.response.use(
   (response) => {
     // The backend wraps every success payload in { success, message, data }.
@@ -289,6 +290,11 @@ api.interceptors.response.use(
     ) {
       response.data = (body as { data: unknown }).data;
     }
+    // The backend sends every money-shaped field in paise, deliberately
+    // (see moneyConverter.ts's own header comment) — this is the single
+    // choke point every real response passes through, so it's converted
+    // back to rupees here once, globally, rather than by each screen.
+    response.data = convertMoneyFieldsFromPaise(response.data);
     return response;
   },
   async (error: unknown) => {

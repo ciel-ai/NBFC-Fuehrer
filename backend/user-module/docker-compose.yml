@@ -3,7 +3,13 @@
 # Stop:   docker compose down
 # Wipe:   docker compose down -v   (deletes all data)
 #
-# Matches: DATABASE_URL="postgresql://postgres:postgres@localhost:5432/fuehrer_dev"
+# Matches: DATABASE_URL="postgresql://postgres:postgres@localhost:5433/fuehrer_dev"
+#
+# Mapped to 5433 on the host, not 5432 — this machine already has a separate,
+# native Postgres install bound to 5432 (unrelated to this project), which
+# would otherwise silently intercept connections meant for this container.
+# Same reasoning as backend/business-module's docker-compose.yml, which for
+# the same reason maps its own Postgres to host port 5434.
 services:
   db:
     image: postgres:16
@@ -14,7 +20,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: fuehrer_dev
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - fuehrer_pgdata:/var/lib/postgresql/data
     healthcheck:

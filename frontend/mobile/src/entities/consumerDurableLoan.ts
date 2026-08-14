@@ -51,8 +51,12 @@ export type CdlDecision = CdlDecisionOutcome;
 // Response types further down are deliberately NOT mirrors — see the note
 // above CdlKycResult.
 
-/** Backend enum casing. The UI displays lowercase; the wire is uppercase. */
-export type CdlEmploymentType = 'SALARIED' | 'SELF_EMPLOYED' | 'STUDENT';
+// Backend enum casing. The UI displays lowercase; the wire is uppercase.
+// STUDENT was previously included here but was never an officially
+// confirmed CDL value — see the matching removal in the backend's
+// employment_type enum (schema.prisma) and CDL_INTEREST_RATES
+// (cdlLoans.service.ts), whose own comment already flagged it as such.
+export type CdlEmploymentType = 'SALARIED' | 'SELF_EMPLOYED';
 
 export type CdlProductCategory =
   | 'TV_APPLIANCES'
@@ -97,8 +101,6 @@ export function toCdlEmploymentType(value: CdlCustomerType | string | undefined)
     case 'self_employed':
     case 'self-employed':
       return 'SELF_EMPLOYED';
-    case 'student':
-      return 'STUDENT';
     default:
       return 'SALARIED';
   }
@@ -121,8 +123,28 @@ export interface CdlQuoteResult {
   /** Authoritative — the same calculation used when the loan is booked. */
   emi: number;
   processingFee: number;
-  /** productValue - downPayment, capped at the product maximum. */
-  maxEligibleLoan: number;
+  processingFeeGst: number;
+  /**
+   * From the backend's actual amortization schedule (sum of per-EMI
+   * interest components) — never emi * tenureMonths. The app must not
+   * recompute this; see realConsumerDurableLoanService.getQuote.
+   */
+  totalInterest: number;
+  /**
+   * From the actual amortization schedule (sum of per-EMI amounts). Named
+   * totalAmount, not totalPayable — the backend's response-wide money
+   * converter detects money fields by word (amount/fee/emi/balance/income/
+   * interest/principal) in the key and converts rupees to paise; "payable"
+   * isn't a recognised word, so that name would leave this one field in a
+   * different unit than every sibling field in the same response.
+   */
+  totalAmount: number;
+  /**
+   * productValue - downPayment, capped at the product maximum. Named
+   * maxEligibleAmount, not maxEligibleLoan — same money-word reasoning as
+   * totalAmount above.
+   */
+  maxEligibleAmount: number;
 }
 
 export interface CdlApplicationInput {

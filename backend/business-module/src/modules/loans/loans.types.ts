@@ -79,6 +79,18 @@ export interface LoanApplication {
     productValue?: Rupees | null;
     downPayment?: Rupees | null;
     productCategory?: string | null;
+    /**
+     * CDL only — the employment type used to determine the permitted
+     * interest-rate set at submission, and the authoritative value for all
+     * downstream CDL processing from that point on (credit assessment,
+     * auto-approval). NOT the same field as `customer.employmentType` below
+     * — that is a general, mutable profile fact that can predate or outlive
+     * any single application; this is a per-application snapshot of what
+     * was true and used for underwriting when THIS application was filed.
+     * Null for gold/housing (which never set it) and for CDL applications
+     * submitted before this column existed.
+     */
+    employmentType?: 'SALARIED' | 'SELF_EMPLOYED' | null;
 
     // Approval details — populated by credit manager
     approvedAmount: Rupees | null;
@@ -193,6 +205,8 @@ export interface LoanApplicationResponse {
     productName: string | null;
     productValue: Rupees | null;
     downPayment: Rupees | null;
+    /** CDL only — see LoanApplication.employmentType's own comment. */
+    employmentType: 'SALARIED' | 'SELF_EMPLOYED' | null;
     storeName: string;
     storeCity: string;
     monthlyIncome: number | null;

@@ -57,21 +57,38 @@ function maskValue(key: string, value: any): any {
     return value;
 }
 
-function maskSensitiveData(obj: any): any {
+// `seen` tracks the current ancestor chain (not every object visited) so
+// cycles are caught without falsely flagging the same object appearing
+// twice in unrelated branches. This matters because logged errors are
+// frequently things like Axios errors, whose `.request`/`.config` hold
+// Node's internal socket/agent objects — those are genuinely circular
+// (socket -> request -> socket -> ...) and previously sent this function
+// into infinite recursion ("Maximum call stack size exceeded"), which
+// crashed the very call trying to log the original error.
+function maskSensitiveData(obj: any, seen: WeakSet<object> = new WeakSet()): any {
     if (!obj || typeof obj !== 'object') return obj;
-    if (Array.isArray(obj)) return obj.map(maskSensitiveData);
+    if (seen.has(obj)) return '[Circular]';
 
+    if (Array.isArray(obj)) {
+        seen.add(obj);
+        const masked = obj.map((item) => maskSensitiveData(item, seen));
+        seen.delete(obj);
+        return masked;
+    }
+
+    seen.add(obj);
     const masked: any = {};
     for (const [key, value] of Object.entries(obj)) {
         const lowerKey = key.toLowerCase();
         if (SENSITIVE_KEYS.some(k => lowerKey.includes(k.toLowerCase()))) {
             masked[key] = maskValue(key, value);
-        } else if (typeof value === 'object') {
-            masked[key] = maskSensitiveData(value);
+        } else if (value !== null && typeof value === 'object') {
+            masked[key] = maskSensitiveData(value, seen);
         } else {
             masked[key] = value;
         }
     }
+    seen.delete(obj);
     return masked;
 }
 

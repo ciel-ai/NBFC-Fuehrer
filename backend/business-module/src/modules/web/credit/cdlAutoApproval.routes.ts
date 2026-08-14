@@ -23,7 +23,6 @@ router.post('/auto-approve', requireAuth(), allowRoles(...CREDIT_ROLES), async (
             requestedAmount,
             tenureMonths,
             customerId,
-            employmentType,
             monthlyIncome,
             existingEmis,
             age,
@@ -36,12 +35,13 @@ router.post('/auto-approve', requireAuth(), allowRoles(...CREDIT_ROLES), async (
             isNewToCredit,
         } = req.body;
 
-        const result = cdlAutoApprovalService.evaluate({
-            loanApplicationId,
+        // employmentType is deliberately not read from the body here — see
+        // cdlAutoApprovalService.evaluateForApplication's own comment. It
+        // sources the authoritative value from the application itself.
+        const result = await cdlAutoApprovalService.evaluateForApplication(loanApplicationId, {
             requestedAmount,
             tenureMonths,
             customerId,
-            employmentType:    employmentType ?? 'SALARIED',
             monthlyIncome,
             existingEmis:      existingEmis ?? 0,
             age,
@@ -53,9 +53,6 @@ router.post('/auto-approve', requireAuth(), allowRoles(...CREDIT_ROLES), async (
             hasKycMismatch:    hasKycMismatch ?? false,
             isNewToCredit:     isNewToCredit ?? false,
         });
-
-        // Save result to DB
-        await cdlAutoApprovalService.saveResult(loanApplicationId, result);
 
         res.status(HTTP.OK).json({ success: true, data: result });
     } catch (err) { next(err); }

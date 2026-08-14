@@ -32,7 +32,18 @@ export type SalesFieldType =
   | 'photo'
   | 'document'
   /** Read-only row computed from earlier answers (e.g. processing fee, EMI). */
-  | 'derived';
+  | 'derived'
+  /**
+   * CDL-only: fetches the authoritative EMI/processing-fee/FOIR quote from
+   * the backend (GET /sales/cdl/quote — the same calculation the customer
+   * app's own quote and the booked loan use) as loanAmount/tenureMonths/
+   * interestRate/employmentType change, debounced. Unlike 'derived', this
+   * is NOT a pure synchronous function of earlier answers — it holds a real
+   * form value (the resolved quote), written via onChange once the fetch
+   * resolves, so the review step and submit payload see actual numbers
+   * rather than recomputing them. See SalesField.tsx's CdlQuoteField.
+   */
+  | 'cdl-quote';
 
 export interface SalesFieldOption {
   label: string;
