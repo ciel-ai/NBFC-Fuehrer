@@ -36,33 +36,42 @@ export async function runDebitRetryJob(): Promise<void> {
     try {
         const now = new Date();
 
-        // Find bounced EMIs that are eligible for retry
-        const bouncedEmis = await prisma.emi_schedule.findMany({
-            where: {
-                status: EMI_STATUS.BOUNCED,
-                next_retry_at: { lte: now },
-                bounce_count: { lt: BUSINESS_RULES.ENACH_RETRY_LIMIT },
-            },
-            include: {
-                loan_account: {
-                    select: {
-                        id: true,
-                        user_id: true,
-                        razorpay_mandate_id: true,
-                        status: true,
-                        enach_mandates: {
-                            where: { status: 'ACTIVE' },
-                            select: { id: true, razorpay_mandate_id: true },
+        const BATCH_SIZE = 100;
+        let cursor: string | undefined;
+
+        while (true) {
+            const batch = await prisma.emi_schedule.findMany({
+                where: {
+                    status: EMI_STATUS.BOUNCED,
+                    next_retry_at: { lte: now },
+                    bounce_count: { lt: BUSINESS_RULES.ENACH_RETRY_LIMIT },
+                },
+                include: {
+                    loan_account: {
+                        select: {
+                            id: true,
+                            user_id: true,
+                            razorpay_mandate_id: true,
+                            status: true,
+                            enach_mandates: {
+                                where: { status: 'ACTIVE' },
+                                select: { id: true, razorpay_mandate_id: true },
+                            },
                         },
                     },
                 },
-            },
-            take: 200,  // Process max 200 retries per run
-        });
+                orderBy: { id: 'asc' },
+                take: BATCH_SIZE,
+                ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+            });
 
-        log.info(`Debit retry: ${bouncedEmis.length} EMIs eligible for retry`);
+            if (batch.length === 0) break;
 
-        for (const emi of bouncedEmis) {
+            cursor = batch[batch.length - 1]!.id;
+
+            log.info(`Debit retry: processing batch of ${batch.length} EMIs`);
+
+            for (const emi of batch) {
             const account = emi.loan_account;
 
             // Skip if loan is no longer active
@@ -127,6 +136,8 @@ export async function runDebitRetryJob(): Promise<void> {
             }
 
             await sleep(150);
+        }
+        
         }
 
         log.info('Debit retry job completed', {

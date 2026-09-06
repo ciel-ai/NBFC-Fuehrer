@@ -4,11 +4,44 @@ import type { Response, NextFunction } from 'express';
 import { requireAuth, allowRoles } from '@/middlewares';
 import { ROLE, HTTP } from '@/config/constants';
 import type { AuthRequest } from '@/types/express';
-import { permissionsService } from '@/modules/admin/permissions.service';
+import type { Role } from '@/config/constants';
+import { permissionsService, getRolePermissions } from '@/modules/admin/permissions.service';
 
 const router = Router();
 
 const ADMIN_ONLY = [ROLE.SUPER_ADMIN, ROLE.ADMIN];
+
+const ALL_MODULES     = ['dashboard','applications','customers','appraisals','credit','finance','lms','collections','reports','agents','branches','users','approvals','permissions','audit','settings'];
+const CREDIT_MODULES  = ['dashboard','applications','customers','appraisals','credit','approvals','reports'];
+const FINANCE_MODULES = ['dashboard','applications','customers','finance','lms','reports'];
+
+function defaultPermissions(role: Role): Record<string, string[]> {
+    if (role === ROLE.SUPER_ADMIN || role === ROLE.ADMIN) {
+        return Object.fromEntries(ALL_MODULES.map((m) => [m, ['READ', 'WRITE']]));
+    }
+    if (role.startsWith('CREDIT_')) {
+        return Object.fromEntries(CREDIT_MODULES.map((m) => [m, ['READ', 'WRITE']]));
+    }
+    if (role.startsWith('FINANCE_')) {
+        return Object.fromEntries(FINANCE_MODULES.map((m) => [m, ['READ', 'WRITE']]));
+    }
+    return {};
+}
+
+// GET /permissions/me — caller's own effective grants (not admin-gated)
+router.get('/me', requireAuth(), async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const role = req.user!.role as Role;
+        let permissions: Record<string, string[]>;
+        if (role === ROLE.SUPER_ADMIN || role === ROLE.ADMIN) {
+            permissions = defaultPermissions(role);
+        } else {
+            const dbPerms = await getRolePermissions(role);
+            permissions = Object.keys(dbPerms).length > 0 ? dbPerms : defaultPermissions(role);
+        }
+        res.status(HTTP.OK).json({ success: true, data: { role, permissions } });
+    } catch (err) { next(err); }
+});
 
 // GET /permissions/roles — list all roles with their permissions
 router.get('/roles', requireAuth(), allowRoles(...ADMIN_ONLY), async (req: AuthRequest, res: Response, next: NextFunction) => {
