@@ -185,6 +185,14 @@ export async function requestOtp(
     await redis.del(RedisKeys.staffOtpAttempts(phone));
 
     // TODO(prod): dispatch via the SMS provider. In non-prod we log + return it.
+    //
+    // Gate verified structurally sound: env.isProd is set once at process
+    // startup from `value.NODE_ENV === 'production'` (config/env.ts), where
+    // NODE_ENV itself is Joi-validated against a fixed enum. There is no
+    // runtime toggle, feature flag, or request-derived input that can flip
+    // isProd to false while actually running in production — the OTP-in-response
+    // (devOtp) and OTP-in-log branch below is therefore structurally
+    // unreachable in a production deployment, not just documented as dev-only.
     logger.info({ message: 'Staff OTP issued', phone, portal });
     if (!env.isProd) {
         logger.info(`\n🔑 STAFF OTP for ${phone}: ${otp}\n`);
