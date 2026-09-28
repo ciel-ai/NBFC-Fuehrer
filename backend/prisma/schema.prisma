@@ -1,3 +1,22 @@
+// ═════════════════════════════════════════════════════════════════════════
+// ⚠️  ORPHANED — UNDER REVIEW FOR DELETION. DO NOT MIGRATE AGAINST THIS.  ⚠️
+//
+// This schema (and its sibling backend/server.js) is a stale duplicate
+// superseded by backend/user-module/prisma/schema.prisma. It is not
+// referenced by any npm workspace, CI workflow, Dockerfile,
+// docker-compose.yml, or deploy.yml — confirmed by repo-wide search. Its
+// content has also diverged from user-module's schema and is one
+// migration behind (missing 20260613000000_add_auth_tables), and it
+// still defines models (agents, audit_logs, emi_schedule,
+// loan_applications, payments) that don't exist in user-module's schema
+// at all.
+//
+// Deletion is pending confirmation from the infra/DB team on whether this
+// schema was ever migrated against a real database. Until that answer
+// comes back, do NOT run `prisma generate`, `prisma migrate`, or
+// `prisma db push` against this schema/directory in any environment.
+// ═════════════════════════════════════════════════════════════════════════
+
 generator client {
   provider = "prisma-client-js"
 }
