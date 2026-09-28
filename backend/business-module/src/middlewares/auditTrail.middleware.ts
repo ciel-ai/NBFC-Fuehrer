@@ -25,16 +25,16 @@ function shouldAlwaysAudit(path: string): boolean {
 }
 
 // ─── Routes that must NEVER be audited yet ─────────────────────────────────────
-// These are mock/stub endpoints (agent-assisted sales flow) with no real
-// business logic behind them — frontend runs USE_MOCK=true and doesn't call
-// them yet. Writing audit_logs rows for fake disbursals/applications would
-// corrupt the compliance record. Remove this exclusion once sales.service.ts /
-// cdlLoans.service.ts are wired to real loansService/disbursementService logic.
+// Previously excluded /sales/ and /consumer-durable-loans/ here as mock/stub
+// endpoints with no real business logic behind them. Both are now wired to
+// real DB-writing logic: cdlLoans.service.ts creates real loan_applications /
+// loan_accounts / disbursements rows (see disburseToMerchant), and
+// sales.service.ts reads/writes the real tables directly and delegates
+// submission to cdlLoansService.submitApplication. There is nothing left to
+// exclude — leaving this list empty (rather than removing the mechanism)
+// so a future genuinely-mock route can be added back deliberately.
 
-const MOCK_ROUTE_PATTERNS: RegExp[] = [
-    /^\/sales\//,
-    /^\/consumer-durable-loans\//,
-];
+const MOCK_ROUTE_PATTERNS: RegExp[] = [];
 
 function isMockRoute(path: string): boolean {
     return MOCK_ROUTE_PATTERNS.some((p) => p.test(path));
