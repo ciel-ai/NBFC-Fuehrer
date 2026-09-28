@@ -3,7 +3,9 @@ import { Router } from 'express';
 import { housingLoansController } from './housingLoans.controller';
 import { requireAuth, allowRoles } from '@/middlewares';
 import { ROLE } from '@/config/constants';
-import { stubGuard } from '@/middlewares/stubGuard.middleware';
+// stubGuard() no longer used anywhere in this file — every housing-loan
+// route is now confirmed wired to real logic (see the per-route comments
+// below).
 
 const router = Router();
 const CUSTOMER = ROLE.CUSTOMER;
@@ -24,13 +26,10 @@ router.get('/applications/:id/decision', requireAuth(), allowRoles(CUSTOMER, CRE
 // docStorage + eSign provider create-sign-request, real loan_applications
 // update) — same pattern as CDL's equivalent route.
 router.post('/applications/:id/agreement', requireAuth(), allowRoles(CUSTOMER), housingLoansController.generateAgreement);
-// stubGuard() KEPT on /esign: eSign() hardcodes stateCode: 'KA' unconditionally
-// when calling esign.applyEStamp() (see the "Placeholder — pending real
-// state-code mapping" comment in housingLoans.service.ts), so every non-
-// Karnataka customer would be charged/stamped under the wrong state's duty
-// rate. This is a real financial-correctness gap, not just cosmetic — flagged
-// in the go-live report instead of unwired.
-router.post('/applications/:id/esign', requireAuth(), allowRoles(CUSTOMER), stubGuard(), housingLoansController.eSign);
+// stubGuard() removed: eSign() now resolves the applicant's real state
+// (customers.state via resolveStateCode()) instead of hardcoding 'KA' — see
+// stateCode.util.ts and the fix commit that closed this correctness gap.
+router.post('/applications/:id/esign', requireAuth(), allowRoles(CUSTOMER), housingLoansController.eSign);
 // stubGuard() removed below: registerNach (real paymentsService/Razorpay
 // mandate), applyPmaySubsidy (real loan-amount-driven calculation, no
 // external provider), disburseToBuilder (real disbursementService), and the

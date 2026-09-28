@@ -3,7 +3,8 @@ import { Router } from 'express';
 import { goldLoansController } from './goldLoans.controller';
 import { requireAuth, allowRoles } from '@/middlewares';
 import { ROLE } from '@/config/constants';
-import { stubGuard } from '@/middlewares/stubGuard.middleware';
+// stubGuard() no longer used anywhere in this file — every gold-loan route
+// is now confirmed wired to real logic (see the per-route comments below).
 
 const router = Router();
 
@@ -71,19 +72,14 @@ router.post(
 );
 
 // POST /gold-loans/applications/:id/esign
-// stubGuard() KEPT: completeESign() derives stateCode via
-// customer.state.slice(0,2).toUpperCase() with an explicit "Placeholder
-// mapping — pending a real state-name-to-code table" comment in the
-// service. That crude derivation can produce a wrong 2-letter code for
-// many real Indian state names (e.g. state names that don't start with
-// their code), which feeds directly into the eStamp provider's stamp-duty
-// calculation — a real financial-correctness gap, not cosmetic. Flagged
-// in the go-live report instead of unwired.
+// stubGuard() removed: completeESign() now resolves the applicant's real
+// state (customers.state via resolveStateCode()) instead of the old
+// slice(0,2) mis-derivation — see stateCode.util.ts and the fix commit
+// that closed this correctness gap.
 router.post(
     '/applications/:id/esign',
     requireAuth(),
     allowRoles(ROLE.CUSTOMER),
-    stubGuard(),
     goldLoansController.completeESign,
 );
 
