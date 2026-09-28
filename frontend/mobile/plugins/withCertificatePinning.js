@@ -163,6 +163,25 @@ function withIosTrustKit(config) {
  */
 module.exports = function withCertificatePinning(config) {
   if (!PINNING_CONFIGURED) {
+    // Build-breaking guard: EAS sets EAS_BUILD_PROFILE (and this repo's
+    // eas.json only defines "development" / "preview" / "production")
+    // during every cloud build, so a preview or production build running
+    // with placeholder hashes still in place must fail the build outright
+    // rather than silently ship with no OS-level pinning. Development
+    // builds keep the soft warn+skip fallback below.
+    const profile = process.env.EAS_BUILD_PROFILE;
+    if (profile === 'preview' || profile === 'production') {
+      throw new Error(
+        `[withCertificatePinning] FATAL: EAS_BUILD_PROFILE="${profile}" but ` +
+          'PINNED_DOMAIN / PRIMARY_HASH / BACKUP_HASH in ' +
+          'plugins/withCertificatePinning.js are still REPLACE_* placeholders. ' +
+          'Shipping this build would mean NO OS-level certificate pinning ' +
+          '(Android network_security_config / iOS TrustKit) in a release build. ' +
+          'Paste the real SHA-256 SPKI hashes (see the file header for the ' +
+          'openssl command) here AND in src/core/api/api.ts before rebuilding.',
+      );
+    }
+
     // eslint-disable-next-line no-console
     console.warn(
       '[withCertificatePinning] SKIPPED: PINNED_DOMAIN / PRIMARY_HASH / ' +

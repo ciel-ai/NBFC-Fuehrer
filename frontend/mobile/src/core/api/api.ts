@@ -198,6 +198,39 @@ if (
   );
 }
 
+// ─── Build-breaking guard: a release build must never ship with placeholders ─
+//
+// The soft fallback above (log + disable pinning) is correct for local/dev
+// work — it keeps the app usable when nobody has pasted the real hashes yet.
+// But it means a release build could silently ship with NO certificate
+// pinning at all if someone forgot to fill in the hashes, since the app would
+// simply start and work. That must be structurally impossible for a build
+// that is actually going to a store/user.
+//
+// __DEV__ is false only in a real release JS bundle (Metro/Expo strip it in
+// production bundling), so this cannot fire in a dev client or Expo Go, but
+// WILL fire immediately at app startup — before any screen renders — for any
+// release/production bundle built with placeholder pin values still in place.
+// This is intentionally a hard crash, not a warning: an app that boots fine
+// while silently unpinned is exactly the failure mode we must prevent from
+// reaching production.
+if (
+  !__DEV__ &&
+  Platform.OS !== 'web' &&
+  API_BASE_URL.startsWith('https://') &&
+  !PINNING_READY
+) {
+  throw new Error(
+    '[api] FATAL: this is a release build (__DEV__ === false) targeting an ' +
+      'HTTPS API, but PINNED_HOSTNAME / SSL_PINNED_HASHES in ' +
+      'src/core/api/api.ts are still REPLACE_* placeholders. Shipping this ' +
+      'build would mean NO certificate pinning in production. Paste the real ' +
+      'SHA-256 SPKI hashes (see the comment above SSL_PINNED_HASHES for the ' +
+      'openssl command to extract them from the live server) in BOTH ' +
+      'src/core/api/api.ts and plugins/withCertificatePinning.js, then rebuild.',
+  );
+}
+
 const api: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
   timeout: API_TIMEOUT,
