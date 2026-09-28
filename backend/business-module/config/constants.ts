@@ -139,7 +139,7 @@ export const ROLE = {
     SALES_GOLD: 'SALES_GOLD',
     SALES_HOUSING: 'SALES_HOUSING',
     
-    // Legacy (deprecated, will remove later)
+    // Core staff roles — used across web/** and staff-role mappings; do not remove
     SUPER_ADMIN: 'SUPER_ADMIN',
     CREDIT_MANAGER: 'CREDIT_MANAGER',
     FINANCE: 'FINANCE',
