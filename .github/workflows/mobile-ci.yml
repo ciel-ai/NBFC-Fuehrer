@@ -1,0 +1,46 @@
+name: Mobile CI
+
+# No mobile workflow existed before this — ci.yml / deploy.yml are backend
+# (business-module) only. This starts minimal: just the certificate-pinning
+# placeholder guard (scripts/check-cert-pinning.js), wired in as a third,
+# earliest-possible layer alongside the two build-breaking guards already in
+# the app itself (src/core/api/api.ts runtime throw and
+# plugins/withCertificatePinning.js EAS-profile throw). CI catches a
+# still-placeholder pin config before a build is even attempted, rather than
+# only at build time.
+
+on:
+  push:
+    branches:
+      - master
+      - 'feature/**'
+      - 'fix/**'
+      - 'release/**'
+    paths:
+      - 'frontend/mobile/**'
+
+  pull_request:
+    branches:
+      - master
+    paths:
+      - 'frontend/mobile/**'
+
+concurrency:
+  group: mobile-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cert-pinning-check:
+    name: Certificate pinning placeholder check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: frontend/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Fail if certificate-pinning values are still REPLACE_* placeholders
+        run: node scripts/check-cert-pinning.js
