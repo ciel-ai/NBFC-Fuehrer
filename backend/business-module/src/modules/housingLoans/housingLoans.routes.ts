@@ -20,16 +20,30 @@ router.post('/applications/:id/credit-assessment', requireAuth(), allowRoles(CUS
 router.post('/applications/:id/property-assessment', requireAuth(), allowRoles(CUSTOMER, CREDIT), housingLoansController.runPropertyAssessment);
 router.post('/applications/:id/submit-review', requireAuth(), allowRoles(CUSTOMER), housingLoansController.submitForReview);
 router.get('/applications/:id/decision', requireAuth(), allowRoles(CUSTOMER, CREDIT), housingLoansController.getCommitteeDecision);
-router.post('/applications/:id/agreement', requireAuth(), allowRoles(CUSTOMER), stubGuard(), housingLoansController.generateAgreement);
+// stubGuard() removed: generateAgreement is real, wired code (pdfService +
+// docStorage + eSign provider create-sign-request, real loan_applications
+// update) — same pattern as CDL's equivalent route.
+router.post('/applications/:id/agreement', requireAuth(), allowRoles(CUSTOMER), housingLoansController.generateAgreement);
+// stubGuard() KEPT on /esign: eSign() hardcodes stateCode: 'KA' unconditionally
+// when calling esign.applyEStamp() (see the "Placeholder — pending real
+// state-code mapping" comment in housingLoans.service.ts), so every non-
+// Karnataka customer would be charged/stamped under the wrong state's duty
+// rate. This is a real financial-correctness gap, not just cosmetic — flagged
+// in the go-live report instead of unwired.
 router.post('/applications/:id/esign', requireAuth(), allowRoles(CUSTOMER), stubGuard(), housingLoansController.eSign);
-router.post('/applications/:id/nach', requireAuth(), allowRoles(CUSTOMER), stubGuard(), housingLoansController.registerNach);
-router.post('/applications/:id/pmay-subsidy', requireAuth(), allowRoles(CUSTOMER), stubGuard(), housingLoansController.applyPmaySubsidy);
-router.post('/applications/:id/disburse', requireAuth(), allowRoles(FINANCE, ADMIN), stubGuard(), housingLoansController.disburseToBuilder);
-router.get('/loans/:id/emi-schedule', requireAuth(), allowRoles(CUSTOMER), stubGuard(), housingLoansController.getEmiSchedule);
-router.get('/loans/:id/prepayment-quote', requireAuth(), allowRoles(CUSTOMER), stubGuard(), housingLoansController.getPrepaymentQuote);
-router.post('/loans/:id/prepayment', requireAuth(), allowRoles(CUSTOMER), stubGuard(), housingLoansController.processPrepayment);
-router.get('/loans/:id/overdue', requireAuth(), allowRoles(CUSTOMER, FINANCE), stubGuard(), housingLoansController.getOverdueStatus);
-router.post('/loans/:id/close', requireAuth(), allowRoles(CUSTOMER, FINANCE), stubGuard(), housingLoansController.closeLoan);
+// stubGuard() removed below: registerNach (real paymentsService/Razorpay
+// mandate), applyPmaySubsidy (real loan-amount-driven calculation, no
+// external provider), disburseToBuilder (real disbursementService), and the
+// EMI-account routes (real emiService/loansRepository/prisma reads+writes) —
+// all confirmed wired to real logic, same as CDL's equivalent routes.
+router.post('/applications/:id/nach', requireAuth(), allowRoles(CUSTOMER), housingLoansController.registerNach);
+router.post('/applications/:id/pmay-subsidy', requireAuth(), allowRoles(CUSTOMER), housingLoansController.applyPmaySubsidy);
+router.post('/applications/:id/disburse', requireAuth(), allowRoles(FINANCE, ADMIN), housingLoansController.disburseToBuilder);
+router.get('/loans/:id/emi-schedule', requireAuth(), allowRoles(CUSTOMER), housingLoansController.getEmiSchedule);
+router.get('/loans/:id/prepayment-quote', requireAuth(), allowRoles(CUSTOMER), housingLoansController.getPrepaymentQuote);
+router.post('/loans/:id/prepayment', requireAuth(), allowRoles(CUSTOMER), housingLoansController.processPrepayment);
+router.get('/loans/:id/overdue', requireAuth(), allowRoles(CUSTOMER, FINANCE), housingLoansController.getOverdueStatus);
+router.post('/loans/:id/close', requireAuth(), allowRoles(CUSTOMER, FINANCE), housingLoansController.closeLoan);
 // generateNoc is real, wired code (real pdfService + docStorage calls,
 // confirmed while building CDL's equivalent off this function) — stubGuard()
 // was blocking it unconditionally, same as CDL's disburseToMerchant
