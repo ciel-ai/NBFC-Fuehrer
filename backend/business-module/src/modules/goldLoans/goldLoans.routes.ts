@@ -50,24 +50,35 @@ router.get(
 );
 
 // POST /gold-loans/applications/:id/accept-final-amount
+// stubGuard() removed: real state-transition + prisma update, no external
+// provider involved.
 router.post(
     '/applications/:id/accept-final-amount',
     requireAuth(),
     allowRoles(ROLE.CUSTOMER),
-    stubGuard(),
     goldLoansController.acceptFinalAmount,
 );
 
 // POST /gold-loans/applications/:id/agreement
+// stubGuard() removed: real pdfService + docStorage + eSign-provider
+// create-sign-request, real loan_applications update — same pattern as
+// CDL's equivalent route.
 router.post(
     '/applications/:id/agreement',
     requireAuth(),
     allowRoles(ROLE.CUSTOMER),
-    stubGuard(),
     goldLoansController.generateAgreement,
 );
 
 // POST /gold-loans/applications/:id/esign
+// stubGuard() KEPT: completeESign() derives stateCode via
+// customer.state.slice(0,2).toUpperCase() with an explicit "Placeholder
+// mapping — pending a real state-name-to-code table" comment in the
+// service. That crude derivation can produce a wrong 2-letter code for
+// many real Indian state names (e.g. state names that don't start with
+// their code), which feeds directly into the eStamp provider's stamp-duty
+// calculation — a real financial-correctness gap, not cosmetic. Flagged
+// in the go-live report instead of unwired.
 router.post(
     '/applications/:id/esign',
     requireAuth(),
@@ -77,29 +88,30 @@ router.post(
 );
 
 // POST /gold-loans/applications/:id/nach
+// stubGuard() removed: real paymentsService/Razorpay mandate creation.
 router.post(
     '/applications/:id/nach',
     requireAuth(),
     allowRoles(ROLE.CUSTOMER),
-    stubGuard(),
     goldLoansController.initiateNach,
 );
 
 // GET /gold-loans/applications/:id/disbursal
+// stubGuard() removed: real read of disbursementService.getDisbursementByLoan.
 router.get(
     '/applications/:id/disbursal',
     requireAuth(),
     allowRoles(ROLE.CUSTOMER, ROLE.FINANCE, ROLE.SUPER_ADMIN),
-    stubGuard(),
     goldLoansController.getDisbursalStatus,
 );
 
 // POST /gold-loans/applications/:id/compliance
+// stubGuard() removed: real KYC-derived AML/compliance read. PEP screening
+// is honestly reported as NOT_TRACKED rather than fabricated as passed.
 router.post(
     '/applications/:id/compliance',
     requireAuth(),
     allowRoles(ROLE.CUSTOMER),
-    stubGuard(),
     goldLoansController.runCompliance,
 );
 
@@ -124,20 +136,24 @@ router.post(
 // ─── Monitoring routes ────────────────────────────────────────────────────────
 
 // GET /gold-loans/:id/monitoring
+// stubGuard() removed: real prisma/emiService/collateral_gold reads. Gold
+// value shown reflects origination valuation (live market-rate tracking is
+// honestly disclosed as unavailable in the response note, not faked).
 router.get(
     '/:id/monitoring',
     requireAuth(),
     allowRoles(ROLE.CUSTOMER, ROLE.CREDIT_MANAGER, ROLE.SUPER_ADMIN),
-    stubGuard(),
     goldLoansController.getMonitoring,
 );
 
 // GET /gold-loans/:id/closure-quote
+// stubGuard() removed: real emiService.getForeclosureQuote + collateral_gold
+// read (already "wired to real pipeline" per an earlier commit; this route's
+// stubGuard() had simply never been removed to match).
 router.get(
     '/:id/closure-quote',
     requireAuth(),
     allowRoles(ROLE.CUSTOMER),
-    stubGuard(),
     goldLoansController.getClosureQuote,
 );
 
