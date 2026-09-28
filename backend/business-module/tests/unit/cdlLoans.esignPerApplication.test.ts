@@ -365,3 +365,49 @@ describe('CDL disburseToMerchant — transactionality (audit finding #4)', () =>
         expect(mockTxLoanAccountsUpdate).not.toHaveBeenCalled();
     });
 });
+
+// ─── eStamp state-code fix ──────────────────────────────────────────────────
+//
+// Regression test for the "hardcoded/mis-derived stateCode" go-live blocker,
+// same bug class as gold/housing loans (see
+// goldHousingLoans.esignPerApplication.test.ts): completeESign() previously
+// derived stateCode via customer.state.slice(0, 2).toUpperCase() (wrong for
+// almost every state whose name doesn't start with its own code, e.g.
+// "Tamil Nadu" -> "Ta" instead of "TN"). It now resolves the real applicant
+// state (customers.state) through stateCode.util.ts's resolveStateCode(),
+// same as gold/housing. These tests assert applyEStamp() is actually called
+// with different, correct codes for different real applicant states.
+describe('CDL completeESign — eStamp stateCode is derived from the real applicant state, not sliced', () => {
+    beforeEach(() => jest.clearAllMocks());
+
+    function signedEsignSetup(applicationId: string) {
+        mockLoanApplicationsFindUniqueOrThrow.mockResolvedValue(
+            approvedApplication({ id: applicationId, userId: USER_ID, esign_request_id: `req-${applicationId}` }),
+        );
+        mockGetSignStatus.mockResolvedValue({ status: 'SIGNED' });
+        mockApplyEStamp.mockResolvedValue({ stampId: `stamp-${applicationId}`, status: 'APPLIED', stampDutyRupees: 25 });
+        mockGetSignedDocument.mockResolvedValue({ documentBase64: Buffer.from('signed').toString('base64') });
+    }
+
+    test('"Tamil Nadu" resolves to "TN", not the "Ta" that slice(0,2) would produce', async () => {
+        signedEsignSetup(APP_1);
+        mockCustomersFindUnique.mockResolvedValue({ state: 'Tamil Nadu' });
+
+        await cdlLoansService.completeESign(APP_1, STAFF_CALLER_ID, STAFF_ROLE);
+
+        expect(mockApplyEStamp).toHaveBeenCalledWith(
+            expect.objectContaining({ stateCode: 'TN' }),
+        );
+    });
+
+    test('"Maharashtra" resolves to "MH", proving the code varies with the applicant\'s actual state', async () => {
+        signedEsignSetup(APP_1);
+        mockCustomersFindUnique.mockResolvedValue({ state: 'Maharashtra' });
+
+        await cdlLoansService.completeESign(APP_1, STAFF_CALLER_ID, STAFF_ROLE);
+
+        expect(mockApplyEStamp).toHaveBeenCalledWith(
+            expect.objectContaining({ stateCode: 'MH' }),
+        );
+    });
+});

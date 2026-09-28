@@ -15,6 +15,7 @@ import { getESignProvider } from '@/providers/esign';
 import { assertTransition } from '@/utils/loanStateMachine.util';
 import { assertApplicationOwnership, assertAccountOwnership } from '@/utils/ownership.util';
 import { generateLoanAccountNumber } from '@/utils/referenceNumber.util';
+import { resolveStateCode } from '@/utils/stateCode.util';
 import { LOAN_STATUS, EMI_STATUS, PRODUCT_TYPE, BUSINESS_RULES } from '@/config/constants';
 import type { Role } from '@/config/constants';
 import type {
@@ -610,7 +611,11 @@ export const cdlLoansService = {
         const stampResult = await esign.applyEStamp({
             requestId: application.esign_request_id,
             loanAmountRupees: Number(application.approved_amount ?? application.amount_requested),
-            stateCode: customer?.state?.slice(0, 2).toUpperCase() ?? 'KA', // Placeholder mapping — pending a real state-name-to-code table, same as gold loan
+            // Real applicant state, mapped via the state-name-to-code table
+            // (see stateCode.util.ts) — was customer.state.slice(0,2), which
+            // produced the wrong code for most state names. Same fix as
+            // gold/housing loans' eSign paths.
+            stateCode: resolveStateCode(customer?.state),
         });
 
         const signedDoc = await esign.getSignedDocument(application.esign_request_id);
