@@ -14,6 +14,7 @@ import { getEncryptionProvider } from '@/providers/encryption';
 import { getESignProvider } from '@/providers/esign';
 import { paymentsService } from '@/modules/payments';
 import { disbursementService } from '@/modules/disbursement';
+import { resolveStateCode } from '@/utils/stateCode.util';
 import type {
     HousingApplicationInput,
     HousingApplicationResult,
@@ -426,10 +427,17 @@ export const housingLoansService = {
             };
         }
 
+        const customer = await prisma.customers.findUnique({
+            where: { user_id: application.user_id },
+            select: { state: true },
+        });
+
         const stampResult = await esign.applyEStamp({
             requestId: application.esign_request_id,
             loanAmountRupees: Number(application.approved_amount ?? application.amount_requested),
-            stateCode: 'KA', // Placeholder — pending real state-code mapping
+            // Real applicant state, mapped via the state-name-to-code table
+            // (see stateCode.util.ts) — was hardcoded 'KA' for every applicant.
+            stateCode: resolveStateCode(customer?.state),
         });
 
         const signedDoc = await esign.getSignedDocument(application.esign_request_id);

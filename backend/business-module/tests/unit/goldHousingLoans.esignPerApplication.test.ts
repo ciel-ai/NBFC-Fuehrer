@@ -197,3 +197,77 @@ describe('housingLoansService.generateAgreement/eSign — writes to loan_applica
         });
     });
 });
+
+// ─── eStamp state-code fix ──────────────────────────────────────────────────
+//
+// Regression test for the "hardcoded/mis-derived stateCode" go-live blocker:
+// goldLoans.service.ts previously derived stateCode via
+// customer.state.slice(0, 2).toUpperCase() (wrong for almost every state
+// whose name doesn't start with its own code), and housingLoans.service.ts
+// hardcoded stateCode: 'KA' unconditionally for every applicant. Both now
+// resolve the real applicant state (customers.state) through
+// stateCode.util.ts's resolveStateCode(). These tests assert applyEStamp()
+// is actually called with different, correct codes for different real
+// applicant states — proving it's no longer hardcoded/mis-derived.
+describe('eStamp stateCode is derived from the real applicant state, not hardcoded/mis-derived', () => {
+    beforeEach(() => jest.clearAllMocks());
+
+    function signedEsignSetup(applicationId: string) {
+        mockLoanApplicationsFindUniqueOrThrow.mockResolvedValue(
+            baseApplication(applicationId, { esign_request_id: `req-${applicationId}` }),
+        );
+        mockGetSignStatus.mockResolvedValue({ status: 'SIGNED' });
+        mockApplyEStamp.mockResolvedValue({ stampId: `stamp-${applicationId}`, status: 'APPLIED', stampDutyRupees: 100 });
+        mockGetSignedDocument.mockResolvedValue({ documentBase64: Buffer.from('signed').toString('base64') });
+    }
+
+    test('gold completeESign: "Tamil Nadu" resolves to "TN", not the "Ta" that slice(0,2) would produce', async () => {
+        signedEsignSetup(GOLD_APP);
+        mockCustomersFindUnique.mockResolvedValue({ state: 'Tamil Nadu' });
+
+        await goldLoansService.completeESign(GOLD_APP, '000000');
+
+        expect(mockApplyEStamp).toHaveBeenCalledWith(
+            expect.objectContaining({ stateCode: 'TN' }),
+        );
+    });
+
+    test('gold completeESign: "Maharashtra" resolves to "MH", proving the code varies with the applicant\'s actual state', async () => {
+        signedEsignSetup(GOLD_APP);
+        mockCustomersFindUnique.mockResolvedValue({ state: 'Maharashtra' });
+
+        await goldLoansService.completeESign(GOLD_APP, '000000');
+
+        expect(mockApplyEStamp).toHaveBeenCalledWith(
+            expect.objectContaining({ stateCode: 'MH' }),
+        );
+    });
+
+    test('housing eSign: "Tamil Nadu" resolves to "TN", not the hardcoded "KA" every applicant previously got', async () => {
+        signedEsignSetup(HOUSING_APP);
+        mockCustomersFindUnique.mockResolvedValue({ state: 'Tamil Nadu' });
+
+        await housingLoansService.eSign(HOUSING_APP);
+
+        expect(mockApplyEStamp).toHaveBeenCalledWith(
+            expect.objectContaining({ stateCode: 'TN' }),
+        );
+    });
+
+    test('housing eSign: "Karnataka" resolves to "KA", and a different applicant\'s "Maharashtra" resolves to "MH" — the code is no longer a fixed constant', async () => {
+        signedEsignSetup(HOUSING_APP);
+        mockCustomersFindUnique.mockResolvedValue({ state: 'Karnataka' });
+        await housingLoansService.eSign(HOUSING_APP);
+        expect(mockApplyEStamp).toHaveBeenLastCalledWith(
+            expect.objectContaining({ stateCode: 'KA' }),
+        );
+
+        jest.clearAllMocks();
+        signedEsignSetup(HOUSING_APP);
+        mockCustomersFindUnique.mockResolvedValue({ state: 'Maharashtra' });
+        await housingLoansService.eSign(HOUSING_APP);
+        expect(mockApplyEStamp).toHaveBeenLastCalledWith(
+            expect.objectContaining({ stateCode: 'MH' }),
+        );
+    });
+});

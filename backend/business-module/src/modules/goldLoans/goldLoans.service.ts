@@ -14,6 +14,7 @@ import { getEncryptionProvider } from '@/providers/encryption';
 import { getESignProvider } from '@/providers/esign';
 import { paymentsService } from '@/modules/payments';
 import { assertOwnsResource, assertAccountOwnership } from '@/utils/ownership.util';
+import { resolveStateCode } from '@/utils/stateCode.util';
 import type { Role } from '@/config/constants';
 import type {
     GoldRate,
@@ -544,7 +545,10 @@ const finalLoan  = Math.round(valuation * (maxLtvPercent / 100));
         const stampResult = await esign.applyEStamp({
             requestId: application.esign_request_id,
             loanAmountRupees: Number(application.approved_amount ?? application.amount_requested),
-            stateCode: customer?.state?.slice(0, 2).toUpperCase() ?? 'KA', // Placeholder mapping — pending a real state-name-to-code table
+            // Real applicant state, mapped via the state-name-to-code table
+            // (see stateCode.util.ts) — was customer.state.slice(0,2), which
+            // produced the wrong code for most state names.
+            stateCode: resolveStateCode(customer?.state),
         });
 
         const signedDoc = await esign.getSignedDocument(application.esign_request_id);
